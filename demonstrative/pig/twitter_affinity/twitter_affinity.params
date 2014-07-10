@@ -1,0 +1,8 @@
+# Bag schema for raw input data
+DATA_SCHEMA = actor_handle: charrary, target_handle: chararray, actor_followers: long
+
+# Default first group to a few well known musicians
+DEFAULT_GROUP1 = 'ladygaga;falloutboy;ddlovato;taylorswift13;owlcity;kanyewest'
+
+# Default second group to a few well known brands
+DEFAULT_GROUP2 = 'adidas;beatport;beatsbydre;budweiser;drpepper;ford;greygoose;pepsi;proactiv;smirnoff;sprite;subway;tacobell'
