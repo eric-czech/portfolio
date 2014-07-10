@@ -20,8 +20,11 @@ Analysis Parts:
 ## The Data Set
 
 To run this analysis, a data set was built containing values for the features below as well as average daily iTunes sales data for __32,310 tracks__ (by __751 artists__).  Here is a full list of all track features collected and their associated definitions:
-
-- __time_signature__ (integer [0,Inf)) => An estimated overall time signature of a track. The time signature (meter) is a notational convention to specify how many beats are in each bar (or measure). 
+<pre>
+<b>time_signature</b> (integer [0,Inf))
+An estimated overall time signature of a track. The time signature (meter) is a notational convention to specify how many beats are in each bar (or measure). 
+<b>key</b> (integer [0,Inf))
+The estimated overall key of a track. The key identiﬁes the tonic triad, the chord, major or minor, which represents the ﬁnal point of rest of a piece.
 - __key__ (integer [0,Inf)) => The estimated overall key of a track. The key identiﬁes the tonic triad, the chord, major or minor, which represents the ﬁnal point of rest of a piece. 
 - __mode__ (binary [0,1]) => indicates the modality (major or minor) of a track, the type of scale from which its melodic content is derived.
 - __tempo__ (floating point [0,Inf)) => The overall estimated tempo of a track in beats per minute (BPM). In musical terminology, tempo is the speed or pace of a given piece and derives directly from the average beat 
@@ -33,6 +36,8 @@ To run this analysis, a data set was built containing values for the features be
 - __danceability__  (floating point [0,1]) => Represents a perceptual measure of intensity and powerful activity released throughout the track. Typical energetic tracks feel fast, loud, and noisy. For example, death metal has high energy, while a Bach prelude scores low on the scale. Perceptual features contributing to this attribute include dynamic range, perceived loudness, timbre, onset rate, and general entropy.
 Detects the presence of spoken words in a track. The more exclusively speech-like the recording (e.g. talk show, audio book, poetry), the closer to 1.0 the attribute value. Values above 0.66 describe tracks that are probably made entirely of spoken words. Values between 0.33 and 0.66 describe tracks that may contain both music and speech, either in sections or layered, including such cases as rap music. Values below 0.33 most likely represent music and other non-speech-like tracks.
 - __valence__ (floating point [0,1]) => Describes the musical positiveness conveyed by a track. Tracks with high valence sound more positive (e.g., happy, cheerful, euphoric), while tracks with low valence sound more negative (e.g. sad, depressed, angry). This attribute in combination with energy is a strong indicator of acoustic mood, the general emotional qualities that may characterize the track's acoustics. Note that in the case of vocal music, lyrics may differ semantically from the perceived acoustic mood.
+</ul>
+</font>
 
 After having collected the values for the features above, the result was then combined with average daily iTunes sales data (over the known lifetime of a track) to form the full data set.
 
