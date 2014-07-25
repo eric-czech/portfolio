@@ -1680,19 +1680,21 @@ div#notebook {
 </div>
 <div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h1 id="phone-call-classifier">Phone Call Classifier</h1>
-<p><em>Used to determine what calls on an itemized phone bill are personal or for business</em></p>
+<h1 id="phone-call-classification">Phone Call Classification</h1>
+<p>As an avid hater of administrata, there are few things I look forward less each month than going through my phone bill and figuring out which business-related calls I can expense. It's a really boring process and though it only takes ~20 minutes, it feels like an infinite amount of time given the constant urge to just say &quot;screw it, call it 50/50&quot;.</p>
+<p>It's a great problem for a computer though and it turns out that ensemble classification methods can do this remarkably accurately. Below, I walk through the process of doing this and long story short, writing off my phone expenses takes a couple seconds now so I can happily spend my extra time each month napping or browsing reddit.</p>
 </div>
 </div>
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
 <div class="prompt input_prompt">
-In&nbsp;[563]:
+In&nbsp;[]:
 </div>
 <div class="inner_cell">
     <div class="input_area">
-<div class="highlight"><pre><span class="kn">import</span> <span class="nn">pandas</span> <span class="kn">as</span> <span class="nn">pd</span>
+<div class="highlight"><pre><span class="c"># Some standard pandas/numpy/sklearn imports I&#39;ll need</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="kn">as</span> <span class="nn">pd</span>
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
 <span class="kn">import</span> <span class="nn">datetime</span> <span class="kn">as</span> <span class="nn">dt</span>
 <span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="kn">as</span> <span class="nn">plt</span>
@@ -2720,7 +2722,7 @@ In&nbsp;[557]:
 </div>
 <div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h1 id="application">Application</h1>
+<h2 id="applying-the-classifier">Applying the classifier</h2>
 </div>
 </div>
 </div>

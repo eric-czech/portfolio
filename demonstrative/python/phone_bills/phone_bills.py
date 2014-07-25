@@ -1,11 +1,16 @@
 
 # coding: utf-8
 
-# # Phone Call Classifier
-# *Used to determine what calls on an itemized phone bill are personal or for business*
+# # Phone Call Classification
+# 
+# As an avid hater of administrata, there are few things I look forward less each month than going through my phone bill and figuring out which business-related calls I can expense.  It's a really boring process and though it only takes ~20 minutes, it feels like an infinite amount of time given the constant urge to just say "screw it, call it 50/50".
+# 
+# It's a great problem for a computer though and it turns out that ensemble classification methods can do this remarkably accurately.  Below, I walk through the process of doing this and long story short, writing off my phone expenses takes a couple seconds now so I can happily spend my extra time each month napping or browsing reddit.
+# 
 
-# In[563]:
+# In[ ]:
 
+# Some standard pandas/numpy/sklearn imports I'll need
 import pandas as pd
 import numpy as np
 import datetime as dt
@@ -159,9 +164,7 @@ with open('/home/ubuntu/phone_bills/phone_bill_classifier.pkl', 'wb') as f:
 # 
 # One thing to note here is that the field encoders also have to be saved for the sake of applying this thing.  The field encoding for new data sets has to match this one exactly and it's also very likely that new values not seen in this data set (i.e. new phone numbers, states, cities, etc.) will come up and the script applying the classifier should encode them as such.
 
-# <br>
-# # Application
-# <br>
+# ## Applying the classifier
 
 # To actually make this useful at all, I wrote a separate script to apply the saved classifier to arbitrary bills.  The script goes through the same rigamarole -- extracting features, encoding fields, subsetting fields, etc. -- and the determines the classification for each record.
 # 
