@@ -3,9 +3,11 @@
 
 # # Phone Call Classification
 # 
-# As an avid hater of administrata, there are few things I look forward less each month than going through my phone bill and figuring out which business-related calls I can expense.  It's a really boring process and though it only takes ~20 minutes, it feels like an infinite amount of time given the constant urge to just say "screw it, call it 50/50".
+# Nothing grinds my gears like sifting through a spreadsheet of calls on my phone bill to figure out which business-related ones I can expense.  I do it every month and hate it more each time so I finally thought I'd giving solving the problem with a computer a whirl.
 # 
-# It's a great problem for a computer though and it turns out that ensemble classification methods can do this remarkably accurately.  Below, I walk through the process of doing this and long story short, writing off my phone expenses takes a couple seconds now so I can happily spend my extra time each month napping or browsing reddit.
+# Below, I walk through training an ensemble tree classifier to identify which calls can be expensed based on csv downloads from my Verizon account.  The statements are pretty detailed and it turns out that a classifier can use them to great effect, performing at least as well as I would (especially considering that I normally say "screw it, call it 50/50" half way through when doing it manually).
+# 
+# The accuracy of the classifier on test data sets is nearly perfect so any more I just sit back, press a button to do the expensing, and spend my very valuable 30 extra minutes per month doing more important things like napping or browsing Reddit.
 # 
 
 # In[ ]:
@@ -166,7 +168,7 @@ with open('/home/ubuntu/phone_bills/phone_bill_classifier.pkl', 'wb') as f:
 
 # ## Applying the classifier
 
-# To actually make this useful at all, I wrote a separate script to apply the saved classifier to arbitrary bills.  The script goes through the same rigamarole -- extracting features, encoding fields, subsetting fields, etc. -- and the determines the classification for each record.
+# To apply this all, I wrote a separate script to use the saved classifier on arbitrary bills.  The script goes through the same rigamarole -- extracting features, encoding fields, subsetting fields, etc. -- and the determines the classification for each record.
 # 
 # Given that classification, then I can figure out how I spend my time on calls which I can then use to set my expenses for the month.
 # 
@@ -230,4 +232,4 @@ with open('/home/ubuntu/phone_bills/phone_bill_classifier.pkl', 'wb') as f:
 
 # Not surprisingly, I make more personal calls but they're usually shorter (average of 5 mins vs 15 for business calls).
 # 
-# Either way, this is sweet! -- easily gives me an extra 30 minutes for redditing each month.
+# Either way, this is sweet! I can use the split between minutes spent making calls of one type or another to determine how much of my phone bill to submit for reimbursement.
