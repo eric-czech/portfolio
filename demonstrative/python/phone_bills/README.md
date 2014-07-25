@@ -8,6 +8,7 @@ Here is a copy of that notebook with lots of details:
 [Phone Call Classification Project](https://rawgit.com/eric-czech/portfolio/master/demonstrative/python/phone_bills/phone_bills.html).
 
 There are plenty of findings and in there, but one of the most interesting IMO was the relative influence of each feature in the model:
+
 <img src="https://rawgit.com/eric-czech/portfolio/master/demonstrative/python/phone_bills/feature_importance.png"/>
 
 The most important input to determining whether or not any one phone call was business-related was the phone number involved in the call.  That's pretty obvious, but its limiting in that the numbers I receive calls from each month tend to change frequently so in order for the classification to generalize well, other features like area code, call length, and call time are needed.
