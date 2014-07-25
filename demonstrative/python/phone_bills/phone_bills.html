@@ -1675,25 +1675,31 @@ div#notebook {
   <div tabindex="-1" id="notebook" class="border-box-sizing">
     <div class="container" id="notebook-container">
 
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h1 id="phone-call-classification">Phone Call Classification</h1>
+<p>Nothing grinds my gears like sifting through a spreadsheet of calls on my phone bill to figure out which business-related ones I can expense. I do it every month and hate it more each time so I finally thought I'd giving solving the problem with a computer a whirl.</p>
+<p>Below, I walk through training an ensemble tree classifier to identify which calls can be expensed based on csv downloads from my Verizon account. The statements are pretty detailed and it turns out that a classifier can use them to great effect, performing at least as well as I would (especially considering that I normally say &quot;screw it, call it 50/50&quot; half way through when doing it manually).</p>
+<p>The accuracy of the classifier on test data sets is nearly perfect so any more I just sit back, press a button to do the expensing, and spend my very valuable 30 extra minutes per month doing more important things like napping or browsing Reddit.</p>
+</div>
+</div>
+</div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
 <div class="prompt input_prompt">
-In&nbsp;[543]:
+In&nbsp;[]:
 </div>
 <div class="inner_cell">
     <div class="input_area">
-<div class="highlight"><pre><span class="kn">import</span> <span class="nn">pandas</span> <span class="kn">as</span> <span class="nn">pd</span>
+<div class="highlight"><pre><span class="c"># Some standard pandas/numpy/sklearn imports I&#39;ll need</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="kn">as</span> <span class="nn">pd</span>
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
 <span class="kn">import</span> <span class="nn">datetime</span> <span class="kn">as</span> <span class="nn">dt</span>
 <span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="kn">as</span> <span class="nn">plt</span>
 <span class="kn">from</span> <span class="nn">pandas</span> <span class="kn">import</span> <span class="n">DataFrame</span><span class="p">,</span> <span class="n">Series</span>
-<span class="kn">from</span> <span class="nn">sklearn.preprocessing</span> <span class="kn">import</span> <span class="n">LabelEncoder</span><span class="p">,</span> <span class="n">StandardScaler</span>
-<span class="kn">from</span> <span class="nn">sklearn.ensemble</span> <span class="kn">import</span> <span class="n">RandomForestClassifier</span>
-<span class="kn">from</span> <span class="nn">sklearn</span> <span class="kn">import</span> <span class="n">svm</span>
-<span class="kn">from</span> <span class="nn">sklearn.cross_validation</span> <span class="kn">import</span> <span class="n">train_test_split</span><span class="p">,</span> <span class="n">KFold</span><span class="p">,</span> <span class="n">cross_val_score</span>
-<span class="kn">from</span> <span class="nn">sklearn.metrics</span> <span class="kn">import</span> <span class="n">classification_report</span>
-<span class="kn">from</span> <span class="nn">sklearn.metrics</span> <span class="kn">import</span> <span class="n">accuracy_score</span>
-<span class="kn">from</span> <span class="nn">sklearn.pipeline</span> <span class="kn">import</span> <span class="n">Pipeline</span>
 </pre></div>
 
 </div>
@@ -1706,28 +1712,20 @@ In&nbsp;[543]:
 </div>
 <div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h1 id="modeling">Modeling</h1>
-<p><br></p>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered">
-<div class="prompt input_prompt">
-</div>
-<div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="load-in-raw-phone-bill-data-and-remove-unnecessary-fields">Load in raw phone bill data and remove unnecessary fields</h3>
+<h3 id="load-in-raw-verizon-phone-bill-data-and-remove-unnecessary-fields">Load in raw (Verizon) phone bill data and remove unnecessary fields</h3>
 </div>
 </div>
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
 <div class="prompt input_prompt">
-In&nbsp;[544]:
+In&nbsp;[567]:
 </div>
 <div class="inner_cell">
     <div class="input_area">
 <div class="highlight"><pre><span class="n">data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">parsers</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s">&#39;/home/ubuntu/phone_bills/phone_bill_20140221.txt&#39;</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="bp">None</span><span class="p">)</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="p">[[</span><span class="n">col</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">col</span> <span class="ow">in</span> <span class="p">(</span><span class="s">&#39;Airtime&#39;</span><span class="p">,</span> <span class="s">&#39;Charges&#39;</span><span class="p">,</span> <span class="s">&#39;Total&#39;</span><span class="p">,</span> <span class="s">&#39;Description&#39;</span><span class="p">,</span> <span class="s">&#39;Application Price&#39;</span><span class="p">)]]</span>
+<span class="n">data</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
 </pre></div>
 
 </div>
@@ -1747,30 +1745,8 @@ Using Python parser to sniff delimiter
 </div>
 </div>
 
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">
-In&nbsp;[545]:
-</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class="highlight"><pre><span class="n">data</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
-</pre></div>
-
-</div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
 <div class="output_area"><div class="prompt output_prompt">
-    Out[545]:</div>
+    Out[567]:</div>
 
 <div class="output_html rendered_html output_subarea output_pyout">
 <div style="max-height:1000px;max-width:1500px;overflow:auto;">
@@ -1787,11 +1763,6 @@ In&nbsp;[545]:
       <th>Origin</th>
       <th>Destination</th>
       <th>Minutes</th>
-      <th>Airtime</th>
-      <th>Charges</th>
-      <th>Total</th>
-      <th>Description</th>
-      <th>Application Price</th>
     </tr>
   </thead>
   <tbody>
@@ -1806,11 +1777,6 @@ In&nbsp;[545]:
       <td> Charleston SC</td>
       <td>   Incoming CL</td>
       <td>  4</td>
-      <td> --</td>
-      <td> --</td>
-      <td> --</td>
-      <td>NaN</td>
-      <td>NaN</td>
     </tr>
     <tr>
       <th>1</th>
@@ -1823,11 +1789,6 @@ In&nbsp;[545]:
       <td> Charleston SC</td>
       <td> Gardencity NY</td>
       <td>  1</td>
-      <td> --</td>
-      <td> --</td>
-      <td> --</td>
-      <td>NaN</td>
-      <td>NaN</td>
     </tr>
     <tr>
       <th>2</th>
@@ -1840,11 +1801,6 @@ In&nbsp;[545]:
       <td> Charleston SC</td>
       <td>   Incoming CL</td>
       <td> 13</td>
-      <td> --</td>
-      <td> --</td>
-      <td> --</td>
-      <td>NaN</td>
-      <td>NaN</td>
     </tr>
     <tr>
       <th>3</th>
@@ -1857,11 +1813,6 @@ In&nbsp;[545]:
       <td>     Butler PA</td>
       <td>    Lebanon PA</td>
       <td>  1</td>
-      <td> --</td>
-      <td> --</td>
-      <td> --</td>
-      <td>NaN</td>
-      <td>NaN</td>
     </tr>
     <tr>
       <th>4</th>
@@ -1874,15 +1825,10 @@ In&nbsp;[545]:
       <td> Charleston SC</td>
       <td>   Incoming CL</td>
       <td>  6</td>
-      <td> --</td>
-      <td> --</td>
-      <td> --</td>
-      <td>NaN</td>
-      <td>NaN</td>
     </tr>
   </tbody>
 </table>
-<p>5 rows × 14 columns</p>
+<p>5 rows × 9 columns</p>
 </div>
 </div>
 
@@ -1892,20 +1838,15 @@ In&nbsp;[545]:
 </div>
 
 </div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
+<div class="cell border-box-sizing text_cell rendered">
 <div class="prompt input_prompt">
-In&nbsp;[546]:
 </div>
 <div class="inner_cell">
-    <div class="input_area">
-<div class="highlight"><pre><span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="p">[[</span><span class="n">col</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">col</span> <span class="ow">in</span> <span class="p">(</span><span class="s">&#39;Airtime&#39;</span><span class="p">,</span> <span class="s">&#39;Charges&#39;</span><span class="p">,</span> <span class="s">&#39;Total&#39;</span><span class="p">,</span> <span class="s">&#39;Description&#39;</span><span class="p">,</span> <span class="s">&#39;Application Price&#39;</span><span class="p">)]]</span>
-</pre></div>
-
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Each call record above comes with details like when the call was made, how it was to, how long it was, etc. and for this particular dataset, I went through and added a <strong>Business</strong> field to indicate whether the call was personal or for my job (0 = personal, 1 = business-related).</p>
+<p>There seems to be a good amount of useful information in each field, but we'll have to munge out some of the features to make them more amenable to a classifier.</p>
 </div>
 </div>
-</div>
-
 </div>
 <div class="cell border-box-sizing text_cell rendered">
 <div class="prompt input_prompt">
@@ -1919,7 +1860,7 @@ In&nbsp;[546]:
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
 <div class="prompt input_prompt">
-In&nbsp;[547]:
+In&nbsp;[568]:
 </div>
 <div class="inner_cell">
     <div class="input_area">
@@ -1940,21 +1881,11 @@ In&nbsp;[547]:
 
 <span class="c"># Parse out area code from phone number</span>
 <span class="n">data</span><span class="p">[</span><span class="s">&#39;Area Code&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">Number</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&#39;-&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
-</pre></div>
 
-</div>
-</div>
-</div>
+<span class="c"># Restrict input data, again, to only the fields relevant after feature extraction</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="p">[[</span><span class="n">col</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span> <span class="k">if</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s">&#39;Date&#39;</span><span class="p">,</span> <span class="s">&#39;Time&#39;</span><span class="p">,</span> <span class="s">&#39;Origin&#39;</span><span class="p">,</span> <span class="s">&#39;Destination&#39;</span><span class="p">)]]</span>
 
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">
-In&nbsp;[548]:
-</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class="highlight"><pre><span class="n">data</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+<span class="n">data</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
 </pre></div>
 
 </div>
@@ -1966,7 +1897,7 @@ In&nbsp;[548]:
 
 
 <div class="output_area"><div class="prompt output_prompt">
-    Out[548]:</div>
+    Out[568]:</div>
 
 <div class="output_html rendered_html output_subarea output_pyout">
 <div style="max-height:1000px;max-width:1500px;overflow:auto;">
@@ -1975,13 +1906,9 @@ In&nbsp;[548]:
     <tr style="text-align: right;">
       <th></th>
       <th>Business</th>
-      <th>Date</th>
-      <th>Time</th>
       <th>Number</th>
       <th>Rate</th>
       <th>Usage Type</th>
-      <th>Origin</th>
-      <th>Destination</th>
       <th>Minutes</th>
       <th>Origin City</th>
       <th>Origin State</th>
@@ -1995,13 +1922,9 @@ In&nbsp;[548]:
     <tr>
       <th>0</th>
       <td> 0</td>
-      <td> 01/07/2014</td>
-      <td>  9:48AM</td>
       <td> 843-270-9399</td>
       <td> Peak</td>
       <td>                M2MAllow</td>
-      <td> Charleston SC</td>
-      <td>   Incoming CL</td>
       <td>  4</td>
       <td> Charleston</td>
       <td> SC</td>
@@ -2013,13 +1936,9 @@ In&nbsp;[548]:
     <tr>
       <th>1</th>
       <td> 1</td>
-      <td> 01/07/2014</td>
-      <td> 11:32AM</td>
       <td> 516-384-4100</td>
       <td> Peak</td>
       <td>               PlanAllow</td>
-      <td> Charleston SC</td>
-      <td> Gardencity NY</td>
       <td>  1</td>
       <td> Charleston</td>
       <td> SC</td>
@@ -2031,13 +1950,9 @@ In&nbsp;[548]:
     <tr>
       <th>2</th>
       <td> 1</td>
-      <td> 01/07/2014</td>
-      <td> 11:50AM</td>
       <td> 646-398-6444</td>
       <td> Peak</td>
       <td>               PlanAllow</td>
-      <td> Charleston SC</td>
-      <td>   Incoming CL</td>
       <td> 13</td>
       <td> Charleston</td>
       <td> SC</td>
@@ -2049,13 +1964,9 @@ In&nbsp;[548]:
     <tr>
       <th>3</th>
       <td> 0</td>
-      <td> 01/07/2014</td>
-      <td>  5:13PM</td>
       <td> 717-673-8466</td>
       <td> Peak</td>
       <td> PlanAllow,NoAnsBusyXfer</td>
-      <td>     Butler PA</td>
-      <td>    Lebanon PA</td>
       <td>  1</td>
       <td>     Butler</td>
       <td> PA</td>
@@ -2067,13 +1978,9 @@ In&nbsp;[548]:
     <tr>
       <th>4</th>
       <td> 1</td>
-      <td> 01/07/2014</td>
-      <td>  5:24PM</td>
       <td> 646-398-6444</td>
       <td> Peak</td>
       <td>               PlanAllow</td>
-      <td> Charleston SC</td>
-      <td>   Incoming CL</td>
       <td>  6</td>
       <td> Charleston</td>
       <td> SC</td>
@@ -2084,7 +1991,7 @@ In&nbsp;[548]:
     </tr>
   </tbody>
 </table>
-<p>5 rows × 15 columns</p>
+<p>5 rows × 11 columns</p>
 </div>
 </div>
 
@@ -2093,6 +2000,15 @@ In&nbsp;[548]:
 </div>
 </div>
 
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Ok, now we've got a more useful data set where the most likely useful features like state of origin/destination, call time of day as seconds, and area code are extracted correctly. Before we can start to train a classifier though, we'll have to deal with all these categorical/non-numeric values.</p>
+</div>
+</div>
 </div>
 <div class="cell border-box-sizing text_cell rendered">
 <div class="prompt input_prompt">
@@ -2106,26 +2022,17 @@ In&nbsp;[548]:
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
 <div class="prompt input_prompt">
-In&nbsp;[549]:
+In&nbsp;[569]:
 </div>
 <div class="inner_cell">
     <div class="input_area">
-<div class="highlight"><pre><span class="n">by_type</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">to_series</span><span class="p">()</span><span class="o">.</span><span class="n">groupby</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">dtypes</span><span class="p">])</span>
-</pre></div>
+<div class="highlight"><pre><span class="kn">from</span> <span class="nn">sklearn.preprocessing</span> <span class="kn">import</span> <span class="n">LabelEncoder</span>
 
-</div>
-</div>
-</div>
+<span class="c"># Group column names by data type</span>
+<span class="n">by_type</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">to_series</span><span class="p">()</span><span class="o">.</span><span class="n">groupby</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">dtypes</span><span class="p">])</span>
 
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">
-In&nbsp;[550]:
-</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class="highlight"><pre><span class="n">encoders</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="c"># Apply (and save) a label encoder for each non-numeric field</span>
+<span class="n">encoders</span> <span class="o">=</span> <span class="p">{}</span>
 <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">by_type</span><span class="o">.</span><span class="n">groups</span><span class="p">[</span><span class="s">&#39;object&#39;</span><span class="p">]:</span>
     <span class="n">encoders</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">LabelEncoder</span><span class="p">()</span>
     <span class="n">vals</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">col</span><span class="p">]))</span>
@@ -2133,27 +2040,131 @@ In&nbsp;[550]:
     <span class="n">encoders</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">encoders</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span>
     <span class="n">data</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="s">&#39;Unknown&#39;</span><span class="p">)</span>
     <span class="n">data</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">encoders</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">col</span><span class="p">])</span>
+
+<span class="n">data</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
 </pre></div>
 
 </div>
 </div>
 </div>
 
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area"><div class="prompt output_prompt">
+    Out[569]:</div>
+
+<div class="output_html rendered_html output_subarea output_pyout">
+<div style="max-height:1000px;max-width:1500px;overflow:auto;">
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>Business</th>
+      <th>Number</th>
+      <th>Rate</th>
+      <th>Usage Type</th>
+      <th>Minutes</th>
+      <th>Origin City</th>
+      <th>Origin State</th>
+      <th>Destination City</th>
+      <th>Destination State</th>
+      <th>Start Time</th>
+      <th>Area Code</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td> 0</td>
+      <td> 15</td>
+      <td> 1</td>
+      <td> 0</td>
+      <td>  4</td>
+      <td> 1</td>
+      <td> 2</td>
+      <td> 3</td>
+      <td> 1</td>
+      <td> 588</td>
+      <td> 10</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td> 1</td>
+      <td>  3</td>
+      <td> 1</td>
+      <td> 4</td>
+      <td>  1</td>
+      <td> 1</td>
+      <td> 2</td>
+      <td> 2</td>
+      <td> 3</td>
+      <td> 692</td>
+      <td>  3</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td> 1</td>
+      <td>  7</td>
+      <td> 1</td>
+      <td> 4</td>
+      <td> 13</td>
+      <td> 1</td>
+      <td> 2</td>
+      <td> 3</td>
+      <td> 1</td>
+      <td> 710</td>
+      <td>  5</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td> 0</td>
+      <td> 10</td>
+      <td> 1</td>
+      <td> 6</td>
+      <td>  1</td>
+      <td> 0</td>
+      <td> 1</td>
+      <td> 5</td>
+      <td> 4</td>
+      <td> 313</td>
+      <td>  7</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td> 1</td>
+      <td>  7</td>
+      <td> 1</td>
+      <td> 4</td>
+      <td>  6</td>
+      <td> 1</td>
+      <td> 2</td>
+      <td> 3</td>
+      <td> 1</td>
+      <td> 324</td>
+      <td>  5</td>
+    </tr>
+  </tbody>
+</table>
+<p>5 rows × 11 columns</p>
 </div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered">
 <div class="prompt input_prompt">
-In&nbsp;[551]:
 </div>
 <div class="inner_cell">
-    <div class="input_area">
-<div class="highlight"><pre><span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="p">[[</span><span class="n">col</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span> <span class="k">if</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s">&#39;Date&#39;</span><span class="p">,</span> <span class="s">&#39;Time&#39;</span><span class="p">,</span> <span class="s">&#39;Origin&#39;</span><span class="p">,</span> <span class="s">&#39;Destination&#39;</span><span class="p">)]]</span>
-</pre></div>
-
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Now we're ready to go! All the string fields have been encoded on some one-dimensional numeric space which might not be as good as something like <a href="http://en.wikipedia.org/wiki/One-hot">One-Hot Encoding</a>, but for my purposes it will do just fine.</p>
 </div>
 </div>
-</div>
-
 </div>
 <div class="cell border-box-sizing text_cell rendered">
 <div class="prompt input_prompt">
@@ -2167,11 +2178,12 @@ In&nbsp;[551]:
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
 <div class="prompt input_prompt">
-In&nbsp;[552]:
+In&nbsp;[570]:
 </div>
 <div class="inner_cell">
     <div class="input_area">
-<div class="highlight"><pre><span class="n">i</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">permutation</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<div class="highlight"><pre><span class="c"># Use 75% train/25% test split</span>
+<span class="n">i</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">permutation</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
 <span class="n">split</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">*.</span><span class="mi">75</span><span class="p">)</span>
 <span class="n">train</span><span class="p">,</span> <span class="n">test</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">i</span><span class="p">[:</span><span class="n">split</span><span class="p">]],</span> <span class="n">data</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">i</span><span class="p">[</span><span class="n">split</span><span class="p">:]]</span>
 </pre></div>
@@ -2186,6 +2198,15 @@ In&nbsp;[552]:
 </div>
 <div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
+<p>We'll ignore the test set for now and instead see how well a classifier can do with cross-validation on the training data</p>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
 <h3 id="run-5-fold-classification-on-training-set">Run 5-Fold classification on training set</h3>
 </div>
 </div>
@@ -2193,13 +2214,18 @@ In&nbsp;[552]:
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
 <div class="prompt input_prompt">
-In&nbsp;[553]:
+In&nbsp;[571]:
 </div>
 <div class="inner_cell">
     <div class="input_area">
-<div class="highlight"><pre><span class="n">clf</span> <span class="o">=</span> <span class="n">RandomForestClassifier</span><span class="p">(</span><span class="n">n_estimators</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
+<div class="highlight"><pre><span class="kn">from</span> <span class="nn">sklearn.ensemble</span> <span class="kn">import</span> <span class="n">RandomForestClassifier</span>
+<span class="kn">from</span> <span class="nn">sklearn.cross_validation</span> <span class="kn">import</span> <span class="n">KFold</span><span class="p">,</span> <span class="n">cross_val_score</span>
+
+<span class="n">clf</span> <span class="o">=</span> <span class="n">RandomForestClassifier</span><span class="p">(</span><span class="n">n_estimators</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
 <span class="n">cv</span> <span class="o">=</span> <span class="n">KFold</span><span class="p">(</span><span class="n">train</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">5</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 <span class="n">scores</span> <span class="o">=</span> <span class="n">cross_val_score</span><span class="p">(</span><span class="n">clf</span><span class="p">,</span> <span class="n">train</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span><span class="mi">1</span><span class="p">:],</span> <span class="n">train</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span><span class="mi">0</span><span class="p">],</span> <span class="n">cv</span><span class="o">=</span><span class="n">cv</span><span class="p">)</span>
+
+<span class="c"># Plot the accuracy for each fold</span>
 <span class="n">Series</span><span class="p">(</span><span class="n">scores</span><span class="p">)</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s">&#39;bar&#39;</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s">&#39;Accuracy per Fold&#39;</span><span class="p">)</span>
 </pre></div>
 
@@ -2212,12 +2238,12 @@ In&nbsp;[553]:
 
 
 <div class="output_area"><div class="prompt output_prompt">
-    Out[553]:</div>
+    Out[571]:</div>
 
 
 <div class="output_text output_subarea output_pyout">
 <pre>
-&lt;matplotlib.axes.AxesSubplot at 0x7f06205ce910&gt;
+&lt;matplotlib.axes.AxesSubplot at 0x7f0620747510&gt;
 </pre>
 </div>
 
@@ -2228,107 +2254,109 @@ In&nbsp;[553]:
 
 <div class="output_png output_subarea ">
 <img src="data:image/png;base64,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
-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
+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
+gg==
 "
 >
 </div>
@@ -2344,6 +2372,15 @@ VaGZ2YLzAeBcdQgzMzMzMzMzMzMzMzMzs8b5f8PIhBBhcUbvAAAAAElFTkSuQmCC
 </div>
 <div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
+<p>Not bad! When I do the classification manually I'd say I'm only about 90% correct so the error of the classifier is similar to my own (i.e. I'll take it). And now lets see how well it generalizes..</p>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
 <h3 id="check-generalization-to-test-data">Check generalization to test data</h3>
 </div>
 </div>
@@ -2351,14 +2388,24 @@ VaGZ2YLzAeBcdQgzMzMzMzMzMzMzMzMzs8b5f8PIhBBhcUbvAAAAAElFTkSuQmCC
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
 <div class="prompt input_prompt">
-In&nbsp;[554]:
+In&nbsp;[573]:
 </div>
 <div class="inner_cell">
     <div class="input_area">
-<div class="highlight"><pre><span class="n">x_train</span><span class="p">,</span> <span class="n">y_train</span> <span class="o">=</span> <span class="n">train</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span><span class="mi">1</span><span class="p">:],</span> <span class="n">train</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span>
+<div class="highlight"><pre><span class="kn">from</span> <span class="nn">sklearn.metrics</span> <span class="kn">import</span> <span class="n">classification_report</span>
+<span class="kn">from</span> <span class="nn">sklearn.metrics</span> <span class="kn">import</span> <span class="n">accuracy_score</span>
+
+<span class="c"># Initialize features and response for each set (testing and training)</span>
+<span class="n">x_train</span><span class="p">,</span> <span class="n">y_train</span> <span class="o">=</span> <span class="n">train</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span><span class="mi">1</span><span class="p">:],</span> <span class="n">train</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span>
 <span class="n">x_test</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">test</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span><span class="mi">1</span><span class="p">:],</span> <span class="n">test</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span>
+
+<span class="c"># Train classifier using training set</span>
 <span class="n">fit</span> <span class="o">=</span> <span class="n">clf</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">x_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+
+<span class="c"># Make predictions on the test set</span>
 <span class="n">predicted</span> <span class="o">=</span> <span class="n">clf</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">x_test</span><span class="p">)</span>
+
+<span class="c"># Show precision, recall, support, and accuracy</span>
 <span class="k">print</span> <span class="s">&#39;Performance Measures:&#39;</span>
 <span class="k">print</span> <span class="n">classification_report</span><span class="p">(</span><span class="n">y_test</span><span class="o">.</span><span class="n">ravel</span><span class="p">(),</span> <span class="n">predicted</span><span class="p">)</span>
 <span class="k">print</span> <span class="s">&#39;Overall Accuracy:&#39;</span>
@@ -2379,13 +2426,13 @@ In&nbsp;[554]:
 Performance Measures:
              precision    recall  f1-score   support
 
-          0       0.95      0.95      0.95        19
-          1       0.83      0.83      0.83         6
+          0       1.00      1.00      1.00        18
+          1       1.00      1.00      1.00         7
 
-avg / total       0.92      0.92      0.92        25
+avg / total       1.00      1.00      1.00        25
 
 Overall Accuracy:
-0.92
+1.0
 
 </pre>
 </div>
@@ -2400,100 +2447,10 @@ Overall Accuracy:
 </div>
 <div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="show-incorrectly-predicted-cases-if-any">Show incorrectly predicted cases (if any)</h3>
+<p>Beautiful. It would be nice if my training and test data sets were larger but I'll shoot myself if I have to go through that list and do any more manually, and this level accuracy should suffice.</p>
+<p>Out of curiosity, lets see which features are most important before using the classifier.</p>
 </div>
 </div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">
-In&nbsp;[555]:
-</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class="highlight"><pre><span class="n">t</span> <span class="o">=</span> <span class="n">test</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-<span class="n">t</span><span class="p">[</span><span class="s">&#39;Predicted&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">predicted</span>
-
-<span class="c"># Function to invert encoded field values</span>
-<span class="k">def</span> <span class="nf">invert_labels</span><span class="p">(</span><span class="n">col</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">encoders</span><span class="p">[</span><span class="n">col</span><span class="o">.</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">inverse_transform</span><span class="p">(</span><span class="n">col</span><span class="p">)</span> <span class="k">if</span> <span class="n">col</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="n">encoders</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="k">else</span> <span class="n">col</span>
-        
-<span class="n">t</span><span class="p">[</span><span class="n">t</span><span class="o">.</span><span class="n">Business</span> <span class="o">!=</span> <span class="n">t</span><span class="o">.</span><span class="n">Predicted</span><span class="p">]</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">invert_labels</span><span class="p">)</span>
-</pre></div>
-
-</div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area"><div class="prompt output_prompt">
-    Out[555]:</div>
-
-<div class="output_html rendered_html output_subarea output_pyout">
-<div style="max-height:1000px;max-width:1500px;overflow:auto;">
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>Business</th>
-      <th>Number</th>
-      <th>Rate</th>
-      <th>Usage Type</th>
-      <th>Minutes</th>
-      <th>Origin City</th>
-      <th>Origin State</th>
-      <th>Destination City</th>
-      <th>Destination State</th>
-      <th>Start Time</th>
-      <th>Area Code</th>
-      <th>Predicted</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>19</th>
-      <td> 1</td>
-      <td> 816-935-6846</td>
-      <td> Peak</td>
-      <td> PlanAllow</td>
-      <td>  6</td>
-      <td> Charleston</td>
-      <td> SC</td>
-      <td> Incoming</td>
-      <td> CL</td>
-      <td> 671</td>
-      <td> 816</td>
-      <td> 0</td>
-    </tr>
-    <tr>
-      <th>44</th>
-      <td> 0</td>
-      <td> 415-729-9643</td>
-      <td> Peak</td>
-      <td> PlanAllow</td>
-      <td> 14</td>
-      <td> Charleston</td>
-      <td> SC</td>
-      <td> Incoming</td>
-      <td> CL</td>
-      <td> 662</td>
-      <td> 415</td>
-      <td> 1</td>
-    </tr>
-  </tbody>
-</table>
-<p>2 rows × 12 columns</p>
-</div>
-</div>
-
-</div>
-
-</div>
-</div>
-
 </div>
 <div class="cell border-box-sizing text_cell rendered">
 <div class="prompt input_prompt">
@@ -2716,6 +2673,24 @@ C9TRlQ4NURMREREREREREREREREREREREZE18P8B9u9amEwgYL4AAAAASUVORK5CYII=
 </div>
 
 </div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>No concerns here at all. I would have expected the area code and phone numbers themselves to be the most helpful, and I'm not surprised that destination state was right behind them given that most calls from New York should be business-related.</p>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="export-classifier-and-field-encoders">Export classifier and field encoders</h3>
+</div>
+</div>
+</div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
 <div class="prompt input_prompt">
@@ -2738,7 +2713,8 @@ In&nbsp;[557]:
 </div>
 <div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p><br> # Application <br></p>
+<p>With the classifier saved, I can apply it to other bills and automatically break out which were personal or not.</p>
+<p>One thing to note here is that the field encoders also have to be saved for the sake of applying this thing. The field encoding for new data sets has to match this one exactly and it's also very likely that new values not seen in this data set (i.e. new phone numbers, states, cities, etc.) will come up and the script applying the classifier should encode them as such.</p>
 </div>
 </div>
 </div>
@@ -2747,7 +2723,27 @@ In&nbsp;[557]:
 </div>
 <div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="call-time-summary-by-type">Call time summary (by type)</h3>
+<h2 id="applying-the-classifier">Applying the classifier</h2>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>To apply this all, I wrote a separate script to use the saved classifier on arbitrary bills. The script goes through the same rigamarole -- extracting features, encoding fields, subsetting fields, etc. -- and the determines the classification for each record.</p>
+<p>Given that classification, then I can figure out how I spend my time on calls which I can then use to set my expenses for the month.</p>
+<p>For example, ouput of the script would look like this:</p>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="summary-of-call-lengths-by-type">Summary of call lengths by type</h3>
 <table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
@@ -2862,6 +2858,16 @@ Business
     </tr>
   </tbody>
 </table>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Not surprisingly, I make more personal calls but they're usually shorter (average of 5 mins vs 15 for business calls).</p>
+<p>Either way, this is sweet! I can use the split between minutes spent making calls of one type or another to determine how much of my phone bill to submit for reimbursement.</p>
 </div>
 </div>
 </div>
