@@ -11,4 +11,4 @@ Some quick links:
 
 -  [Phone Bill Classification](http://nbviewer.ipython.org/github/eric-czech/portfolio/blob/master/demonstrative/python/notebooks/phone_bills.ipynb) - Expensing business calls on my Verizon Wireless bill using an ensemble tree classifier
 
--  [Predicting Sales Through Music Anatomy](/portfolio/demonstrative/R/music_anatomy/README.md) - Analyzing the relationship between iTunes sales and traits of music like tempo, loudness, danceability, acousticness, etc.
+-  [Predicting Sales Through Music Anatomy](/demonstrative/R/music_anatomy/README.md) - Analyzing the relationship between iTunes sales and traits of music like tempo, loudness, danceability, acousticness, etc.
