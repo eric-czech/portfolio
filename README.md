@@ -9,7 +9,7 @@ All of the projects contained are broken roughly into two categories, [functiona
 
 Project Links
 ------------------
-####Data Science
+####Data Analysis
 -  [Predicting Sales Through Music Anatomy (R)](/demonstrative/R/music_anatomy/README.md) - Analyzing the relationship between iTunes sales and traits of music like tempo, loudness, danceability, acousticness, and more ([Forbes.com Article](http://www.forbes.com/sites/livbuli/2014/09/18/engineering-success-the-data-driven-approach-to-hit-making/)).
 
 -  [Predicting the Chemical Composition of Soil in Africa (Python)](http://nbviewer.ipython.org/github/eric-czech/portfolio/blob/master/demonstrative/python/notebooks/kaggle_soil.ipynb) - Kaggle competition submission analyzing 3,595 different properties of soil samples in an effort to predict other properties of that same soil like pH, sand content, and Phosphorous/Carbon/Calcium levels.
