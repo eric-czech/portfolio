@@ -17,4 +17,5 @@ Project Links
 -  [Phone Bill Classification (Python)](http://nbviewer.ipython.org/github/eric-czech/portfolio/blob/master/demonstrative/python/notebooks/phone_bills.ipynb) - Expensing business calls on my Verizon Wireless bill using an ensemble tree classifier
 
 ####Data Engineering
-- 
+-  [Calculating "Affinity" Between Entities on Twitter (Pig)](/demonstrative/pig/twitter_affinity/twitter_affinity.pig) - Determining the strentgh of pairwise relationships between Twitter users by analyzing the reach of the users that engage with both entities in any given pair -- this was a valuable tool at Next Big Sound for recommending artist sponsorships to various brands. 
+
