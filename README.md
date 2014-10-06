@@ -16,11 +16,14 @@ Project Links
 
 -  [Phone Bill Classification (Python)](http://nbviewer.ipython.org/github/eric-czech/portfolio/blob/master/demonstrative/python/notebooks/phone_bills.ipynb) - Expensing business calls on my Verizon Wireless bill using an ensemble tree classifier.
 
--  [Calculating "Affinity" Between Entities on Twitter (Pig)](/demonstrative/pig/twitter_affinity/twitter_affinity.pig) - Determining the strentgh of pairwise relationships between Twitter users by analyzing the reach of the users that engage with both entities in any given pair -- this was a valuable tool at Next Big Sound for recommending artist sponsorships to various brands. 
+-  [Calculating "Affinity" Between Entities on Twitter (Pig)](/demonstrative/pig/twitter_affinity) - Determining the strentgh of pairwise relationships between Twitter users by analyzing the reach of the users that engage with both entities in any given pair -- this was a valuable tool at Next Big Sound for recommending artist sponsorships to various brands. 
 
 
 ####Data Engineering
 -  [High Performance Transformations for 10M+ Record Impala Result Sets (R)](/demonstrative/R/impala/transforms.R) - data.table optimizations applied to common transformations on large data frames in R.  This was helpful at Next Big Sound for processing huge data frames when base R or plyr functions wouldn't cut it.
+
+-  [Next Big Sound Chart Calculator (Pig)](/demonstrative/pig/predictive_billboard_chart) - Computes a list of artists most likely to appear on the [Billboard 200](http://en.wikipedia.org/wiki/Billboard_200) using likelihoods produced by supervised learning algorithms in HBase, semi-structured event data from MongoDB, and artist meta data from MySQL.
+
 
 ####Data Systems
 -  [HBlocks (Java, Pig, Oozie, Bash, HDFS, MySQL)](http://bit.ly/1rCkZJS) - White paper on production storage system at Next Big Sound that spans multiple Hadoop subsystems to create a large scale (many terabyte) data revision control platform.  *No code uploaded yet, just the paper for now.*
