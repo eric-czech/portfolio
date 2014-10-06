@@ -22,7 +22,7 @@ Project Links
 ####Data Engineering
 -  [High Performance Transformations for 10M+ Record Impala Result Sets (R)](/demonstrative/R/impala/transforms.R) - data.table optimizations applied to common transformations on large data frames in R.  This was helpful at Next Big Sound for processing huge data frames when base R or plyr functions wouldn't cut it.
 
--  [Next Big Sound Chart Calculator (Pig)](/demonstrative/pig/predictive_billboard_chart) - Computes a list of artists most likely to appear on the [Billboard 200](http://en.wikipedia.org/wiki/Billboard_200) using likelihoods produced by supervised learning algorithms in HBase, semi-structured event data from MongoDB, and artist meta data from MySQL.
+-  [Next Big Sound Chart Calculator (Pig)](/demonstrative/pig/predictive_billboard_chart) - Computes a list of artists most likely to appear on the [Billboard 200](http://en.wikipedia.org/wiki/Billboard_200) using likelihoods produced by a particular [supervised learning technique](http://making.nextbigsound.com/post/68287169332/predicting-next-years-breakout-artists) and stored in HBase, semi-structured event data from MongoDB, and artist meta data from MySQL.
 
 
 ####Data Systems
