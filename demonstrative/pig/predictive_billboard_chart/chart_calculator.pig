@@ -1,7 +1,7 @@
--- NBS 15 chart calculation script
+-- Next Big Sound Chart calculation script
 --
 -- Execution outline:
--- 1. Load Billboard 200 score data by entity
+-- 1. Load Billboard 200 score data by entity from HBase
 -- 2. Load previous Billboard chart appearances from Mongo
 -- 3. Load entities to remove based on manual exceptions
 --      indicated in the past or those that are not musicians
@@ -168,7 +168,8 @@ DESCRIBE int_charts;
 
 -- Load x_artists_categories to create a list of non-music entities for removal
 entity_cat = LOAD '$META_WAREHOUSE/meta_x_artists_categories' AS (
-	entity_id:int, category_id:int, rank_value:long, created_at:chararray, updated_at:chararray, deleted_at:chararray
+	entity_id:int, category_id:int, rank_value:long, created_at:chararray, 
+	updated_at:chararray, deleted_at:chararray
 );
 
 entity_cat_filtered = FILTER entity_cat BY deleted_at == '\\N';
