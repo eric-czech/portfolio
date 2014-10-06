@@ -1,7 +1,7 @@
 Twitter Affinity Project
 ====================
 
-The Pig script in this project demonstrates the process for calculating "affinity" between two entities on Twitter.  At Next Big Sound, commercial applications of this metric utilized the following definition:
+The [Pig script](twitter_affinity.pig) in this project demonstrates the process for calculating "affinity" between two entities on Twitter.  At Next Big Sound, commercial applications of this metric utilized the following definition:
 
 Given an entity pair on Twitter with members *U<sub>1</sub>* and *U<sub>2</sub>*, "Affinity" equals the sum of the number of followers of the unique users that [mention](https://support.twitter.com/articles/14023-what-are-replies-and-mentions)/[retweet](https://support.twitter.com/articles/77606-faqs-about-retweets-rt) BOTH *U<sub>1</sub>* and *U<sub>2</sub>*.
 
