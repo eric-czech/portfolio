@@ -1,4 +1,4 @@
-Data Science Portfolio
+Data Engineering Portfolio
 =======
 
 Hello!  I'm [Eric](https://www.linkedin.com/pub/eric-czech/8/992/202).  
