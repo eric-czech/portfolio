@@ -1,0 +1,9 @@
+[submodule "environments/vagrant/research/puppet/modules/python"]
+	path = environments/vagrant/research/puppet/modules/python
+	url = https://github.com/stankevich/puppet-python.git
+[submodule "environments/vagrant/research/stdlib"]
+	path = environments/vagrant/research/stdlib
+	url = https://github.com/puppetlabs/puppetlabs-stdlib.git
+[submodule "environments/vagrant/research/puppet/modules/vcsrepo"]
+	path = environments/vagrant/research/puppet/modules/vcsrepo
+	url = https://github.com/puppetlabs/puppetlabs-vcsrepo.git
