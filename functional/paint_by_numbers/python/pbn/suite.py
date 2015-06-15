@@ -4,11 +4,11 @@ from pbn import operations as ops
 import pandas as pd
 import numpy as np
 
-def get_pbn(img, max_colors=25):
+def get_pbn(img, max_colors=25, alpha=1):
     colors = ops.unravel(img)
     colors.head()
 
-    preds = ops.cluster_color_space(colors, max_clusters=max_colors)
+    preds = ops.cluster_color_space(colors, max_clusters=max_colors, alpha=alpha)
 
     pred_colors = pd.concat([preds, colors], axis=1)
     pred_colors = pred_colors.rename(columns={0: 'CLUSTER'})
@@ -23,6 +23,8 @@ def get_pbn(img, max_colors=25):
     img_cl = ops.reravel(pred_colors[['CLUSTER']], img.shape[0], img.shape[1])
     img_cl = np.reshape(img_cl, img.shape[0:2])
 
+    img_cl = ops.blur(img_cl)
+    img_cl = ops.blur(img_cl)
     spatial_clusters = ops.cluster_euclidean_space(np.int64(img_cl))
 
     # Recon after aptial clustering

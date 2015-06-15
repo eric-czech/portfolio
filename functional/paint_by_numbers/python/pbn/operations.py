@@ -25,11 +25,42 @@ def reravel(d, x, y):
         dc[r_i, r_j] = r
     return dc
 
-def cluster_color_space(img_df, max_clusters=5):
-    dpgmm = mixture.DPGMM(n_components=max_clusters)
+
+def cluster_color_space(img_df, max_clusters=5, alpha=1):
+    dpgmm = mixture.DPGMM(n_components=max_clusters, alpha=alpha)
     dpgmm.fit(img_df)
     pred = dpgmm.predict(img_df)
     return pd.Series(pred)
+
+
+def blur(img_nd):
+    for i, v in np.ndenumerate(img_nd):
+        patch = _get_patch(i, delta=1)
+        votes = {}
+        for point in patch:
+            x, y = point
+            if point == i:
+                continue
+            if x < 0 or x >= img_nd.shape[0]:
+                continue
+            if y < 0 or y >= img_nd.shape[1]:
+                continue
+            vp = img_nd[point]
+            if not vp in votes:
+                votes[vp] = 0
+            votes[vp] += 1
+        vsame = votes.get(v, 0)
+        if vsame > 1:
+            continue
+        votes = pd.Series(votes).order(ascending=False)
+        top_c, top_v = votes.index[0], votes.iloc[0]
+        if vsame > 0:
+            if top_v > 5:
+                img_nd[i] = top_c
+        if vsame == 0:
+            img_nd[i] = top_c
+    return img_nd
+
 
 
 def image_from_clusters(spatial_clusters, color_clusters, img_nd, use_random_color=False):
@@ -43,10 +74,13 @@ def image_from_clusters(spatial_clusters, color_clusters, img_nd, use_random_col
                 img[p[0], p[1]] = color
     return img
 
+
 def cluster_euclidean_space(img_nd):
     return _get_clusters(img_nd)
 
+
 __OFFSETS = [(-1, -1), (-1, 0), (-1, 1), (1, -1), (1, 0), (1, 1), (0, -1), (0, 1)]
+
 
 def _traverse(node, d):
     res = {node[0]: node[1]}
@@ -55,12 +89,13 @@ def _traverse(node, d):
         loc, value = stack.pop(-1)
         for offset in __OFFSETS:
             neighbor = _get_neighbor(offset, loc, d)
-            if neighbor\
-                and not neighbor[0] in res\
-                and neighbor[1] == value:
+            if neighbor \
+                    and not neighbor[0] in res \
+                    and neighbor[1] == value:
                 res[neighbor[0]] = neighbor[1]
                 stack.append(neighbor)
     return res
+
 
 def _get_neighbor(offset, loc, d):
     i, j = loc
@@ -71,11 +106,12 @@ def _get_neighbor(offset, loc, d):
         return None
     return (ni, nj), d[ni, nj]
 
+
 def _get_clusters(d):
     candidates = dict([(i, v) for i, v in np.ndenumerate(d)])
     clusters = {}
     while len(candidates) > 0:
-        #print 'canidate len:', len(candidates)
+        # print 'canidate len:', len(candidates)
         loc, val = candidates.popitem()
         if val not in clusters:
             clusters[val] = []
@@ -88,6 +124,7 @@ def _get_clusters(d):
 
 
 LABEL_MARGIN = 4
+
 
 def get_cluster_props(spatial_clusters, color_clusters):
     res = {}
@@ -121,10 +158,11 @@ def get_cluster_props(spatial_clusters, color_clusters):
 def _get_patch(point, delta=1):
     x, y = point
     res = []
-    for dx in range(-delta, delta+1):
-        for dy in range(-delta, delta+1):
-            res.append((x+dx, y+dy))
+    for dx in range(-delta, delta + 1):
+        for dy in range(-delta, delta + 1):
+            res.append((x + dx, y + dy))
     return res
+
 
 def _is_patch_enclosed(point, members, delta):
     for point in _get_patch(point, delta=delta):
@@ -137,7 +175,7 @@ def render_pbn(fc, img_nd, bkg=[.99, .99, .99], edg=[0., 0., 0.], solution=False
     res = np.empty_like(img_nd)
     for cc_id in fc:
         for c in fc[cc_id]:
-            actual_color = c['color']/float(255)
+            actual_color = c['color'] / float(255)
             def_label = c['default_label']
             use_actual = solution or not def_label or len(c['points']) < size_limit
             color = actual_color if use_actual else bkg
