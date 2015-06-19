@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+body {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  margin: auto;
+  position: relative;
+  width: 960px;
+}
+
+form {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+}
+
+text {
+  font: 11px sans-serif;
+  fill: white;
+  cursor: default;
+  pointer-events: none;
+}
+
+path {
+  stroke: #fff;
+  fill-rule: evenodd;
+  cursor: default;
+}
+
+path:hover {
+  opacity: .5;
+}
+
+div.tooltip {
+  position: absolute;
+  text-align: center; 
+  width: 60px;  
+  height: 28px;   
+  padding: 2px; 
+  font: 12px sans-serif;  
+  background: lightsteelblue; 
+  border: 0px;          
+  border-radius: 8px;
+ /*  pointer-events: none;  This line needs to be removed */
+  
+}
+
+
+
+</style>
+<body>
+<form>
+  <label><input type="radio" name="mode" value="value" checked> Value</label>
+  <label><input type="radio" name="mode" value="count"> Count</label>
+</form>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script>
+
+var width = 800,
+    height = 800,
+    radius = Math.min(width, height) / 2,
+    duration = 500;
+
+var x = d3.scale.linear()
+    .range([0, 2 * Math.PI]);
+
+var y = d3.scale.sqrt()
+    .range([0, radius]);
+
+var color = d3.scale.category20();
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height)
+  .append("g")
+    .attr("transform", "translate(" + width / 2 + "," + (height / 2 + 10) + ")");
+
+var value_func = function(d) { return d.node_value; }
+
+var partition = d3.layout.partition()
+    .sort(null)
+    .value(value_func);
+
+var arc = d3.svg.arc()
+    .startAngle(function(d) { return Math.max(0, Math.min(2 * Math.PI, x(d.x))); })
+    .endAngle(function(d) { return Math.max(0, Math.min(2 * Math.PI, x(d.x + d.dx))); })
+    .innerRadius(function(d) { return Math.max(0, y(d.y)); })
+    .outerRadius(function(d) { return Math.max(0, y(d.y + d.dy)); });
+
+var tip = d3.select("body")
+  .append("div") 
+  .attr("class", "tooltip")
+  .style("opacity", 0);
+
+
+// Keep track of the node that is currently being displayed as the root.
+var node;
+
+//d3.json("./data/music.json", function(error, root) {
+d3.json("./data/share_data_plays.json", function(error, root) {
+//d3.json("./data/flare.json", function(error, root) {
+  node = root;
+  var padding = 5;
+
+   var path = svg
+      .datum(root)
+      .selectAll("path")
+      .data(partition.nodes)
+      .enter().append("path")
+        .attr("d", arc)
+        .attr("id", function(d, i){ return 'arc_' + i; })
+        .style("fill", function(d) { return color((d.children ? d : d.parent).name); })
+        .on("click", click)
+        .on("mouseover", showTooltip)
+        .on("mousemove", showTooltip)
+        .on("mouseout", hideTooltip)
+        .each(stash);
+
+   var text = svg
+      .datum(root)
+      .selectAll("text")
+      .data(partition.nodes)
+      .enter().append("text")
+        .style("font-size",10)
+        .attr("text-anchor", function(d) {
+          return x(d.x + d.dx / 2) > Math.PI ? "end" : "start";
+          //return "middle";
+        })
+        .attr("dy", ".2em")
+        .attr("transform", transformText)
+        .on("click", click)
+        .on("mouseover", showTooltip)
+        .on("mousemove", showTooltip)
+        .on("mouseout", hideTooltip)
+        .text(function(d){ 
+          if (!d.parent || d.depth <= 1)
+            return d.name;
+          else{
+            diff = d.depth - d.parent.depth
+            return diff <= 1 || value_func(d) / value_func(d.parent) > .1 ? d.name : '';
+          }
+          //diff = d.depth - node.depth;
+          //return diff == 1 || diff == 2 ? d.name : ''; 
+          //return diff == 1 ? d.name : ''; 
+        });
+
+  d3.selectAll("input").on("change", function change() {
+
+    value_func = this.value === "count"
+        ? function(d) { return d.node_ct; }
+        : function(d) { return d.node_value; };
+
+    path
+        .data(partition.value(value_func).nodes)
+        .transition()
+        .duration(duration)
+        .attrTween("d", arcTweenData);
+        //.attrTween("d", arcTweenZoom(node));
+
+    translateText(node, text.data(partition.value(value_func).nodes));
+
+  });
+
+  function showTooltip(d){
+    tip
+      .html('<p>' + d.name + ': '+d.node_value+'</p>')
+      .style("opacity", .9)
+      .style("left", (d3.event.pageX - (width / 2)) + "px")      
+      .style("top", (d3.event.pageY) + "px");
+  }
+
+  function hideTooltip(d){
+    tip.style("opacity", 0);
+  }
+
+  function transformText(d){
+      var multiline = (d.name || "").split(" ").length > 1,
+          angle = x(d.x + d.dx / 2) * 180 / Math.PI - 90,
+          rotate = angle + (multiline ? -.5 : 0);
+      return "rotate(" + rotate + ")translate(" + (y(d.y) + padding) + ")rotate(" + (angle > 90 ? -180 : 0) + ")";
+      //return "rotate(" + rotate + ")translate(" + (y(d.y) + padding) + ")rotate(90)";
+  }
+
+  function click(d) {
+    node = d;
+    path
+      .transition()
+      .duration(duration)
+      .attrTween("d", arcTweenZoom(d));
+
+    translateText(d, text);
+
+  }
+
+  function translateText(p, selector){
+    selector
+      .style("visibility", function(e) {
+          return isParentOf(p, e) ? null : d3.select(this).style("visibility");
+        })
+        .transition()
+        .duration(duration)
+        .attrTween("text-anchor", function(d) {
+          return function() {
+            return x(d.x + d.dx / 2) > Math.PI ? "end" : "start";
+            //return "middle";
+          };
+        })
+        .attrTween("transform", function(d) {
+          return function() {
+            return transformText(d);
+          };
+        })
+        .style("fill-opacity", function(e) { return isParentOf(p, e) ? 1 : 1e-6; })
+        .text(function(d){ 
+          if (!d.parent || d.depth <= 1)
+            return d.name;
+          else{
+            diff = d.depth - d.parent.depth
+            return diff <= 1 || value_func(d) / value_func(d.parent) > .1 ? d.name : '';
+          }
+        })
+        .each("end", function(e) {
+          d3.select(this).style("visibility", isParentOf(p, e) ? null : "hidden");
+        });
+  }
+
+
+});
+
+d3.select(self.frameElement).style("height", height + "px");
+
+// Setup for switching data: stash the old values for transition.
+function stash(d) {
+  d.x0 = d.x;
+  d.dx0 = d.dx;
+}
+
+function isParentOf(p, c) {
+  if (p === c) return true;
+  if (p.children) {
+    return p.children.some(function(d) {
+      return isParentOf(d, c);
+    });
+  }
+  return false;
+}
+
+
+// When switching data: interpolate the arcs in data space.
+function arcTweenData(a, i) {
+  var oi = d3.interpolate({x: a.x0, dx: a.dx0}, a);
+  function tween(t) {
+    var b = oi(t);
+    a.x0 = b.x;
+    a.dx0 = b.dx;
+    return arc(b);
+  }
+  if (i == 0) {
+   // If we are on the first arc, adjust the x domain to match the root node
+   // at the current zoom level. (We only need to do this once.)
+    var xd = d3.interpolate(x.domain(), [node.x, node.x + node.dx]);
+    return function(t) {
+      x.domain(xd(t));
+      return tween(t);
+    };
+  } else {
+    return tween;
+  }
+}
+
+// When zooming: interpolate the scales.
+function arcTweenZoom(d) {
+  var xd = d3.interpolate(x.domain(), [d.x, d.x + d.dx]),
+      yd = d3.interpolate(y.domain(), [d.y, 1]),
+      yr = d3.interpolate(y.range(), [d.y ? 20 : 0, radius]);
+  return function(d, i) {
+    return i
+        ? function(t) { return arc(d); }
+        : function(t) { x.domain(xd(t)); y.domain(yd(t)).range(yr(t)); return arc(d); };
+  };
+}
+
+</script>
