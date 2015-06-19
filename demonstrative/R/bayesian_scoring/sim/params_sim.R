@@ -13,7 +13,8 @@ params <- new.env()
 params$groups <- list(
   Group.10=function(d) 10, 
   Group.50=function(d) 50, 
-  Group.100=function(d) 100
+  Group.100=function(d) 100,
+  Group.250=function(d) 250
 )
 
 # Vector of event names and corresponding weights; these weights are

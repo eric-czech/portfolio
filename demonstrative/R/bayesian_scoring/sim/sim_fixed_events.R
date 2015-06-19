@@ -6,7 +6,6 @@ source('sim/params_sim.R')
 
 set.seed(2)
 
-
 group.event.probs <- data.frame(group=names(params$groups), p=.1)
 
 event.probs <- foreach(event=names(params$events), .combine = rbind) %do% {

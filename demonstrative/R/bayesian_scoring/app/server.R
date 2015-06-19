@@ -7,7 +7,6 @@ source('app.R')
 
 shinyServer(function(input, output, session) {
   
-  # Combine the selected variables into a new data frame
   selectedData <- reactive({
     sim <- new.env()
     if (input$data.type == 'Fixed')

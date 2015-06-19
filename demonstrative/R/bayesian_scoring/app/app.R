@@ -4,7 +4,6 @@ library(qcc)
 
 
 getPosterior <- function(data, input){
-  print('Getting posterior data...')
   
   prior.alpha <- input$prior.alpha
   prior.beta <- input$prior.beta
@@ -56,6 +55,28 @@ getPosterior <- function(data, input){
     rbind(split)
   
 
+}
+
+getMcmcPosterior <- function(data, input){
+# Data format:
+#   group  event        day value size
+#   1 Group.10 event1 2015-01-01     0   10
+#   2 Group.10 event1 2015-01-02     0   10
+  n.days <- length(unique(data$day))
+  offset <- 3
+  trials <- dcast(data, group + event ~ day, value.var='size')[,offset:(n.days+offset-1)]
+  y <- dcast(data, group + event ~ day, value.var='value')[,offset:(n.days+offset-1)]
+  y <- round(y, digits=0) %>% apply(2, as.integer)
+  d <- list(
+    N=n.days,
+    G=dim(y)[1],
+    y=y,
+    trials=trials
+  )
+  
+  fit <- stan(file='../mcmc/zero-inflated-binom-set.stan', data=d, iter = 1000, chains=1)
+  
+  fit@sim$samples[[1]] # this returns list of parameters like theta[11] and samples for each
 }
 
 getPosteriorPlot <- function(data, input){
