@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 
 def get_pbn(img, max_colors=25, alpha=1):
-    colors = ops.unravel(img)
+    colors = ops.unravel_old(img)
     colors.head()
 
     preds = ops.cluster_color_space(colors, max_clusters=max_colors, alpha=alpha)
