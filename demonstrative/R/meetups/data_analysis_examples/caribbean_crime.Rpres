@@ -1,0 +1,149 @@
+Homicide in the Caribbean
+========================================================
+width:  1800
+height: 900
+
+First Slide
+========================================================
+
+For more details on authoring R presentations click the
+**Help** button on the toolbar.
+
+- Bullet 1
+- Bullet 2
+- Bullet 3
+
+Load Raw Data
+========================================================
+
+```{r, echo=FALSE}
+library(foreach)
+library(dplyr)
+library(reshape2)
+library(stringr)
+library(ggplot2)
+setwd('/Users/eczech/repos/portfolio/demonstrative/R/meetups/data_analysis_examples')
+theme_nobg = theme(panel.background=element_blank())
+theme_boxplot = theme(
+  panel.grid.minor=element_blank(), 
+  panel.grid.major=element_blank(),                     
+  axis.text.x = element_text(angle = 65, hjust = 1)
+)
+```
+
+```{r}
+library(knitr)
+data <- read.csv('data/crime_data.csv', stringsAsFactors=F)
+kable(data %>% sample_n(8), caption='Raw Data Set', format='html') 
+``` 
+
+Transform Raw Data
+========================================================
+
+```{r}
+data <- data %>% 
+  
+  # Turn columns into rows, repeating the country each time
+  melt(id.vars='Country', variable.name = 'Year', value.name = 'Homicide.Rate') %>% 
+  
+  # Convert the years to numeric values and subtract the minimum year from each
+  mutate(Year = as.numeric(str_replace(Year, 'X', '')) - 2000) %>%
+  
+  # Remove absent values for the sake of later modeling
+  filter(!is.na(Homicide.Rate))
+
+kable(data %>% sample_n(8), caption='Transformed Data Set', format='html')
+```
+
+Maximum Likelihood Regression (Theory)
+========================================================
+
+We want to know the following for each country: 
+
+Maximum Likelihood Regression (Application)
+======================================================== 
+
+```{r}
+library(lme4)
+
+# Regress the homicide rate by year, but allow for slopes and intercepts
+# to vary by country.  The "0" here means that there are no intercepts
+# or slopes common to all countries. 
+fit <- lmer(Homicide.Rate ~ 0 + (Year|Country), data = data)
+
+# Randomly simulate predictions from the fitted model to get a sense
+# of variance for each country
+predictions <- foreach(c=unique(data$Country), .combine=rbind) %do%{ 
+  pred.d <- data.frame(Country=c, Year=(2014:2015) - 2000)
+  pred.fun <- function(x) { predict(x, pred.d, type='response') }
+  bootfit <- bootMer(fit, use.u=T, nsim=5, FUN=pred.fun)
+  # Column "2" below is the prediction for 2015
+  data.frame(Country=c, Prediction=bootfit$t[,2])
+}
+```
+
+
+Maximum Likelihood Regression (Predictions)
+======================================================== 
+
+```{r, fig.width=16, fig.height=8, fig.align='center'}
+ordered.countries <- predictions %>% group_by(Country) %>% 
+  summarise(Median=median(Prediction)) %>%
+  arrange(desc(Median)) %>% .$Country
+
+predictions %>% 
+  mutate(Country=factor(as.character(Country), levels=ordered.countries)) %>%
+  ggplot(aes(x=Country, y=Prediction)) + geom_boxplot() + ylab('Homicide.Rate') +  
+  theme_boxplot + ggtitle('2015 Homicide Rate Predictions')
+```
+
+Cuba
+======================================================== 
+
+If the ONLY known Homicide Rate for Cuba is 4.2 (recorded in 2012),
+
+Why then, do the predictions for Homicide Rates in other years look like this?
+
+```{r, echo=FALSE, fig.width=16, fig.height=8, fig.align='center'}
+cuba.data <- subset(data, Country == 'Cuba') %>% mutate(Known=T)
+cuba.pred <- predict(fit, newdata = data.frame(Country='Cuba', Year=c(0:11,13:15)))
+cuba.data <- rbind(cuba.data, data.frame(Known=F, Country='Cuba', Year=c(0:11,13:15), Homicide.Rate=cuba.pred))
+
+median.data <- data %>% group_by(Year) %>% 
+  summarise(Homicide.Rate=median(Homicide.Rate)) %>% mutate(Country='All', Known=T)
+  
+all.data <- rbind(cuba.data, median.data) %>% mutate(Year = Year + 2000)
+ 
+ggplot() + 
+  geom_line(aes(x=Year, y=Homicide.Rate), data=subset(all.data, Country=='All')) + 
+  geom_point(aes(x=Year, y=Homicide.Rate, color=Known), data=subset(all.data, Country=='Cuba'), size=5) +
+  geom_line(aes(x=Year, y=Homicide.Rate), color='grey', data=subset(all.data, Country=='Cuba')) +
+  theme_nobg + ggtitle('Cuban Predictions vs Overall Median') + 
+  annotate('text', x = 2014, y = 22, label = "Median Homicide Rate\nOver All Countries") + 
+  annotate('text', x = 2008, y = 6, label = "Predicted Homicide Rates in Cuba")
+```
+
+Probabilistic (i.e. Bayesian) Modeling
+======================================================== 
+
+Going back to the original problem, we're going to start with a dataset like this:
+
+```{r}
+kable(data %>% sample_n(8), caption='Raw Data Set', format='html') 
+```
+
+Probabilistic Modeling
+======================================================== 
+
+What does a "probabilistic model" look like?
+
+```{r}
+
+```
+
+Slide With Plot
+========================================================
+
+```{r, echo=FALSE}
+plot(cars)
+```
