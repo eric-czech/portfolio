@@ -280,11 +280,11 @@ def _is_patch_enclosed(point, members, delta):
     return True
 
 
-def render_pbn(fc, img_nd, bkg=[.99, .99, .99], edg=[1., 1., 1.], solution=False, size_limit=25):
+def render_pbn(fc, img_nd, bkg=[.99, .99, .99], edg=[1., 1., 1.], solution=False, size_limit=25, ):
     res = np.empty_like(img_nd)
     for cc_id in fc:
         for c in fc[cc_id]:
-            actual_color = c['color'] / float(255)
+            actual_color = c['color']  # this was dividing by 255 before
             def_label = c['default_label']
             use_actual = solution or len(c['points']) < size_limit
             color = actual_color if use_actual else bkg
@@ -294,7 +294,7 @@ def render_pbn(fc, img_nd, bkg=[.99, .99, .99], edg=[1., 1., 1.], solution=False
 
             if not use_actual:
                 for point in c['edges']:
-                    res[point] = actual_color#edg
+                    res[point] = actual_color if edg is None else edg
 
             if def_label:
                 for point in def_label:

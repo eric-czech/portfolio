@@ -41,3 +41,19 @@ def denoise_flat_img(img_flat, img_raw_shape, color_cols, n_iter=1, suffix='dn',
     denoise_cols = ['{}_{}'.format(c, suffix) for c in color_cols]
     img_flat[denoise_cols] = ops.unravel(img_raw, denoise_cols)[denoise_cols]
     return img_flat
+
+
+def match_to_palette(df_color, palette):
+    """ Finds the closest color in the palette to all colors given
+    :param df_color: Data frame containing 3 cols on same scale as palette (eg rgb, lab)
+    :param palette: Data frame also with 3 rows, each containing a palette color
+                    on the same scale as df_color
+    :return: A data frame of the same shape and size as df_color, with row values replaced
+                    by the closest entries in the palette
+    """
+    def get_closest_color(x):
+        i = np.argmin((palette - np.array(x)).apply(np.linalg.norm, axis=1))
+        if np.isnan(i):
+            print(x, (palette - np.array(x)))
+        return palette.iloc[i]
+    return df_color.apply(get_closest_color, axis=1)

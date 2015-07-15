@@ -1,9 +1,9 @@
-Homicide in the Caribbean
+Caribbean Crime
 ========================================================
 width:  1800
-height: 900
+height: 1200
 
-First Slide
+R Presentations
 ========================================================
 
 For more details on authoring R presentations click the
@@ -13,17 +13,28 @@ For more details on authoring R presentations click the
 - Bullet 2
 - Bullet 3
 
-Load Raw Data
+```{r}
+# some code
+data.frame(some_number=1:3, some_letter=c('a', 'b', 'c')) 
+```
+
+Raw Crime Data
 ========================================================
 
 ```{r, echo=FALSE}
+knitr::opts_chunk$set(cache=T)
 library(foreach)
 library(dplyr)
 library(reshape2)
-library(stringr)
+library(stringr) 
 library(ggplot2)
+
 setwd('/Users/eczech/repos/portfolio/demonstrative/R/meetups/data_analysis_examples')
-theme_nobg = theme(panel.background=element_blank())
+theme_nobg = theme(
+  panel.background=element_blank(), 
+  axis.text.x = element_text(angle = 65, hjust = 1)
+)
+
 theme_boxplot = theme(
   panel.grid.minor=element_blank(), 
   panel.grid.major=element_blank(),                     
@@ -44,27 +55,253 @@ Transform Raw Data
 data <- data %>% 
   
   # Turn columns into rows, repeating the country each time
-  melt(id.vars='Country', variable.name = 'Year', value.name = 'Homicide.Rate') %>% 
+  melt(id.vars='Country', variable.name='Year', value.name='Homicide.Rate') %>% 
   
-  # Convert the years to numeric values and subtract the minimum year from each
-  mutate(Year = as.numeric(str_replace(Year, 'X', '')) - 2000) %>%
+  # Convert the years to numeric values and subtract the minimum year from each; also
+  # convert names of countries to factors
+  mutate(Year=as.numeric(str_replace(Year, 'X', '')) - 2000, Country=factor(Country)) %>%
   
   # Remove absent values for the sake of later modeling
   filter(!is.na(Homicide.Rate))
 
-kable(data %>% sample_n(8), caption='Transformed Data Set', format='html')
+data %>% sample_n(8) # Transformed Data Set
 ```
 
-Maximum Likelihood Regression (Theory)
+
+The Goal: Predict 2015 Homicide Rate
+======================================================== 
+
+```{r, include=FALSE}
+get.linear.regressions <- function(){
+  subset(data, Country %in% c('Jamaica', 'Saint Vincent and the Grenadines', 'Cuba')) %>%
+    group_by(Country) %>% 
+    do({
+      r <- data.frame(Year=2000:2015 - 2000) 
+      r$LinearRegression <- predict(lm(Homicide.Rate ~ Year, .), r)
+      r
+    }) %>% left_join(data, by=c('Country', 'Year')) %>% 
+    mutate(Year=Year + 2000) %>% ggplot() + 
+    geom_line(aes(x=Year, y=LinearRegression, color=Country)) +
+    geom_point(aes(x=Year, y=Homicide.Rate, color=Country), size=3) + 
+    scale_x_continuous(breaks=2000:2015) + theme_nobg 
+}
+```
+
+```{r, fig.width=16, fig.height=8, fig.align='center'}  
+get.linear.regressions()  
+```
+
+
+Shared Slopes
+======================================================== 
+
+- The slopes and intercepts amongst the islands are likely related
+- There are enough countries with little data that separate regressions would suck
+
+
+```{r, echo=FALSE, fig.width=16, fig.height=12, fig.align='center'}
+data %>% mutate(Year = Year + 2000 ) %>% ggplot(aes(x=Year, y=Homicide.Rate)) + 
+  geom_line() + facet_wrap(~Country) + theme_nobg
+```
+
+
+Hiearchical Modeling
+======================================================== 
+
+- Usual linear regression:
+
+$$ HomicideRate_i = \beta_{0} + Year_i \cdot \beta_1 + \epsilon$$
+    
+$$ \epsilon \sim \mathcal{N}(0, \sigma) $$
+    
+- Hierarchical regression
+  - Each country has it's own slope and intercept, both of which are sort of shared
+
+$$ i \in Years, j \in Countries: $$
+
+$$HomicideRate_{ij} = \beta_{0j} + Year_{ij} \cdot \beta_{1j} + \epsilon$$
+
+$$\beta_{0j} \sim \mathcal{N}(\mu_0, \sigma_0)$$
+$$\beta_{1j} \sim \mathcal{N}(\mu_1, \sigma_1)$$ 
+$$\epsilon \sim \mathcal{N}(0, \sigma)$$
+
+
+Probabilistic (i.e. Bayesian) Modeling
+======================================================== 
+
+What does a "probabilistic model" look like?
+
+Here's one [example](https://github.com/eric-czech/portfolio/blob/master/demonstrative/R/meetups/data_analysis_examples/bayes_regression.stan)
+
+Running A Probabilistic Model
+======================================================== 
+
+```{r}
+setwd('/Users/eczech/repos/portfolio/demonstrative/R/meetups/data_analysis_examples')
+
+countries <- unique(data$Country)
+stan.data <- list(
+  N = nrow(data),
+  C = length(unique(data$Country)),
+  country = match(data$Country, countries),
+  year = data$Year,
+  homicide = data$Homicide.Rate
+)
+
+fit <- stan('bayes_regression.stan', data = stan.data , warmup = 2000, iter = 5000, thin = 100, chains = 4, verbose = FALSE)
+bayes.predictions <- rstan::extract(fit)$predictions
+```
+
+```{r, include=FALSE}
+colnames(bayes.predictions) <- countries
+bayes.predictions <- as.data.frame(bayes.predictions) %>% 
+    mutate(SampleId=1:nrow(.)) %>% 
+    melt(id.vars = 'SampleId', variable.name = 'Country', value.name = 'Prediction')
+```
+
+Probabilistic Model Predictions
+======================================================== 
+
+```{r, include=FALSE}
+plot.predictions <- function(predictions, title){
+  ordered.countries <- predictions %>% group_by(Country) %>% 
+    dplyr::summarise(Median=median(Prediction)) %>%
+    arrange(desc(Median)) %>% .$Country
+  
+  predictions %>% 
+    mutate(Country=factor(as.character(Country), levels=ordered.countries)) %>% 
+    ggplot(aes(x=Country, y=Prediction)) + geom_boxplot() + ylab('Homicide.Rate') +
+    theme_boxplot + ggtitle(title)
+}
+```
+```{r, fig.width=16, fig.height=8, fig.align='center'}
+bayes.predictions %>% sample_n(5)    
+plot.predictions(bayes.predictions, 'Probability Model Predictions') 
+```
+
+Cuba
+======================================================== 
+
+If the ONLY known Homicide Rate for Cuba is 4.2 (recorded in 2012),
+
+Why then, do the 2015 predictions look like this?
+
+```{r, echo=FALSE, fig.width=16, fig.height=8, fig.align='center'}
+
+cuba.data <- subset(bayes.predictions, Country == 'Cuba') %>% group_by(Country) %>%
+  dplyr::summarise(Known=F, Year=2015 - 2000, Homicide.Rate=median(Prediction)) %>% 
+  rbind(subset(data, Country == 'Cuba') %>% mutate(Known=T))
+
+median.data <- data %>% group_by(Year) %>% 
+  dplyr::summarise(Country='All', Known=T, Homicide.Rate=median(Homicide.Rate))
+
+all.data <- rbind(cuba.data, median.data) %>% mutate(Year = Year + 2000)
+#all.data
+
+ggplot() + 
+  geom_line(aes(x=Year, y=Homicide.Rate), data=subset(all.data, Country=='All')) + 
+  geom_point(aes(x=Year, y=Homicide.Rate, color=Known), data=subset(all.data, Country=='Cuba'), size=5) +
+  geom_line(aes(x=Year, y=Homicide.Rate), color='grey', data=subset(all.data, Country=='Cuba')) +
+  theme_nobg + ggtitle('Cuban Predictions vs Overall Median') + 
+  annotate('text', x = 2014, y = 22, label = "Median Homicide Rate\nover all countries") + 
+  annotate('text', x = 2015, y = 8, label = "Predicted value for\nCuba in 2015") +
+  annotate('text', x = 2011, y = 6, label = "Only known Value for\nCuba in 2012")
+```
+
+
+
+Maximum Likelihood (Theory)
 ========================================================
 
-We want to know the following for each country: 
+What is the true probability that I forget my lunch for work?
 
-Maximum Likelihood Regression (Application)
+```{r, echo=FALSE}
+kable(data.frame(Day=1:8, Result=c('Yes', 'No', 'No', 'No', 'Yes', 'No', 'No', 'Yes')))
+```
+
+Pr(forget lunch) = # Yes's / # Total = 3/8 = .375
+
+Obviously
+
+Maximum Likelihood (Theory 2)
+========================================================
+
+What if it wasn't obvious?  What if you just had to guess and test some how?
+
+Given some guess $p$, we can say that the probability or likelihood of seeing our data was:
+
+$$Pr(\text{data we saw }|p) = Pr(3 \text{Yes's }|p) \cdot Pr(5 \text{No's }|p) $$
+
+$$ = p^3 \cdot (1-p)^5%$$
+
+<br>
+So if we randomly guess that $p$ is .1, then the "likelihood" of our data is $.1^3 \cdot .9^5 = 0.0006$
+
+Other random guesses: 
+
+```{r}
+p=seq(.1, .9, .1)
+data.frame(p=p, likelihood=p^3 * (1-p)^5)
+```
+
+Maximum Likelihood (Theory 2)
+========================================================
+
+<br>
+<center>What $p$ makes the likelihood highest?</center>
+
+```{r, echo=FALSE, fig.align='center', fig.width=12, fig.height=3}
+data.frame(p=p, likelihood=p^3 * (1-p)^5) %>% 
+  ggplot(aes(x=p, y=likelihood)) + geom_line()
+```
+
+Sometimes you can cheat by taking the derivative with respect to $p$ and setting that to 0
+
+This gives $p=\frac{3}{8} = .375$ in this case
+
+
+
+Going back to the original problem, we're going to start with a dataset like this:
+```{r}
+# Raw Data Set Sample
+data %>% sample_n(8)
+```
+
+Maximum Likelihood Regression (Application 2)
+======================================================== 
+
+```{r, include=FALSE}
+get.points <- function(){
+  plt.data <- subset(data, Country %in% c('Jamaica', 'Saint Vincent and the Grenadines')) %>%
+    group_by(Country) %>% 
+    do({
+      r <- data.frame(Year=2000:2015 - 2000) 
+      r$LinearRegression <- predict(lm(Homicide.Rate ~ Year, .), r)
+      r
+    }) %>% left_join(data, by=c('Country', 'Year')) %>% 
+    mutate(Year=Year + 2000) 
+  d1 <- subset(plt.data, Country=='Saint Vincent and the Grenadines')
+  d2 <- subset(plt.data, Country=='Jamaica')
+  ggplot(d1) + 
+    geom_line(aes(x=Year, y=LinearRegression)) +
+    geom_point(aes(x=Year, y=Homicide.Rate),  data=d2, size=3) + 
+    scale_x_continuous(breaks=2000:2015) + theme_nobg 
+}
+```
+
+What is the likelihood for this guess at a regression line?
+
+```{r, fig.width=16, fig.height=8, fig.align='center'}  
+get.points()  
+```
+
+
+Maximum Likelihood Regression (in R)
 ======================================================== 
 
 ```{r}
 library(lme4)
+library(foreach)
 
 # Regress the homicide rate by year, but allow for slopes and intercepts
 # to vary by country.  The "0" here means that there are no intercepts
@@ -73,10 +310,10 @@ fit <- lmer(Homicide.Rate ~ 0 + (Year|Country), data = data)
 
 # Randomly simulate predictions from the fitted model to get a sense
 # of variance for each country
-predictions <- foreach(c=unique(data$Country), .combine=rbind) %do%{ 
-  pred.d <- data.frame(Country=c, Year=(2014:2015) - 2000)
-  pred.fun <- function(x) { predict(x, pred.d, type='response') }
-  bootfit <- bootMer(fit, use.u=T, nsim=5, FUN=pred.fun)
+ml.predictions <- foreach(c=unique(data$Country), .combine=rbind) %do%{ 
+  predictions <- data.frame(Country=c, Year=(2014:2015) - 2000)
+  pred.fun <- function(x) { predict(x, predictions, type='response') }
+  bootfit <- bootMer(fit, use.u=T, nsim=5, FUN=pred.fun) 
   # Column "2" below is the prediction for 2015
   data.frame(Country=c, Prediction=bootfit$t[,2])
 }
@@ -87,63 +324,213 @@ Maximum Likelihood Regression (Predictions)
 ======================================================== 
 
 ```{r, fig.width=16, fig.height=8, fig.align='center'}
-ordered.countries <- predictions %>% group_by(Country) %>% 
-  summarise(Median=median(Prediction)) %>%
+ordered.countries <- ml.predictions %>% group_by(Country) %>% 
+  dplyr::summarise(Median=median(Prediction)) %>%
   arrange(desc(Median)) %>% .$Country
 
-predictions %>% 
+ml.predictions %>% 
   mutate(Country=factor(as.character(Country), levels=ordered.countries)) %>%
   ggplot(aes(x=Country, y=Prediction)) + geom_boxplot() + ylab('Homicide.Rate') +  
   theme_boxplot + ggtitle('2015 Homicide Rate Predictions')
 ```
 
-Cuba
+Timeseries Modeling in a Real World Setting
 ======================================================== 
 
-If the ONLY known Homicide Rate for Cuba is 4.2 (recorded in 2012),
+<center><h1>Gaussian Process</h1></center>
 
-Why then, do the predictions for Homicide Rates in other years look like this?
+- Assume the whole dataset is _ONE_ sample from a multivariate normal distribution
+- Multivariate Normal Distribution has 2 parameters:
+  - $\mu$ mean of all dimensions
+  - $\sum$, containing the correlations between all dimensions
+
+- Very versatile timeseries models AND can be modeled __hierarchically__
+
+<center><img src="http://scikit-learn.org/stable/_images/plot_gp_regression_0021.png"/></center>
+
+
+Machine Learning Algorithms
+======================================================== 
+
+- Random Forest
+- Gradient Boosted Regression Trees
+- Neural Networks
+- Nearest Neighbor Regression
+- ElasticNet Regression
+- Support Vector Machine Regression
+
+
+Support Vector Machines (SVM)
+======================================================== 
+
+<center>SVM fit to some complicated function:</center>
+True Function: $$ y = \frac{sin(x)}{x} + \frac{x}{100} $$
 
 ```{r, echo=FALSE, fig.width=16, fig.height=8, fig.align='center'}
-cuba.data <- subset(data, Country == 'Cuba') %>% mutate(Known=T)
-cuba.pred <- predict(fit, newdata = data.frame(Country='Cuba', Year=c(0:11,13:15)))
-cuba.data <- rbind(cuba.data, data.frame(Known=F, Country='Cuba', Year=c(0:11,13:15), Homicide.Rate=cuba.pred))
+i = pi/8
+x = seq(-4*pi, 4*pi, i)
+xn = x
+#d = data.frame(x=x, y=sin(x))
+d = data.frame(x=x, y=sin(x)/x + .01 * x, Type='Actual')
 
-median.data <- data %>% group_by(Year) %>% 
-  summarise(Homicide.Rate=median(Homicide.Rate)) %>% mutate(Country='All', Known=T)
-  
-all.data <- rbind(cuba.data, median.data) %>% mutate(Year = Year + 2000)
- 
+tuneGrid <- expand.grid(C=c(.1,1,10,100), sigma=c(.1,1,10,100))
+fit <- train(y ~ x, data=d, method="svmRadial", tuneGrid=tuneGrid,
+             preProc = c("center", "scale"), trControl=trainControl(method='cv', number=10, allowParallel = T))
+y = predict(fit, newdata=data.frame(x=xn))
+d = rbind(d, data.frame(x=xn, y=y, Type='Predicted'))
 ggplot() + 
-  geom_line(aes(x=Year, y=Homicide.Rate), data=subset(all.data, Country=='All')) + 
-  geom_point(aes(x=Year, y=Homicide.Rate, color=Known), data=subset(all.data, Country=='Cuba'), size=5) +
-  geom_line(aes(x=Year, y=Homicide.Rate), color='grey', data=subset(all.data, Country=='Cuba')) +
-  theme_nobg + ggtitle('Cuban Predictions vs Overall Median') + 
-  annotate('text', x = 2014, y = 22, label = "Median Homicide Rate\nOver All Countries") + 
-  annotate('text', x = 2008, y = 6, label = "Predicted Homicide Rates in Cuba")
+  geom_line(data=subset(d, Type=='Actual'), aes(x=x, y=y, color=Type)) + 
+  geom_point(data=subset(d, Type=='Predicted'), aes(x=x, y=y, color=Type)) + theme_nobg
 ```
 
-Probabilistic (i.e. Bayesian) Modeling
+
+Support Vector Machines (in R)
 ======================================================== 
-
-Going back to the original problem, we're going to start with a dataset like this:
-
-```{r}
-kable(data %>% sample_n(8), caption='Raw Data Set', format='html') 
-```
-
-Probabilistic Modeling
-======================================================== 
-
-What does a "probabilistic model" look like?
-
-```{r}
-
-```
-
-Slide With Plot
-========================================================
 
 ```{r, echo=FALSE}
-plot(cars)
+plot.svm.predictions <- function(predictions){
+  ordered.countries <- predictions %>% group_by(Country) %>% 
+    dplyr::summarise(Median=median(Prediction)) %>%
+    arrange(desc(Median)) %>% .$Country 
+
+  predictions %>% 
+    mutate(Country=factor(as.character(Country), levels=ordered.countries)) %>%
+    ggplot(aes(x=Country, y=Prediction)) + geom_boxplot() + 
+    theme_boxplot
+}
 ```
+
+Example Usage:
+
+```{r}
+library(kernlab)
+
+head(data, 3)
+ 
+# Fit SVM model with default arguments
+fit <- ksvm(Homicide.Rate ~ Year + Country, data = data)
+
+# Get and show sample of predictions
+svm.predictions <- data.frame(Country=unique(data$Country), Year=2015 - 2000) 
+svm.predictions$Prediction <- predict(fit, svm.predictions)
+
+head(svm.predictions, 3)
+```
+
+
+Default SVM With Bootstrap
+======================================================== 
+
+```{r, results='hide'}
+n.bootstrap <- 30 # Number of bootstrap samples to take
+
+svm.predictions <- foreach(i=1:n.bootstrap, .combine=rbind) %do% {
+  samp <- data %>% sample_frac(size=1, replace=T) # Perform bootstrap sample
+  
+  # Fit SVM with default arguments
+  fit <- ksvm(Homicide.Rate ~ Year + Country, data = samp)
+  
+  # Return predictions for 2015
+  data.frame(Country=unique(samp$Country), Year=2015-2000) %>% 
+    mutate(Prediction=predict(fit, .)[,1], Year=Year+2000, SampleId=i)
+} 
+```
+
+Default SVM With Bootstrap Results
+======================================================== 
+
+```{r, fig.width=20, fig.height=8, fig.align='center'}
+head(svm.predictions) 
+plot.svm.predictions(svm.predictions)  
+```
+
+SVM Tuning
+======================================================== 
+
+```{r, include=FALSE} 
+library(doParallel)
+registerDoParallel(makeCluster(5))
+```
+
+
+```{r, results='hide'}
+svm.predictions <- foreach(i=1:n.bootstrap, .combine=rbind) %dopar% {
+  library(caret)
+  library(dplyr)
+  samp <- data %>% sample_frac(size=1, replace=T) 
+
+  # SVM parameters to try
+  tuneGrid <- expand.grid(C=c(.001,.01,.1,.5,1), degree=c(1,2,3), scale=c(.1))
+  
+  # Fit svm for all parameters above and keep the best one
+  fit <- train(Homicide.Rate ~ Year + Country, data=data, method="svmPoly", 
+               preProc = c("center", "scale"), tuneGrid = tuneGrid,
+               trControl=trainControl(method='cv', number=10, allowParallel = F))
+  
+  # Make predictions using best model from above
+  data.frame(Country=unique(samp$Country), Year=2015-2000) %>%
+    mutate(Prediction=predict(fit, .),  Year=Year+2000, SampleId=i) 
+}
+```
+
+Every Machine Learning has parameters that need to be tuned -- in this case:
+- __C__ - A "regularization parameter"
+- __degree__ - The polynomial degree used by the SVM kernel  
+
+
+SVM Tuning Results
+======================================================== 
+
+```{r, fig.width=20, fig.height=8, fig.align='center'}
+plot.svm.predictions(svm.predictions) 
+```
+
+Comparing All the Predictions
+======================================================== 
+
+```{r, include=FALSE}
+plot.all.predictions <- function(all.predictions){
+  ordered.countries <- all.predictions %>% group_by(Country) %>% 
+    dplyr::summarise(Median=median(Prediction)) %>% 
+    arrange(desc(Median)) %>% .$Country 
+  
+  all.predictions %>%  
+    group_by(Country, Type) %>% 
+    dplyr::summarise(
+      lo=quantile(Prediction, .1),
+      mid=median(Prediction), 
+      hi=quantile(Prediction, .9)) %>%
+    mutate(Country=factor(as.character(Country), levels=ordered.countries), ModelType=factor(Type)) %>% 
+    ggplot(aes(x=Country, y=mid, ymin=lo, ymax=hi, color=ModelType)) + 
+    geom_pointrange(position = position_dodge(width = 0.9), size=1) + 
+    theme_nobg + ylab('Predicted Homicide Rate') + 
+    ggtitle('2015 Predictions Across Model Types')
+}
+```
+```{r}
+all.predictions <- rbind(
+    ml.predictions %>% mutate(Type='Maximum Likelihood Model'),
+    bayes.predictions %>% mutate(Type='Bayesian Model') %>% select(-SampleId),
+    svm.predictions %>% mutate(Type='SVM Model')  %>% select(-SampleId, -Year)
+)
+all.predictions %>% sample_n(5)
+```
+
+Plotting All Predictions
+======================================================== 
+
+```{r, fig.width=20, fig.height=12, fig.align='center'}
+plot.all.predictions(all.predictions) 
+```
+
+
+Dirichlet Process
+======================================================== 
+
+- An __infinite mixture model__
+- A __bayesian__ clustering method (priors can be tuned)
+- Important because:
+  1. You don't have to specify the number of clusters
+  2. It can be combined with other probability models in a very natural way (not true of other unbounded clustering algorithms)
+
+<center><img src="http://statistical-research.com/wp-content/uploads/2013/03/DirichletClustering.png"/></center>

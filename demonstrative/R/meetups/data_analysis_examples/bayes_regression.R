@@ -4,15 +4,10 @@ library(reshape2)
 library(stringr)
 library(rstan)
 
-csv <- '/Users/eczech/repos/portfolio/demonstrative/R/meetups/data_analysis_examples/data/crime_data.csv'
-data <- read.csv(csv, stringsAsFactors=F)
+setwd('/Users/eczech/repos/portfolio/demonstrative/R/meetups/data_analysis_examples/')
+source('utils.R')
 
-
-data <- data %>% 
-  melt(id.vars='Country', variable.name = 'Year', value.name = 'Homicide.Rate') %>% 
-  mutate(Year = as.numeric(str_replace(Year, 'X', '')) - 2000) %>%
-  filter(!is.na(Homicide.Rate))
-
+data <- get.raw.data()
 
 countries <- unique(data$Country)
 stan.data <- list(
@@ -24,7 +19,7 @@ stan.data <- list(
 )
 
 setwd('/Users/eczech/repos/portfolio/demonstrative/R/meetups/data_analysis_examples')
-fit = stan('bayes_regression.stan', data = stan.data , warmup = 2000, iter = 5000, thin = 100, chains = 4, verbose = FALSE)
+fit <- suppressMessages(stan('bayes_regression.stan', data = stan.data , warmup = 2000, iter = 5000, thin = 100, chains = 4, verbose = FALSE))
 posterior <- rstan::extract(fit)
 
 # Convergence checks

@@ -7,6 +7,7 @@ import numpy as np
 
 def _rgb_to_lab(rgb):
     orgb = sRGBColor(rgb[0], rgb[1], rgb[2])
+    orgb.is_upscaled = False
     r = convert_color(orgb, LabColor).get_value_tuple()
     if not np.all(np.isfinite(r)):
         raise ValueError('Found non finite values in input rgb tuple {} '.format(rgb))
