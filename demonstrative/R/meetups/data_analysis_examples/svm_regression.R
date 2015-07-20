@@ -55,9 +55,9 @@ svm.predictions %>%
 
 i = pi/8
 x = seq(-4*pi, 4*pi, i)
-xn = x
-#d = data.frame(x=x, y=sin(x))
+xn = c(x, seq(4*pi, 6*pi, i))
 d = data.frame(x=x, y=sin(x)/x + .01 * x, Type='Actual')
+#d = data.frame(x=x, y=x^2, Type='Actual')
 plot(d$x, d$y)
 
 tuneGrid <- expand.grid(C=c(.1,1,10,100), sigma=c(.1,1,10,100))

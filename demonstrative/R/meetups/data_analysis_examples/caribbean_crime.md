@@ -582,19 +582,6 @@ ml.predictions %>%
 
 <img src="caribbean_crime-figure/unnamed-chunk-20-1.png" title="plot of chunk unnamed-chunk-20" alt="plot of chunk unnamed-chunk-20" style="display: block; margin: auto;" />
 
-Timeseries Modeling in a Real World Setting
-======================================================== 
-
-<center><h1>Gaussian Process</h1></center>
-
-- Assume the whole dataset is _ONE_ sample from a multivariate normal distribution
-- Multivariate Normal Distribution has 2 parameters:
-  - $\mu$ mean of all dimensions
-  - $\sum$, containing the correlations between all dimensions
-
-- Very versatile timeseries models AND can be modeled __hierarchically__
-
-<center><img src="http://scikit-learn.org/stable/_images/plot_gp_regression_0021.png"/></center>
 
 
 Machine Learning Algorithms
@@ -611,6 +598,14 @@ Machine Learning Algorithms
 Support Vector Machines (SVM)
 ======================================================== 
 
+- Supervised technique for classification and regression
+- Always performs linear regression .. but it transforms its inputs into more dimensions
+- Can fit pretty complicated, non-linear structures
+
+<center><img width='75%' src="http://www.saedsayad.com/images/SVR_5.png"/></center>
+
+SVM Fit 
+======================================================== 
 <center>SVM fit to some complicated function:</center>
 True Function: $$ y = \frac{sin(x)}{x} + \frac{x}{100} $$
 
@@ -782,13 +777,23 @@ plot.all.predictions(all.predictions)
 <img src="caribbean_crime-figure/unnamed-chunk-31-1.png" title="plot of chunk unnamed-chunk-31" alt="plot of chunk unnamed-chunk-31" style="display: block; margin: auto;" />
 
 
-Dirichlet Process
+Timeseries Modeling in a Real World Setting
 ======================================================== 
 
-- An __infinite mixture model__
-- A __bayesian__ clustering method (priors can be tuned)
-- Important because:
-  1. You don't have to specify the number of clusters
-  2. It can be combined with other probability models in a very natural way (not true of other unbounded clustering algorithms)
+<center><h1>Gaussian Process</h1></center>
 
-<center><img src="http://statistical-research.com/wp-content/uploads/2013/03/DirichletClustering.png"/></center>
+- Assume the whole dataset is _ONE_ sample from a multivariate normal distribution
+- Multivariate Normal Distribution has 2 parameters:
+  - $\mu$ mean of all dimensions
+  - $\sum$, containing the correlations between all dimensions
+
+- Very versatile timeseries models AND can be modeled __hierarchically__
+
+<center><img src="http://scikit-learn.org/stable/_images/plot_gp_regression_0021.png"/></center>
+
+
+Done
+========================================================
+
+BREAK
+

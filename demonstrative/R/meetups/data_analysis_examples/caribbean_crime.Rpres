@@ -334,19 +334,6 @@ ml.predictions %>%
   theme_boxplot + ggtitle('2015 Homicide Rate Predictions')
 ```
 
-Timeseries Modeling in a Real World Setting
-======================================================== 
-
-<center><h1>Gaussian Process</h1></center>
-
-- Assume the whole dataset is _ONE_ sample from a multivariate normal distribution
-- Multivariate Normal Distribution has 2 parameters:
-  - $\mu$ mean of all dimensions
-  - $\sum$, containing the correlations between all dimensions
-
-- Very versatile timeseries models AND can be modeled __hierarchically__
-
-<center><img src="http://scikit-learn.org/stable/_images/plot_gp_regression_0021.png"/></center>
 
 
 Machine Learning Algorithms
@@ -363,17 +350,25 @@ Machine Learning Algorithms
 Support Vector Machines (SVM)
 ======================================================== 
 
+- Supervised technique for classification and regression
+- Always performs linear regression .. but it transforms its inputs into more dimensions
+- Can fit pretty complicated, non-linear structures
+
+<center><img width='75%' src="http://www.saedsayad.com/images/SVR_5.png"/></center>
+
+SVM Fit 
+======================================================== 
 <center>SVM fit to some complicated function:</center>
 True Function: $$ y = \frac{sin(x)}{x} + \frac{x}{100} $$
 
-```{r, echo=FALSE, fig.width=16, fig.height=8, fig.align='center'}
+```{r, echo=FALSE, fig.width=16, fig.height=6, fig.align='center'}
 i = pi/8
 x = seq(-4*pi, 4*pi, i)
 xn = x
 #d = data.frame(x=x, y=sin(x))
 d = data.frame(x=x, y=sin(x)/x + .01 * x, Type='Actual')
 
-tuneGrid <- expand.grid(C=c(.1,1,10,100), sigma=c(.1,1,10,100))
+tuneGrid <- expand.grid(C=c(.1,1,10,100), sigma=c(.1,1,10,100)) 
 fit <- train(y ~ x, data=d, method="svmRadial", tuneGrid=tuneGrid,
              preProc = c("center", "scale"), trControl=trainControl(method='cv', number=10, allowParallel = T))
 y = predict(fit, newdata=data.frame(x=xn))
@@ -524,13 +519,23 @@ plot.all.predictions(all.predictions)
 ```
 
 
-Dirichlet Process
+Timeseries Modeling in a Real World Setting
 ======================================================== 
 
-- An __infinite mixture model__
-- A __bayesian__ clustering method (priors can be tuned)
-- Important because:
-  1. You don't have to specify the number of clusters
-  2. It can be combined with other probability models in a very natural way (not true of other unbounded clustering algorithms)
+<center><h1>Gaussian Process</h1></center>
 
-<center><img src="http://statistical-research.com/wp-content/uploads/2013/03/DirichletClustering.png"/></center>
+- Assume the whole dataset is _ONE_ sample from a multivariate normal distribution
+- Multivariate Normal Distribution has 2 parameters:
+  - $\mu$ mean of all dimensions
+  - $\sum$, containing the correlations between all dimensions
+
+- Very versatile timeseries models AND can be modeled __hierarchically__
+
+<center><img src="http://scikit-learn.org/stable/_images/plot_gp_regression_0021.png"/></center>
+
+
+Done
+========================================================
+
+BREAK
+
