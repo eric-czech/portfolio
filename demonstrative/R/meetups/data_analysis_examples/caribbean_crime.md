@@ -558,7 +558,7 @@ fit <- lmer(Homicide.Rate ~ 0 + (Year|Country), data = data)
 ml.predictions <- foreach(c=unique(data$Country), .combine=rbind) %do%{ 
   predictions <- data.frame(Country=c, Year=(2014:2015) - 2000)
   pred.fun <- function(x) { predict(x, predictions, type='response') }
-  bootfit <- bootMer(fit, use.u=T, nsim=5, FUN=pred.fun) 
+  bootfit <- bootMer(fit, use.u=T, nsim=30, FUN=pred.fun) 
   # Column "2" below is the prediction for 2015
   data.frame(Country=c, Prediction=bootfit$t[,2])
 }
@@ -572,12 +572,12 @@ Maximum Likelihood Regression (Predictions)
 ```r
 ordered.countries <- ml.predictions %>% group_by(Country) %>% 
   dplyr::summarise(Median=median(Prediction)) %>%
-  arrange(desc(Median)) %>% .$Country
+  arrange(desc(Median)) %>% .$Country 
 
 ml.predictions %>% 
   mutate(Country=factor(as.character(Country), levels=ordered.countries)) %>%
   ggplot(aes(x=Country, y=Prediction)) + geom_boxplot() + ylab('Homicide.Rate') +  
-  theme_boxplot + ggtitle('2015 Homicide Rate Predictions')
+  theme_boxplot + ggtitle('2015 Homicide Rate Predictions') + theme_boxplot
 ```
 
 <img src="caribbean_crime-figure/unnamed-chunk-20-1.png" title="plot of chunk unnamed-chunk-20" alt="plot of chunk unnamed-chunk-20" style="display: block; margin: auto;" />
