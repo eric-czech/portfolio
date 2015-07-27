@@ -1,7 +1,6 @@
 
 
-get.raw.data <- function() {
-  csv <- '/Users/eczech/repos/portfolio/demonstrative/R/meetups/data_analysis_examples/data/crime_data.csv'
+get.raw.data <- function(csv='/Users/eczech/repos/portfolio/demonstrative/R/meetups/data_analysis_examples/data/crime_data.csv') {
   data <- read.csv(csv, stringsAsFactors=F)
   
   

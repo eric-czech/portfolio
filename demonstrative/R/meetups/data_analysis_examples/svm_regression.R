@@ -7,10 +7,13 @@ library(doParallel)
 library(kernlab)
 registerDoParallel(makeCluster(5))
 
-setwd('/Users/eczech/repos/portfolio/demonstrative/R/meetups/data_analysis_examples/')
+root.dir <- '/Users/eczech/repo'
+setwd(paste0(root.dir, '/portfolio/demonstrative/R/meetups/data_analysis_examples/'))
 source('utils.R')
 
-data <- get.raw.data()
+csv <- paste0(root.dir, '/portfolio/demonstrative/R/meetups/data_analysis_examples/data/crime_data.csv')
+data <- get.raw.data(csv = csv)
+
 data <- data %>% mutate(Country = factor(Country))
 head(data)
 

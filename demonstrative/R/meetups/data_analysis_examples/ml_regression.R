@@ -5,10 +5,13 @@ library(foreach)
 library(stringr)
 library(lme4)
 
-setwd('/Users/eczech/repos/portfolio/demonstrative/R/meetups/data_analysis_examples/')
+# /Users/eczech/repos/portfolio/demonstrative/R/meetups/data_analysis_examples/data/crime_data.csv
+root.dir <- '/Users/eczech/repo'
+setwd(paste0(root.dir, '/portfolio/demonstrative/R/meetups/data_analysis_examples/'))
 source('utils.R')
 
-data <- get.raw.data()
+csv <- paste0(root.dir, '/portfolio/demonstrative/R/meetups/data_analysis_examples/data/crime_data.csv')
+data <- get.raw.data(csv = csv)
 
 fit <- lmer(Homicide.Rate ~ 0 + (Year|Country), data = data)
 
