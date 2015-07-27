@@ -27,10 +27,11 @@
       <file leaf-file-name="operations.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/pbn/operations.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.4054054" vertical-offset="60" max-vertical-offset="4635">
-              <caret line="17" column="0" selection-start-line="17" selection-start-column="0" selection-end-line="17" selection-end-column="0" />
+            <state vertical-scroll-proportion="-0.029106028" vertical-offset="4844" max-vertical-offset="5370">
+              <caret line="322" column="38" selection-start-line="322" selection-start-column="38" selection-end-line="322" selection-end-column="38" />
               <folding>
                 <element signature="e#23#55#0" expanded="true" />
+                <marker date="1438000757000" expanded="true" signature="8455:9252" placeholder="..." />
               </folding>
             </state>
           </provider>
@@ -172,6 +173,7 @@
   </component>
   <component name="PropertiesComponent">
     <property name="last_opened_file_path" value="$USER_HOME$/nbs/bin/python" />
+    <property name="LayoutCode.rearrangeEntriesPython" value="false" />
   </component>
   <component name="RunManager">
     <configuration default="true" type="tests" factoryName="py.test">
@@ -363,6 +365,7 @@
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
             <element signature="e#23#55#0" expanded="true" />
+            <marker date="1438000757000" expanded="true" signature="8455:9252" placeholder="..." />
           </folding>
         </state>
       </provider>
@@ -403,6 +406,7 @@
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
             <element signature="e#23#55#0" expanded="true" />
+            <marker date="1438000757000" expanded="true" signature="8455:9252" placeholder="..." />
           </folding>
         </state>
       </provider>
@@ -480,10 +484,11 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/operations.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.4054054" vertical-offset="60" max-vertical-offset="4635">
-          <caret line="17" column="0" selection-start-line="17" selection-start-column="0" selection-end-line="17" selection-end-column="0" />
+        <state vertical-scroll-proportion="-0.029106028" vertical-offset="4844" max-vertical-offset="5370">
+          <caret line="322" column="38" selection-start-line="322" selection-start-column="38" selection-end-line="322" selection-end-column="38" />
           <folding>
             <element signature="e#23#55#0" expanded="true" />
+            <marker date="1438000757000" expanded="true" signature="8455:9252" placeholder="..." />
           </folding>
         </state>
       </provider>

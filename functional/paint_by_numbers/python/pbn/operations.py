@@ -281,8 +281,57 @@ def _is_patch_enclosed(point, members, delta):
     return True
 
 
-def render_pbn(fc, img_nd, bkg=[.99, .99, .99], edg=[1., 1., 1.], solution=False, size_limit=25, ):
-    res = np.empty_like(img_nd)
+# def render_pbn(fc, img_nd, bkg=[.99, .99, .99], edg=[1., 1., 1.], solution=False, size_limit=25):
+#     res = np.empty_like(img_nd)
+#     for cc_id in fc:
+#         for c in fc[cc_id]:
+#             actual_color = c['color']  # this was dividing by 255 before
+#             def_label = c['default_label']
+#             use_actual = solution or len(c['points']) < size_limit
+#             color = actual_color if use_actual else bkg
+#
+#             for point in c['points']:
+#                 res[point] = color
+#
+#             if not use_actual:
+#                 for point in c['edges']:
+#                     res[point] = actual_color if edg is None else edg
+#
+#             if def_label:
+#                 for point in def_label:
+#                     res[point] = actual_color
+#     return res
+
+def _add_to_result(p, neighbors, color, edg_color, img_orig, img_res, is_edge, scale):
+    res = np.empty((scale, scale, img_orig.shape[2]))
+    res[:, :] = color
+    if is_edge:
+        s = scale - 1
+        for n in _get_patch(p):
+            if _is_in_bounds(n, img_orig) and n in neighbors:
+                if n[0] > p[0] and n[1] > p[1]:
+                    res[s, s] = edg_color
+                elif n[0] > p[0] and n[1] < p[1]:
+                    res[s, 0] = edg_color
+                elif n[0] > p[0] and n[1] == p[1]:
+                    res[s, :] = edg_color
+                elif n[0] < p[0] and n[1] > p[1]:
+                    res[0, s] = edg_color
+                elif n[0] < p[0] and n[1] < p[1]:
+                    res[0, 0] = edg_color
+                elif n[0] < p[0] and n[1] == p[1]:
+                    res[0, :] = edg_color
+                elif n[0] == p[0] and n[1] > p[1]:
+                    res[:, s] = edg_color
+                elif n[0] == p[0] and n[1] < p[1]:
+                    res[:, 0] = edg_color
+    r, c = p[0] * scale, p[1] * scale
+    img_res[r:(r+scale), c:(c+scale)] = res
+
+
+def render_pbn(fc, img_nd, bkg=[.99, .99, .99], edg=[1., 1., 1.], solution=False, size_limit=25,
+               scale_factor=1):
+    img_res = np.empty((img_nd.shape[0] * scale_factor, img_nd.shape[1] * scale_factor, img_nd.shape[2]))
     for cc_id in fc:
         for c in fc[cc_id]:
             actual_color = c['color']  # this was dividing by 255 before
@@ -291,13 +340,13 @@ def render_pbn(fc, img_nd, bkg=[.99, .99, .99], edg=[1., 1., 1.], solution=False
             color = actual_color if use_actual else bkg
 
             for point in c['points']:
-                res[point] = color
+                _add_to_result(point, c['neighbors'], color, edg, img_nd, img_res, False, scale_factor)
 
             if not use_actual:
                 for point in c['edges']:
-                    res[point] = actual_color if edg is None else edg
+                    _add_to_result(point, c['neighbors'], color, edg, img_nd, img_res, True, scale_factor)
 
-            if def_label:
-                for point in def_label:
-                    res[point] = actual_color
-    return res
+            # if def_label:
+            #     for point in def_label:
+            #         res[point] = actual_color
+    return img_res
