@@ -23,4 +23,4 @@ grobs <- foreach(algorithm=unique(feats$Algorithm)) %do% {
   ggplotGrob(g)
 }
 grid.newpage()
-grid.arrange(grobs[[1]], grobs[[2]], grobs[[3]], grobs[[4]], grobs[[5]], grobs[[5]], nrow=3, ncol=2) 
+grid.arrange(grobs[[1]], grobs[[2]], grobs[[3]], grobs[[4]], grobs[[5]], grobs[[6]], nrow=3, ncol=2) 

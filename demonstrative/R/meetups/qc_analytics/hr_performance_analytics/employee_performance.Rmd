@@ -1,0 +1,191 @@
+---
+title: "Employee Performance Analysis\n(err a pretend version of it)"
+output: html_document
+---
+
+#### Using Ordered, Hierarchical Logistic Regression
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+library(dplyr)
+library(rstan)
+library(ggplot2)
+library(foreach)
+library(stringr)
+library(iterators)
+
+### Create some raw data
+# These are the values the model should be able to recover
+engineer.slope <- .9
+lunch.lady.slope <- 2.1
+sales.guy.slope <- 5.1
+
+logit <- function(x){
+  log(x / (1 - x))
+}
+invlogit <- function(x){
+  value <- exp(x)/(1+exp(x))
+  return(value)
+}
+
+# Create the actual raw data ... err this part is kind of ugly
+# but the data it creates looks less confusing (shown right after)
+xn <- 250
+#x <- rnorm(n=xn, mean=0, sd=1)
+x <- sample(seq(-2, 2, .001), size = xn, replace = T)
+data <- data.frame(
+  linear.response.1 = c(
+    engineer.slope * x + logit(runif(xn)),  
+    lunch.lady.slope * x + logit(runif(xn)),
+    sales.guy.slope * x + logit(runif(xn))
+  ),
+  title = c(
+    rep('Engineer', xn), 
+    rep('Lunch Lady', xn),
+    rep('Sales Guy', xn)
+  )) %>% 
+  group_by(title) %>% 
+  do({ 
+    data.frame(
+      performance=cut(invlogit(.$linear.response.1), breaks = c(0, .33, .66, 1), labels = c('C', 'B', 'A')),
+      response.2 = sample(seq(-2, 2, .001), size = xn, replace = T),
+      response.1 = x
+    )
+  }) %>%
+  mutate_each(funs(factor), one_of('performance', 'title')) %>%
+  ungroup
+
+```
+
+Pretend this is the scenario:
+
+- Employees take a survey with two questions
+- Responses are some float number between -2 and 2
+- Each employee also has a title and a performance grade equal to either C, B, or A where A is best
+
+The fake data looks like:
+
+```{r}
+head(data)
+```
+
+And the fake data is created so __response.2__ is a random number and __response.1__ is ACTUALLY related to performance.
+
+__Response.1__ is related in a different way for each employee title though, but in all cases the performance goes up as that response goes up (perhaps the question was like "How hard do you work?" -- so it should be indicative of performance).  It just goes up more quickly for some jobs more than others:
+
+
+```{r, echo=T}
+# Average response values by title and performance:
+# note that performance goes up as response.1 goes up
+library(reshape2)
+data %>% 
+  group_by(title, performance) %>% 
+  summarise(
+    avg_response.1=round(mean(response.1), 2), 
+    avg_response.2=round(mean(response.2), 2)
+  ) %>% melt(id.vars=c('title', 'performance')) %>%
+  ggplot(aes(x=performance, y=value)) + geom_bar(stat='identity', position='dodge') + 
+  facet_grid(variable~title)
+```
+
+Again response.2 is just nonsense and response.1 has an actual relationship with performance defined like:
+
+```{r}
+# These are the values the model should be able to recover
+engineer.slope <- .9
+lunch.lady.slope <- 2.1
+sales.guy.slope <- 5.1
+```
+
+
+### Creating a Model
+
+The point then will be to determine how as the response values change, the performance changes as well __PER job title__.
+
+One way to do this with stan is to use an ordered logistic model where the slope per job title varies:
+
+```{r, echo=T}
+### Create a 'Performance' model based on employee survey responses, 
+### with a hierarchical separation for each job title
+
+stan.model <- '
+  data {
+    int<lower=2> N_PERF_VALS;                // # of possible performance measures like "A" or "B", etc.
+    int<lower=0> N_OBS;                      // # of employees in question (i.e. number of observations)
+    int<lower=1> N_VARS;                     // # of survey responses
+    int<lower=1> N_JOBS;                     // # of different titles possible
+    int<lower=1,upper=N_PERF_VALS> y[N_OBS]; // Vector of performance evaluations
+    int<lower=1> g[N_OBS];                   // "Group" or rather "Job title" for each employee
+    row_vector[N_VARS] x[N_OBS];             // Matrix of survey responses for each employee
+  }
+  parameters {
+    vector[N_VARS] beta[N_JOBS];   // Slope estimates by job title
+    ordered[N_PERF_VALS-1] cutpoints; 
+  }
+  model {
+    // Assign normal priors to coefficients to estimate
+    for (i in 1:N_JOBS)
+      beta[i]  ~ normal(0,10);
+
+    // Create model where the output is predicted by the per-job-title 
+    // intercept plus the per-job-title slope times each survey response value
+    for (i in 1:N_OBS)
+      y[i] ~ ordered_logistic(x[i] * beta[g[i]], cutpoints);
+  }
+'
+```
+
+
+Now feed the data to Stan and run the model:
+
+```{r, echo=T}
+# Convert the raw data created into Stan data
+d <- list(
+  N_PERF_VALS = length(levels(data$performance)), # One for each performance grade (A, B, or C)
+  N_OBS = nrow(data),
+  N_VARS = 2,  # One for each of the two survey responses
+  N_JOBS = 3,  # One for each of the job titles
+  y = as.integer(data$performance),         # These are the performance grades
+  x = data[,c('response.1', 'response.2')], # These are the survey responses
+  g = as.integer(data$title)                # And these are integers corresponding to each job title
+)
+
+# Run the sampler
+fit <- stan(model_code = stan.model, data = d, warmup = 100, iter = 1000, thin = 5, chains = 1, verbose = FALSE)
+```
+
+
+```{r, echo=F}
+extract.samples <- function(stan.model){
+  params = list(
+    'Engineer.Response.1.Beta'=list(n='beta[1,1]', actual=engineer.slope, r=1),
+    'Engineer.Response.2.Beta'=list(n='beta[1,2]', actual=0, r=2),
+    'Lunch.Lady.Response.1.Beta'=list(n='beta[2,1]', actual=lunch.lady.slope, r=1),
+    'Lunch.Lady.Response.2.Beta'=list(n='beta[2,2]', actual=0, r=2),
+    'Sales.Guy.Response.1.Beta'=list(n='beta[3,1]', actual=sales.guy.slope, r=1),
+    'Sales.Guy.Response.2.Beta'=list(n='beta[3,2]', actual=0, r=2)
+  )
+  samples <- foreach(pn=names(params), i=icount(), .combine=rbind) %do%{
+    param = params[[pn]]
+    data.frame(
+      param=pn, 
+      title=str_split(pn, '\\.')[[1]][1], 
+      sample=fit@sim$samples[[1]][[ param[['n']] ]], 
+      actual=param[['actual']], response=paste('Slope for Response', param[['r']]))
+  }
+  samples
+}
+```
+
+Take the sampled parameter estimates out of the stan model and plot the posterior estimates.
+
+Also show the __ACTUAL__ value for each parameter used to generate the data in the first place as a red line:
+
+```{r}
+samples <- extract.samples(fit)
+
+vlines <- samples %>% group_by(title, param, response) %>% summarise(actual=actual[1])
+
+ggplot(samples, aes(x=sample)) + geom_density() + 
+  facet_grid(title~response) + 
+  geom_vline(aes(xintercept=actual), color='red', data = vlines) + theme_bw()
+```

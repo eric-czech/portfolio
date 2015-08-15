@@ -5,6 +5,12 @@ import numpy as np
 import pandas as pd
 from sklearn import mixture
 import math
+import itertools
+from pbn import dots
+from pbn.dots import AlphabetLabelRenderer
+
+LABEL_MARGIN = 3
+
 
 def unravel_old(d):
     n2d = d.shape[0] * d.shape[1]
@@ -139,9 +145,6 @@ def collapse_clusters(spatial_clusters, color_matrix, **kwargs):
     print('{} clusters collapsed of {}'.format(n_collapses, n_total))
     return res
 
-from scipy import ndimage
-
-
 
 def cluster_by_proximity(color_matrix, n_iterations=1, **kwargs):
     spatial_clusters = _get_clusters(color_matrix)
@@ -197,9 +200,6 @@ def _get_clusters(d):
     return clusters
 
 
-LABEL_MARGIN = 2
-
-
 def get_cluster_props(spatial_clusters, color_clusters, color_matrix):
     res = {}
     for cc_id, cs in spatial_clusters.items():
@@ -209,28 +209,40 @@ def get_cluster_props(spatial_clusters, color_clusters, color_matrix):
         for cluster in cs:
             members = set(cluster)
             neighbors = {}
-            edges, labels = [], []
+            edges = []
             for point in cluster:
                 is_edge, nbs = _get_point_props(point, members, color_matrix)
                 if is_edge:
                     edges.append(point)
-                if _is_patch_enclosed(point, members, LABEL_MARGIN):
-                    labels.append(point)
-                neighbors.update(nbs)
 
-            default_label = None
-            if len(labels) > 0:
-                default_label = _get_patch(labels[0], delta=LABEL_MARGIN)
+                #if _is_patch_enclosed(point, members, LABEL_MARGIN):
+                #if _is_shape_enclosed(members, _get_label_patch(point)):
+                    #labels.append(point)
+                neighbors.update(nbs)
 
             res[cc_id].append({
                 'color': color,
                 'points': cluster,
                 'edges': edges,
-                'labels': labels,
-                'default_label': default_label,
+                #'labels': labels,
                 'neighbors': neighbors
             })
     return res
+
+
+def _get_patch(point, delta=1):
+    return _get_shape_patch(point, range(-delta, delta+1), range(-delta, delta+1))
+
+
+def _is_shape_enclosed(members, candidates):
+    for point in candidates:
+        if point not in members:
+            return False
+    return True
+
+
+def _is_patch_enclosed(point, members, delta):
+    return _is_shape_enclosed(members, _get_patch(point, delta))
 
 
 def _get_collapsed_cluster(current_id, points, neighbors, shrinkage=2, threshold=.6):
@@ -265,43 +277,6 @@ def _get_point_props(point, members, color_matrix):
     return is_edge, neighbors
 
 
-def _get_patch(point, delta=1):
-    x, y = point
-    res = []
-    for dx in range(-delta, delta + 1):
-        for dy in range(-delta, delta + 1):
-            res.append((x + dx, y + dy))
-    return res
-
-
-def _is_patch_enclosed(point, members, delta):
-    for point in _get_patch(point, delta=delta):
-        if point not in members:
-            return False
-    return True
-
-
-# def render_pbn(fc, img_nd, bkg=[.99, .99, .99], edg=[1., 1., 1.], solution=False, size_limit=25):
-#     res = np.empty_like(img_nd)
-#     for cc_id in fc:
-#         for c in fc[cc_id]:
-#             actual_color = c['color']  # this was dividing by 255 before
-#             def_label = c['default_label']
-#             use_actual = solution or len(c['points']) < size_limit
-#             color = actual_color if use_actual else bkg
-#
-#             for point in c['points']:
-#                 res[point] = color
-#
-#             if not use_actual:
-#                 for point in c['edges']:
-#                     res[point] = actual_color if edg is None else edg
-#
-#             if def_label:
-#                 for point in def_label:
-#                     res[point] = actual_color
-#     return res
-
 def _add_to_result(p, neighbors, color, edg_color, img_orig, img_res, is_edge, scale):
     res = np.empty((scale, scale, img_orig.shape[2]))
     res[:, :] = color
@@ -329,24 +304,99 @@ def _add_to_result(p, neighbors, color, edg_color, img_orig, img_res, is_edge, s
     img_res[r:(r+scale), c:(c+scale)] = res
 
 
-def render_pbn(fc, img_nd, bkg=[.99, .99, .99], edg=[1., 1., 1.], solution=False, size_limit=25,
+def _draw_cluster_label(p, renderer, color_cluster, color_lbl, color_bkg, img_res, scale):
+    r, c = p[0] * scale, p[1] * scale
+    dot_matrix = renderer.get_matrix_for_key(tuple(color_cluster), color_lbl, color_bkg)
+
+    # Center location for dot matrix
+    ro, co = int(dot_matrix.shape[0]/2), int(dot_matrix.shape[1]/2)
+    r, c = r - ro, c - co
+
+    # Add label to image if it still fits when centered
+    rd, cd = r + dot_matrix.shape[0], c + dot_matrix.shape[1]
+    if r >= 0 and c >= 0 and rd <= img_res.shape[0] and cd <= img_res.shape[1]:
+        img_res[r:rd, c:cd, :] = dot_matrix
+
+
+def distance_between(p1, p2):
+    return np.sqrt((p2[1] - p1[1])**2 + (p2[0] - p1[0])**2)
+
+
+def _get_label_renderer(clusters):
+    colors = []
+    for cc_id in clusters:
+        for c in clusters[cc_id]:
+            colors.append(tuple(c['color']))
+    colors.sort()
+    colors = list(c for c, _ in itertools.groupby(colors))
+    if len(colors) > 25:
+        raise ValueError('Currently no more than 25 unique colors are supported')
+    renderer = dots.get_label_renderer()
+    labels = renderer.get_labels()[:len(colors)]
+    color_index = dict(zip(colors, labels))
+    renderer.set_keys_for_labels(color_index)
+    return renderer, color_index
+
+
+def _get_closest_to_median(points):
+    if points is None or len(points) == 0:
+        return None
+    median_p = (np.median([p[0] for p in points]), np.median([p[1] for p in points]))
+
+    closest_p, min_dist = points[0], np.inf
+    for p in points:
+        dist = distance_between(p, median_p)
+        if dist < min_dist:
+            closest_p = p
+            min_dist = dist
+    return closest_p
+
+
+import math
+
+
+def _get_label_patch(point, scale_factor):
+    return _get_shape_patch(point, range(-1, 2), range(-1, 1))
+
+
+def _get_shape_patch(point, xrange, yrange):
+    res = []
+    x, y = point
+    for i in xrange:
+        for j in yrange:
+            res.append((x + i, y + j))
+    return res
+
+
+def render_pbn(fc, img_nd, bkg=[.99, .99, .99], edg=[1., 1., 1.], lbl=[.99, .99, .99], solution=False, size_limit=25,
                scale_factor=1):
+    import imp
+    imp.reload(dots)
     img_res = np.empty((img_nd.shape[0] * scale_factor, img_nd.shape[1] * scale_factor, img_nd.shape[2]))
+
+    label_renderer, color_index = _get_label_renderer(fc)
+
     for cc_id in fc:
         for c in fc[cc_id]:
-            actual_color = c['color']  # this was dividing by 255 before
-            def_label = c['default_label']
-            use_actual = solution or len(c['points']) < size_limit
+            actual_color = c['color']
+            #use_actual = solution or len(c['points']) < size_limit
+            use_actual = solution or len(c['labels']) == 0
             color = actual_color if use_actual else bkg
+            #color = (rnd(), rnd(), rnd()) if use_actual else bkg
 
+            members = set(c['points'])
+            labels = []
             for point in c['points']:
+                if _is_shape_enclosed(members, _get_label_patch(point, scale_factor)):
+                    labels.append(point)
                 _add_to_result(point, c['neighbors'], color, edg, img_nd, img_res, False, scale_factor)
 
             if not use_actual:
                 for point in c['edges']:
                     _add_to_result(point, c['neighbors'], color, edg, img_nd, img_res, True, scale_factor)
 
-            # if def_label:
-            #     for point in def_label:
-            #         res[point] = actual_color
-    return img_res
+                closest_p = _get_closest_to_median(labels)
+                if closest_p is not None:
+                    _draw_cluster_label(closest_p, label_renderer, actual_color, lbl, bkg, img_res, scale_factor)
+
+    return img_res, color_index

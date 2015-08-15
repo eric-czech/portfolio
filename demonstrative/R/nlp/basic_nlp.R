@@ -7,13 +7,13 @@ library(topicmodels)
 library(dplyr)
 
 # Load in some text data
-d <- read.csv('/Users/eczech/Desktop/EmotionalDesignSurvey.csv', stringsAsFactors=F, fileEncoding="UTF-8")
+d <- read.csv('/Users/eczech/Desktop/EmotionalDesignSurvey.csv', fileEncoding="UTF-8")
 
 # Test data frame
 #d <- data.frame(WHY=c('went running today', 'run to the store store', 'runs in the snow', 'college is long', 'college is fun', 'I went to college'), stringsAsFactors = F)
 
 # Apply common transformations
-corpus <- Corpus(VectorSource(d$WHY))
+corpus <- tm::Corpus(tm::VectorSource(d$WHY))
 corpus <- tm_map(corpus, removeNumbers)
 corpus <- tm_map(corpus, removePunctuation)
 corpus <- tm_map(corpus, stripWhitespace)
@@ -21,11 +21,24 @@ corpus <- tm_map(corpus, content_transformer(tolower))
 corpus <- tm_map(corpus, removeWords, stopwords("english")) 
 #corpus <- tm_map(corpus, stemDocument, language = "english") 
 
+get.tdm <- function(column, stoptype=stopwords('english')){
+  corpus <- Corpus(VectorSource(column))
+  corpus <- tm_map(corpus, removeNumbers)
+  corpus <- tm_map(corpus, removePunctuation)
+  corpus <- tm_map(corpus, stripWhitespace)
+  corpus <- tm_map(corpus, content_transformer(tolower))
+  corpus <- tm_map(corpus, removeWords, stoptype) 
+  TermDocumentMatrix(corpus)
+}
+BigramTokenizer <-function(x) unlist(lapply(ngrams(words(x), 2), paste, collapse = " "), use.names = FALSE)
+x <- get.tdm(d$WHY)
+BiTDM <- TermDocumentMatrix(get.tdm(d$WHY), control = list(tokenize = BigramTokenizer))
+
 # Create TD matrix for use in LDA
 dtm <- DocumentTermMatrix(corpus)
 word.counts <- colSums(as.matrix(dtm))
 word.ct.sort <- sort(word.counts, decreasing = T)
-
+as.matrix(DocumentTermMatrix(corpus))
 
 # Determine the ideal number of topics via maximum likelihood
 max.topics <- 10
@@ -63,3 +76,14 @@ get.docs <- function(topic){
 
 lapply(1:n.topics, get.docs)
 
+
+
+get.corpus <- function(column, stoptype=stopwords('english')){
+  corpus <- Corpus(VectorSource(column))
+  corpus <- tm_map(corpus, removeNumbers)
+  corpus <- tm_map(corpus, removePunctuation)
+  corpus <- tm_map(corpus, stripWhitespace)
+  corpus <- tm_map(corpus, content_transformer(tolower))
+  corpus <- tm_map(corpus, removeWords, stoptype) 
+}
+x <- get.corpus(d$WHY)

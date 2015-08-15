@@ -4,7 +4,14 @@ import pandas as pd
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.preprocessing import PolynomialFeatures
 
+
 def get_one_hot_features(df, **kwargs):
+    """
+    Returns a one-hot encoded version of the given data
+    :param df:
+    :param kwargs:
+    :return:
+    """
 
     # The column labeling cannot be done using the 'sparse' option
     # so make sure that is overriden in the given arguments for OneHotEncoder
