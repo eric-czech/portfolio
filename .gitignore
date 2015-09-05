@@ -2,3 +2,5 @@
 *.rdx
 *.rdb
 *.RData
+*.ipynb_checkpoints
+*.idea
