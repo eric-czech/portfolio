@@ -15,7 +15,7 @@ Project Links
 - [Bayesian Analysis Presentation (Python & R)](https://github.com/eric-czech/portfolio/blob/master/demonstrative/python/notebooks/meetups/data_analysis_examples/meetup_pres.ipynb) - Slides from a talk given to the [Charleston Data Analytics](http://www.meetup.com/Charleston-Data-Analytics/) meetup group about the following:
   1. Bayesian ranking and modeling approaches for smaller data sets (examples in Python and Stan)
   2. Hierarchical Maximum Likelihood modeling within the context of forecasting crime rates for various Carribean countries
-  3. Creating a paint-by-numbers from a digitical image through the use of nonparametric, Bayesian clustering algorithms (i.e. [Dirichlet Process](https://en.wikipedia.org/wiki/Dirichlet_process))
+  3. Creating a paint-by-numbers from a digital image through the use of nonparametric, Bayesian clustering algorithms (i.e. [Dirichlet Process](https://en.wikipedia.org/wiki/Dirichlet_process))
 
 -  [Predicting Sales Through Music Anatomy (R)](/demonstrative/R/music_anatomy/README.md) - Analyzing the relationship between iTunes sales and traits of music like tempo, loudness, danceability, acousticness, and more ([Forbes.com Article](http://www.forbes.com/sites/livbuli/2014/09/18/engineering-success-the-data-driven-approach-to-hit-making/)).
 
