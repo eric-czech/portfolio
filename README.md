@@ -12,7 +12,7 @@ Project Links
 
 ####Data Analysis
 
-- [Bayesian Analysis Presentation (Python & R)](https://github.com/eric-czech/portfolio/blob/master/demonstrative/python/notebooks/meetups/data_analysis_examples/meetup_pres.ipynb) - Slides from a talk given to the [Charleston Data Analytics](http://www.meetup.com/Charleston-Data-Analytics/) meetup group about the following:
+- [Bayesian Analysis Presentation (Python & R)](https://github.com/eric-czech/portfolio/blob/master/demonstrative/python/notebooks/meetups/data_analysis_examples/meetup_pres.ipynb) - Slides [[Download HTML Version](https://github.com/eric-czech/portfolio/raw/master/demonstrative/python/notebooks/meetups/data_analysis_examples/meetup_pres.slides.html)] from a talk given to the [Charleston Data Analytics](http://www.meetup.com/Charleston-Data-Analytics/) meetup group about the following:
   1. Bayesian ranking and modeling approaches for smaller data sets (examples in Python and Stan)
   2. Hierarchical Maximum Likelihood modeling within the context of forecasting crime rates for various Carribean countries
   3. Creating a paint-by-numbers from a digital image through the use of nonparametric, Bayesian clustering algorithms (i.e. [Dirichlet Process](https://en.wikipedia.org/wiki/Dirichlet_process))
