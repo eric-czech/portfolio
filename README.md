@@ -11,6 +11,12 @@ Project Links
 ------------------
 
 ####Data Analysis
+
+- [Bayesian Analysis Presentation](https://github.com/eric-czech/portfolio/blob/master/demonstrative/python/notebooks/meetups/data_analysis_examples/meetup_pres.ipynb) - Slides from a talk given to the [Charleston Data Analytics](http://www.meetup.com/Charleston-Data-Analytics/) meetup group about the following:
+  1. Bayesian ranking and modeling approaches for smaller data sets (examples in Python and Stan)
+  2. Hierarchical Maximum Likelihood modeling within the context of forecasting crime rates for various Carribean countries
+  3. Creating a paint-by-numbers from a digitical image through the use of nonparametric, Bayesian clustering algorithms (i.e. [Dirichlet Process](https://en.wikipedia.org/wiki/Dirichlet_process))
+
 -  [Predicting Sales Through Music Anatomy (R)](/demonstrative/R/music_anatomy/README.md) - Analyzing the relationship between iTunes sales and traits of music like tempo, loudness, danceability, acousticness, and more ([Forbes.com Article](http://www.forbes.com/sites/livbuli/2014/09/18/engineering-success-the-data-driven-approach-to-hit-making/)).
 
 -  [Predicting the Chemical Composition of Soil in Africa (Python)](http://nbviewer.ipython.org/github/eric-czech/portfolio/blob/master/demonstrative/python/notebooks/kaggle/kaggle_soil.ipynb) - Kaggle competition submission analyzing 3,595 different properties of soil samples in an effort to predict other properties of that same soil like pH, sand content, and Phosphorous/Carbon/Calcium levels.
