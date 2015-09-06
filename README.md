@@ -1,7 +1,7 @@
 Data Science Portfolio
 =======
 
-This repository contains examples of some the projects I've had the pleasure to work on over the last few years.  The guide below is meant to demonstrate a small but representative portion of the details of those projects, spanning a spectrum that involves at least some of the following skills:
+This repository contains examples of some the projects I've had the pleasure to work on over the last few years.  The guide below is meant to demonstrate a small but somewhat representative portion of the details of those projects, spanning a spectrum that involves at least some of the following skills:
 
 - __Statistical Research__ - IPython and R notebooks and slides
 - __Application Development__ - Large-scale database systems built on top of Hadoop (Hortonworks and Cloudera), Java, Pig, Hive, and MySQL
