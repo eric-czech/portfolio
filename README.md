@@ -21,7 +21,7 @@ Project Links
 
 -  [Predicting the Chemical Composition of Soil in Africa (Python)](http://nbviewer.ipython.org/github/eric-czech/portfolio/blob/master/demonstrative/python/notebooks/kaggle/kaggle_soil.ipynb) - Kaggle competition submission analyzing 3,595 different properties of soil samples in an effort to predict other properties of that same soil like pH, sand content, and Phosphorous/Carbon/Calcium levels.
 
--  [Phone Bill Classification (Python)](http://nbviewer.ipython.org/github/eric-czech/portfolio/blob/master/demonstrative/python/notebooks/phone_bills.ipynb) - Expensing business calls on my Verizon Wireless bill using an ensemble tree classifier.
+-  [Phone Bill Classification (Python)](http://nbviewer.ipython.org/github/eric-czech/portfolio/blob/master/demonstrative/python/notebooks/misc/phone_bills.ipynb) - Expensing business calls on my Verizon Wireless bill using an ensemble tree classifier.
 
 -  [Calculating "Affinity" Between Entities on Twitter (Pig)](/demonstrative/pig/twitter_affinity) - Determining the strentgh of pairwise relationships between Twitter users by analyzing the reach of the users that engage with both entities in any given pair -- this was a valuable tool at Next Big Sound for recommending artist sponsorships to various brands. 
 
