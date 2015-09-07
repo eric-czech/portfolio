@@ -33,7 +33,7 @@ Project Links
 
 
 ####Data Systems
--  [HBlocks (Java, Pig, Oozie, Bash, HDFS, MySQL)](http://bit.ly/1rCkZJS) - White paper on production storage system at Next Big Sound that spans multiple Hadoop subsystems to create a large scale (many terabyte) data revision control platform.  *No code uploaded yet, just the paper for now.*
+-  [HBlocks (Java, Pig, Oozie, Bash, HDFS, MySQL)](http://bit.ly/1QkU3Xt) - White paper on production storage system at Next Big Sound that spans multiple Hadoop subsystems to create a large scale (many terabyte) data revision control platform.  *No code uploaded yet, just the paper for now.*
 
 -  [HDFS Disaster Recovery (Bash)](/demonstrative/bash/hdfs_backup/hdfs_backup.sh) - Shell script used to backup critical HDFS paths into rolling "archive" directories for offsite delivery or immediate DR.
 
