@@ -1,0 +1,100 @@
+---
+title: "Fitting Censored Distributions"
+author: "Eric Czech"
+date: "September 16, 2015"
+output: html_document
+---
+
+```{r, message=F, error=F, echo=F}
+library(dplyr)
+library(ggplot2)
+
+plot.dist.fit <- function(x, x.trunc, x.fit, x.censor, dist.name){
+  rbind(
+    data.frame(x=x, type='Actual Distribution'),
+    data.frame(x=x.trunc, type='Truncated Distribution'),
+    data.frame(x=x.fit, type='Fit Distribution')
+  ) %>% 
+    ggplot(aes(x=x, color=type)) + geom_density() + scale_y_sqrt() + theme_bw() + 
+    ggtitle(sprintf('%s Distribution Fits', dist.name)) + 
+    geom_vline(xintercept=x.censor, alpha=.3, linetype='longdash')
+}
+```
+
+## Fitting a Right-Censored Normal Distribution
+
+### Manual Method (w/ optim)
+```{r}
+
+# These are the actual parameters for the distribution to fit
+mu = 10; sd = 10; 
+
+# Sample size
+n = 100000
+
+# Right censoring value
+x.max = 30
+
+# Create the truncated sample
+x = rnorm(n, mu, sd)
+x.trunc = ifelse(x >= x.max, x.max, x)
+
+loglik <- function(data, p) {
+  -sum(ifelse(
+    data >= x.max, 
+    # If right-censored, use upper CDF value beginning at x.max
+    pnorm(data, p[1], p[2], lower.tail = F, log.p = T),  
+    # Otherwise use the usual PDF for the value
+    dnorm(data, p[1], p[2], log = T) 
+  ))
+}
+
+fit.res <- optim(c(mean(x.trunc), sd(x.trunc)), loglik, data = x.trunc)
+sprintf('Fitted distribution mean = %s, std = %s', fit.res$par[1], fit.res$par[2])
+
+# [1] 10.00380 10.01219  --> inferred values are pretty close
+x.fit <- rnorm(n, fit.res$par[1], fit.res$par[2])
+
+plot.dist.fit(x, x.trunc, x.fit, x.max, 'Normal')
+```
+
+### Using 'fitdist'
+
+```{r, echo=T}
+library(fitdistrplus)
+
+d <- data.frame(
+  left=ifelse(x >= x.max, x.max, x), # Assign left side as x.max when censored
+  right=ifelse(x >= x.max, NA, x)    # Assign right side as NA when censored
+)
+fitdistcens(d, 'norm')
+```
+
+## Fitting a Right-Censored Gamma Distribution
+
+```{r}
+# Parameters to fit to
+shape = 20; rate = 5; 
+
+# Random gamma sample
+x = rgamma(n, shape, rate)
+
+# Censor sample to be below or equal to 5
+x.max = 5
+x.trunc = ifelse(x >= x.max, x.max, x)
+
+# Fit censored sample
+d <- data.frame(
+  left=ifelse(x >= x.max, x.max, x),
+  right=ifelse(x >= x.max, NA, x)
+)
+fit.res <- fitdistcens(d, 'gamma')
+
+# Display results
+x.fit <- rgamma(n, fit.res$estimate['shape'], fit.res$estimate['rate'])
+sprintf('Fitted distribution shape = %s, rate = %s', fit.res$estimate['shape'], fit.res$estimate['rate'])
+
+plot.dist.fit(x, x.trunc, x.fit, x.max, 'Gamma')
+```
+
+

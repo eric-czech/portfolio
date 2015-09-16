@@ -28,7 +28,7 @@ def get_one_hot_features(df, **kwargs):
     return pd.DataFrame(df_ohe, columns=cols)
 
 
-def get_polynomial_features(df, **kwargs):
+def get_polynomial_features(df, interaction_sign=' x ', **kwargs):
     """
     Gets polynomial features for the given data frame using the given sklearn.PolynomialFeatures arguments
     :param df: DataFrame to create new features from
@@ -36,7 +36,7 @@ def get_polynomial_features(df, **kwargs):
     :return: DataFrame with labeled polynomial feature values
     """
     pf = PolynomialFeatures(**kwargs)
-    feats = _get_polynomial_features(df.columns.tolist(), pf.fit(df))
+    feats = _get_polynomial_features(df.columns.tolist(), pf.fit(df), interaction_sign=interaction_sign)
     return pd.DataFrame(pf.transform(df), columns=feats)
 
 
