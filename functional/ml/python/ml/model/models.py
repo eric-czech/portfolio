@@ -2,63 +2,29 @@ __author__ = 'eczech'
 
 import pandas as pd
 import numpy as np
-from sklearn.linear_model import LogisticRegression, LogisticRegressionCV, RandomizedLogisticRegression
-from sklearn.grid_search import Parallel, delayed
-from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier, ExtraTreesClassifier
+
+from sklearn.grid_search import Parallel, delayed, BaseSearchCV
 from sklearn.metrics import roc_curve
-from sklearn.grid_search import GridSearchCV
 from sklearn import base
-from sklearn.svm import SVC
 import functools
-import multiprocessing
-import logging
+import collections
 
-logger = multiprocessing.log_to_stderr()
-logger.setLevel(logging.INFO)
-
-TREE_CLASSIFIERS = [GradientBoostingClassifier, RandomForestClassifier, ExtraTreesClassifier]
-LOGREG_CLASSIFIERS = [LogisticRegression, LogisticRegressionCV, RandomizedLogisticRegression]
-MODE_CLASSIFIER = 'classifier'
-MODE_REGRESSOR = 'regressor'
-FOLD_COL_PREFIX = 'fold:'
-CLF_IMPL = 'value'
-CLF_NAME = 'name'
-
-
-def is_instance_of(obj, classes):
-    return np.any([isinstance(obj, c) for c in classes])
-
-
-def _get_classifier_fi(clf, columns):
-    res = None
-
-    # If model is grid search, fetch underlying, best estimator
-    if isinstance(clf, GridSearchCV):
-        logger.info(clf.best_params_)
-        clf = clf.best_estimator_
-
-    # SVC - univariate importance exists only with linear kernel
-    # and when number of classes == 2
-    if isinstance(clf, SVC) \
-        and clf.get_params()['kernel'] == 'linear' \
-            and clf.coef_.shape[0] == 1:
-        res = clf.coef_[0]
-
-    # Logreg - univariate importance exists only with 2 classes
-    if is_instance_of(clf, LOGREG_CLASSIFIERS) and clf.coef_.shape[0] == 1:
-        res = clf.coef_[0]
-
-    # Tree classifiers - univariate importance always exists
-    if is_instance_of(clf, TREE_CLASSIFIERS):
-        res = clf.feature_importances_
-
-    return pd.Series(res, index=columns) if res is not None else res
+from .common import *
+from .importances import get_classifier_fi, get_regressor_fi
 
 
 def get_feature_importance(clf, columns, mode):
     if mode == MODE_CLASSIFIER:
-        return _get_classifier_fi(clf, columns)
+        return get_classifier_fi(clf, columns)
+    if mode == MODE_REGRESSOR:
+        return get_regressor_fi(clf, columns)
     return None
+
+
+def _get_clf_name(clf):
+    if isinstance(clf, BaseSearchCV):
+        return clf.estimator.__class__.__name__
+    return clf.__class__.__name__
 
 
 def run_fold(args):
@@ -67,6 +33,7 @@ def run_fold(args):
     res = []
     for clf in clfs:
         model = base.clone(clf[CLF_IMPL])
+        LOGGER.warn('Running model {} on fold {}'.format(_get_clf_name(model), i+1))
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
         feat_imp = get_feature_importance(model, X_test.columns.tolist(), mode)
@@ -91,15 +58,12 @@ def run_classifiers(X, y, clfs, cv, **kwargs):
     return run_models(X, y, clfs, cv, MODE_CLASSIFIER, **kwargs)
 
 
-def parse_kwargs(kwargs, prefix):
-    keys = [k for k in kwargs if k.startswith(prefix)]
-    new_kwargs = {k.replace(prefix, '', 1): kwargs[k] for k in keys}
-    old_kwargs = {k: kwargs[k] for k in kwargs if k not in keys}
-    return new_kwargs, old_kwargs
+def run_regressors(X, y, clfs, cv, **kwargs):
+    return run_models(X, y, clfs, cv, MODE_REGRESSOR, **kwargs)
 
 
 def run_models(X, y, clfs, cv, mode, **kwargs):
-    """ Fit multiple classification or regression models concurrently
+    """ Fit multiple classification or regression model concurrently
 
     :param X: Feature data set (must be a pandas DataFrame)
     :param y: Response to predict (must be a pandas Series)
@@ -118,6 +82,8 @@ def run_models(X, y, clfs, cv, mode, **kwargs):
     :return: A list of lists where the outer list contains as many entries as there are folds and the inner lists
         contain per-fold results for each estimator given
     """
+    validate_mode(mode)
+
     clfs = [{CLF_NAME: k, CLF_IMPL: v} for k, v in clfs.items()]
 
     par_kwargs, kwargs = parse_kwargs(kwargs, 'par_')
@@ -204,3 +170,24 @@ def summarize_importances(res):
     res = functools.reduce(pd.DataFrame.append, imp_res)
     res.index.name = 'feature'
     return res
+
+
+def summarize_grid_parameters(res):
+    grid_res = collections.defaultdict(list)
+    for fold_res in res:
+        for clf_res in fold_res:
+            model = clf_res['model']['value']
+            if isinstance(model, BaseSearchCV):
+                if hasattr(model, 'param_grid'):
+                    keys = model.param_grid.keys()
+                elif hasattr(model, 'param_distributions'):
+                    keys = model.param_distributions.keys()
+                params = model.best_estimator_.get_params()
+                params = {k: v for k, v in params.items() if k in keys}
+                params['fold_id'] = clf_res['fold']
+                params['model_name'] = clf_res['model']['name']
+                grid_res[clf_res['model']['name']].append(params)
+    grid_res = [pd.melt(pd.DataFrame(grid_res[k]), id_vars=['fold_id', 'model_name']) for k in grid_res]
+    if not grid_res:
+        return None
+    return functools.reduce(pd.DataFrame.append, grid_res)

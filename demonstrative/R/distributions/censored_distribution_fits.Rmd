@@ -97,4 +97,3 @@ sprintf('Fitted distribution shape = %s, rate = %s', fit.res$estimate['shape'], 
 plot.dist.fit(x, x.trunc, x.fit, x.max, 'Gamma')
 ```
 
-

@@ -13,3 +13,10 @@ def get_test_classifier_data(multinomial=False):
     else:
         df['target'] = np.where(d.target == 1, 0, 1)
     return df[d.feature_names], df['target']
+
+
+def get_test_regressor_data():
+    d = datasets.load_boston()
+    df = pd.DataFrame(d.data, columns=d.feature_names)
+    df['target'] = d.target
+    return df[d.feature_names], df['target']
