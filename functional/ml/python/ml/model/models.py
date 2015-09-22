@@ -8,9 +8,11 @@ from sklearn.metrics import roc_curve
 from sklearn import base
 import functools
 import collections
-
+from .log import log, DEFAULT_LOG_FORMAT, DEFAULT_LOG_FILE, set_logger
 from .common import *
 from .importances import get_classifier_fi, get_regressor_fi
+
+_HR = '-' * 80
 
 
 def get_feature_importance(clf, columns, mode):
@@ -31,10 +33,16 @@ def run_fold(args):
     i, train, test, clfs, mode, X, y, kwargs = args
     X_train, X_test, y_train, y_test = X.iloc[train], X.iloc[test], y.iloc[train], y.iloc[test]
     res = []
+
     for clf in clfs:
         model = base.clone(clf[CLF_IMPL])
-        LOGGER.warn('Running model {} on fold {}'.format(_get_clf_name(model), i+1))
+        log('Running model {} on fold {}'.format(_get_clf_name(model), i+1))
         model.fit(X_train, y_train)
+
+        if kwargs.get('show_best_params') and isinstance(model, BaseSearchCV):
+            log('\tBest grid parameters (model = {}, fold = {}): {}'
+                .format(_get_clf_name(model), i+1, model.best_params_))
+
         y_pred = model.predict(X_test)
         feat_imp = get_feature_importance(model, X_test.columns.tolist(), mode)
 
@@ -79,6 +87,7 @@ def run_models(X, y, clfs, cv, mode, **kwargs):
             keep_X: Boolean indicating whether or not test datasets should be preserved in results
             predict_proba: Boolean indicating whether or not class probability predictions should be made for classifiers;
                 defaults to false
+            show_best_params: Prints BaseSearchCV "best_params_" in cross validation loops
     :return: A list of lists where the outer list contains as many entries as there are folds and the inner lists
         contain per-fold results for each estimator given
     """
@@ -87,10 +96,17 @@ def run_models(X, y, clfs, cv, mode, **kwargs):
     clfs = [{CLF_NAME: k, CLF_IMPL: v} for k, v in clfs.items()]
 
     par_kwargs, kwargs = parse_kwargs(kwargs, 'par_')
+    log_kwargs, kwargs = parse_kwargs(kwargs, 'log_')
 
     args_list = [(i, train, test, clfs, mode, X, y, kwargs) for i, (train, test) in enumerate(cv)]
-    res = Parallel(**par_kwargs)(delayed(run_fold)(args) for args in args_list)
 
+    log_file = log_kwargs.get('file', DEFAULT_LOG_FILE)
+    set_logger(log_file, log_kwargs.get('format', DEFAULT_LOG_FORMAT))
+
+    print('Beginning cross validation (see {} for progress updates)'.format(log_file))
+    res = Parallel(**par_kwargs)(delayed(run_fold)(args) for args in args_list)
+    log('CV Complete ({} model(s) run)'.format(len(clfs)))
+    log(_HR)
     return res
 
 

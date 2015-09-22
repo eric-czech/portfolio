@@ -15,10 +15,6 @@ from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor, E
 from sklearn.linear_model import ElasticNet, ElasticNetCV, LinearRegression, BayesianRidge, Ridge, RidgeCV
 from sklearn.linear_model import Lasso, LassoCV
 
-import logging
-import multiprocessing
-
-LOGGER = multiprocessing.log_to_stderr(level=logging.WARN)
 
 TREE_CLASSIFIERS = [GradientBoostingClassifier, RandomForestClassifier, ExtraTreesClassifier]
 LOGREG_CLASSIFIERS = [LogisticRegression, LogisticRegressionCV, RandomizedLogisticRegression]

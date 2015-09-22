@@ -8,6 +8,7 @@ import multiprocessing
 #LOGGER.setLevel(logging.IN)
 from sklearn.grid_search import BaseSearchCV
 
+
 def get_classifier_fi(clf, columns):
     res = None
 
