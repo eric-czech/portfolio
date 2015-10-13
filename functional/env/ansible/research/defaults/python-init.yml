@@ -1,0 +1,3 @@
+--
+# Defaults for python-init task
+anaconda_home: ~/anaconda2

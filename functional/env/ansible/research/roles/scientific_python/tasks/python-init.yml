@@ -1,0 +1,11 @@
+---
+- name: Download Anaconda
+  get_url: url=https://3230d63b5fc54e62148e-c95ac804525aac4b6dba79b00b39d1d3.ssl.cf1.rackcdn.com/Anaconda3-2.3.0-Linux-x86_64.sh dest=/tmp/anaconda.sh mode=0740
+- name: Install Anaconda
+  shell: /tmp/anaconda.sh -b -p {{anaconda_home}} creates={{anaconda_home}} executable=/bin/bash
+- name: Add conda to PATH
+  lineinfile: dest=/home/{{anaconda_user}}/.bashrc regexp="anaconda_path_entry$" line="export PATH={{anaconda_home}}/bin:$PATH {{'#'}}anaconda_path_entry"
+- name: Update conda to latest version
+  shell: "{{anaconda_home}}/bin/conda update conda --yes -q executable=/bin/bash"
+- name: Install pip
+  shell: "{{anaconda_home}}/bin/conda install pip --yes -q executable=/bin/bash"

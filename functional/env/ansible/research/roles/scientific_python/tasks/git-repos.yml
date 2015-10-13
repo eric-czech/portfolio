@@ -1,0 +1,8 @@
+---
+- name: Create Repos Directory
+  file: path={{repo_dir}} state=directory
+- name: Download Portfolio Repo
+  git: repo=https://github.com/eric-czech/portfolio.git dest={{repo_dir}} update=no
+- name: Add Repo Paths to Python Env
+  lineinfile: dest={{anaconda_home}}/envs/{{env_name}}/lib/{{env_python}}/site-packages/local.pth regexp='{{repo_dir}}/{{item}}' line='{{repo_dir}}/{{item}}' create=yes
+  with_items: "{{py_env_paths}}"

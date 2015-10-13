@@ -1,0 +1,9 @@
+---
+#- name: Create Jupyter Configuration File
+#  shell: "{{anaconda_home}}/envs/{{env_name}}/bin/jupyter-notebook --generate-config creates=~/.jupyter/jupyter_notebook_config.py executable=/bin/bash"
+- name: Create Jupyter Notebook Configuration Dir
+  file: path=~/.jupyter state=directory
+- name: Create Jupyter Notebook Configuration File
+  template: 
+     src: jupyter_notebook_config.j2 
+     dest: ~/.jupyter/jupyter_notebook_config.py 

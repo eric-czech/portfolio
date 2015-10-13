@@ -1,0 +1,4 @@
+---
+repo_dir: /home/{{anaconda_user}}/repos/portfolio
+env_name: py3.4
+env_python: python3.4

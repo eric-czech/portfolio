@@ -1,0 +1,15 @@
+---
+#- include: python-init.yml
+#- include: python-env.yml 
+#- include: conda-package.yml package_name=jupyter
+- include: git-repos.yml 
+  vars:
+     py_env_paths:
+        - functional/paint_by_numbers/python
+        - functional/sports/python
+        - functional/ml/python
+- include: jupyter-notebook.yml 
+  vars:
+     notebook_password_hash: "sha1:afc154d82c0f:f333cbd905ab7345cfae7103ae7517372fad1474"
+     notebook_dir: /home/{{anaconda_user}}/repos/portfolio/demonstrative/python/notebooks
+     notebook_port: 9081

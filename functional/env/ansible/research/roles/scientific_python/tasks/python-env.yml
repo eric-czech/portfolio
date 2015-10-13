@@ -1,0 +1,3 @@
+---
+- name: Create Environment 
+  shell: "{{anaconda_home}}/bin/conda create -y -m -p {{anaconda_home}}/envs/{{env_name}} python={{env_python}} creates={{anaconda_home}}/envs/{{env_name}} executable=/bin/bash"
