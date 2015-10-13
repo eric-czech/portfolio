@@ -6,8 +6,7 @@ import pandas as pd
 from sklearn import mixture
 import math
 import itertools
-from pbn import dots
-from pbn.dots import AlphabetLabelRenderer
+from . import dots, conversions
 
 LABEL_MARGIN = 3
 
@@ -22,15 +21,16 @@ def unravel_old(d):
     return pd.DataFrame(colors, columns=['R', 'G', 'B'])
 
 
-
 def unravel(d, color_cols=['l', 'a', 'b']):
     n2d = d.shape[0] * d.shape[1]
     colors = np.empty((n2d, 5))
     for i in range(d.shape[0]):
         for j in range(d.shape[1]):
             z = i * d.shape[1] + j
-            colors[z] = [float(i), float(j)] + list(d[i, j, :])
-    return pd.DataFrame(colors, columns=['x', 'y'] + color_cols)
+            colors[z] = [i, j] + list(d[i, j, :])
+    res = pd.DataFrame(colors, columns=['x', 'y'] + color_cols)
+    res[['x', 'y']] = res[['x', 'y']].astype(np.int64)
+    return res
 
 
 def reravel(d, x, y):
@@ -329,9 +329,9 @@ def _get_label_renderer(clusters):
             colors.append(tuple(c['color']))
     colors.sort()
     colors = list(c for c, _ in itertools.groupby(colors))
-    if len(colors) > 25:
-        raise ValueError('Currently no more than 25 unique colors are supported')
     renderer = dots.get_label_renderer()
+    if len(colors) > renderer.get_max_colors():
+        raise ValueError('Currently no more than {} unique colors are supported'.format(renderer.get_max_colors()))
     labels = renderer.get_labels()[:len(colors)]
     color_index = dict(zip(colors, labels))
     renderer.set_keys_for_labels(color_index)
@@ -368,10 +368,14 @@ def _get_shape_patch(point, xrange, yrange):
     return res
 
 
-def render_pbn(fc, img_nd, bkg=[.99, .99, .99], edg=[1., 1., 1.], lbl=[.99, .99, .99], solution=False, size_limit=25,
-               scale_factor=1):
-    import imp
-    imp.reload(dots)
+def render_pbn(fc, img_nd, alpha,
+               bkg=[.99, .99, .99], edg=[1., 1., 1.], lbl=[.99, .99, .99],
+               solution=False, scale_factor=1):
+
+    bkg = np.array(conversions._rgb_to_lab(bkg)) * alpha
+    edg = np.array(conversions._rgb_to_lab(edg)) * alpha
+    lbl = np.array(conversions._rgb_to_lab(lbl)) * alpha
+
     img_res = np.empty((img_nd.shape[0] * scale_factor, img_nd.shape[1] * scale_factor, img_nd.shape[2]))
 
     label_renderer, color_index = _get_label_renderer(fc)
@@ -379,9 +383,7 @@ def render_pbn(fc, img_nd, bkg=[.99, .99, .99], edg=[1., 1., 1.], lbl=[.99, .99,
     for cc_id in fc:
         for c in fc[cc_id]:
             actual_color = c['color']
-            #use_actual = solution or len(c['points']) < size_limit
-            use_actual = solution or len(c['labels']) == 0
-            color = actual_color if use_actual else bkg
+            color = actual_color if solution else bkg
             #color = (rnd(), rnd(), rnd()) if use_actual else bkg
 
             members = set(c['points'])
@@ -391,7 +393,7 @@ def render_pbn(fc, img_nd, bkg=[.99, .99, .99], edg=[1., 1., 1.], lbl=[.99, .99,
                     labels.append(point)
                 _add_to_result(point, c['neighbors'], color, edg, img_nd, img_res, False, scale_factor)
 
-            if not use_actual:
+            if not solution:
                 for point in c['edges']:
                     _add_to_result(point, c['neighbors'], color, edg, img_nd, img_res, True, scale_factor)
 
