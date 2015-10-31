@@ -36,7 +36,7 @@ def run_fold(args):
 
     for clf in clfs:
         model = base.clone(clf[CLF_IMPL])
-        log('Running model {} on fold {}'.format(_get_clf_name(model), i+1))
+        log('Running model {} ({}) on fold {}'.format(clf[CLF_NAME], _get_clf_name(model), i+1))
         model.fit(X_train, y_train)
 
         if kwargs.get('show_best_params') and isinstance(model, BaseSearchCV):
@@ -179,10 +179,14 @@ def summarize_importances(res):
     imp_res = []
     for fold_res in res:
         for clf_res in fold_res:
+            if clf_res['feat_imp'] is None:
+                continue
             feat_imp = pd.DataFrame(clf_res['feat_imp']).T
             feat_imp['model_name'] = clf_res['model'][CLF_NAME]
             feat_imp['fold_id'] = clf_res['fold']
             imp_res.append(feat_imp)
+    if len(imp_res) == 0:
+        return None
     res = functools.reduce(pd.DataFrame.append, imp_res)
     res.index.name = 'feature'
     return res
@@ -193,6 +197,14 @@ def summarize_grid_parameters(res):
     for fold_res in res:
         for clf_res in fold_res:
             model = clf_res['model']['value']
+
+            # Attempt to find base search CV in pipeline, if model
+            # was in fact a pipeline
+            pipe_model = resolve_estimator_from_pipeline(model)
+            if pipe_model is not None:
+                model = pipe_model
+
+            # Add to results if model is a parameter search wrapper
             if isinstance(model, BaseSearchCV):
                 if hasattr(model, 'param_grid'):
                     keys = model.param_grid.keys()
@@ -207,3 +219,4 @@ def summarize_grid_parameters(res):
     if not grid_res:
         return None
     return functools.reduce(pd.DataFrame.append, grid_res)
+

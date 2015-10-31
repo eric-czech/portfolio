@@ -383,17 +383,20 @@ def render_pbn(fc, img_nd, alpha,
     for cc_id in fc:
         for c in fc[cc_id]:
             actual_color = c['color']
-            color = actual_color if solution else bkg
-            #color = (rnd(), rnd(), rnd()) if use_actual else bkg
+            # color = actual_color if solution else bkg
+            # color = (rnd(), rnd(), rnd()) if use_actual else bkg
 
             members = set(c['points'])
             labels = []
             for point in c['points']:
                 if _is_shape_enclosed(members, _get_label_patch(point, scale_factor)):
                     labels.append(point)
+
+            color = actual_color if solution or len(labels) == 0 else bkg
+            for point in c['points']:
                 _add_to_result(point, c['neighbors'], color, edg, img_nd, img_res, False, scale_factor)
 
-            if not solution:
+            if not solution and len(labels) > 0:
                 for point in c['edges']:
                     _add_to_result(point, c['neighbors'], color, edg, img_nd, img_res, True, scale_factor)
 

@@ -7,14 +7,26 @@ import multiprocessing
 #LOGGER = multiprocessing.log_to_stderr()
 #LOGGER.setLevel(logging.IN)
 from sklearn.grid_search import BaseSearchCV
+from sklearn.pipeline import Pipeline
+
+
+def _resolve_clf(clf):
+    # If model is grid search, fetch underlying, best estimator
+    if isinstance(clf, BaseSearchCV):
+        return clf.best_estimator_
+
+    # If model is pipeline, resolved contained estimator
+    pipe_clf = resolve_estimator_from_pipeline(clf)
+    if pipe_clf is not None:
+        return _resolve_clf(pipe_clf)
+
+    # Otherwise, return as is
+    return clf
 
 
 def get_classifier_fi(clf, columns):
     res = None
-
-    # If model is grid search, fetch underlying, best estimator
-    if isinstance(clf, BaseSearchCV):
-        clf = clf.best_estimator_
+    clf = _resolve_clf(clf)
 
     # SVC - univariate importance exists only with linear kernel
     # and when number of classes == 2
@@ -36,10 +48,7 @@ def get_classifier_fi(clf, columns):
 
 def get_regressor_fi(clf, columns):
     res = None
-
-    # If model is grid search, fetch underlying, best estimator
-    if isinstance(clf, BaseSearchCV):
-        clf = clf.best_estimator_
+    clf = _resolve_clf(clf)
 
     # SVR - univariate importance is only present with linear kernel
     if isinstance(clf, SVR) \
@@ -53,5 +62,6 @@ def get_regressor_fi(clf, columns):
     # Tree classifiers - univariate importance always exists
     if is_instance_of(clf, TREE_REGRESSORS):
         res = clf.feature_importances_
+
 
     return pd.Series(res, index=columns) if res is not None else res
