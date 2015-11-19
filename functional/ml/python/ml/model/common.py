@@ -6,20 +6,21 @@ import pandas as pd
 
 # Classifier Imports
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV, RandomizedLogisticRegression
-from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier, ExtraTreesClassifier
+from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
+from sklearn.ensemble import ExtraTreesClassifier, AdaBoostClassifier
 from sklearn.svm import SVC
 
 # Regressor Imports
 from sklearn.svm import SVR
-from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor, ExtraTreesRegressor
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor, ExtraTreesRegressor, AdaBoostRegressor
 from sklearn.linear_model import ElasticNet, ElasticNetCV, LinearRegression, BayesianRidge, Ridge, RidgeCV
 from sklearn.linear_model import Lasso, LassoCV
 from sklearn.pipeline import Pipeline
 
 
-TREE_CLASSIFIERS = [GradientBoostingClassifier, RandomForestClassifier, ExtraTreesClassifier]
+TREE_CLASSIFIERS = [GradientBoostingClassifier, RandomForestClassifier, ExtraTreesClassifier, AdaBoostClassifier]
 LOGREG_CLASSIFIERS = [LogisticRegression, LogisticRegressionCV, RandomizedLogisticRegression]
-TREE_REGRESSORS = [GradientBoostingRegressor, RandomForestRegressor, ExtraTreesRegressor]
+TREE_REGRESSORS = [GradientBoostingRegressor, RandomForestRegressor, ExtraTreesRegressor, AdaBoostRegressor]
 LINEAR_REGRESSORS = [ElasticNet, ElasticNetCV, LinearRegression, BayesianRidge, Ridge, RidgeCV, Lasso, LassoCV]
 
 FOLD_COL_PREFIX = 'fold:'

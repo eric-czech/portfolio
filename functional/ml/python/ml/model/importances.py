@@ -33,11 +33,11 @@ def get_classifier_fi(clf, columns):
     if isinstance(clf, SVC) \
         and clf.get_params()['kernel'] == 'linear' \
             and clf.coef_.shape[0] == 1:
-        res = clf.coef_[0]
+        res = np.abs(clf.coef_[0])
 
     # Logreg - univariate importance exists only with 2 classes
     if is_instance_of(clf, LOGREG_CLASSIFIERS) and clf.coef_.shape[0] == 1:
-        res = clf.coef_[0]
+        res = np.abs(clf.coef_[0])
 
     # Tree classifiers - univariate importance always exists
     if is_instance_of(clf, TREE_CLASSIFIERS):
@@ -53,11 +53,11 @@ def get_regressor_fi(clf, columns):
     # SVR - univariate importance is only present with linear kernel
     if isinstance(clf, SVR) \
             and clf.get_params()['kernel'] == 'linear':
-        res = clf.coef_[0]
+        res = np.abs(clf.coef_[0])
 
     # Linear regressors - coefficients are always one-dimensional
     if is_instance_of(clf, LINEAR_REGRESSORS):
-        res = clf.coef_
+        res = np.abs(clf.coef_)
 
     # Tree classifiers - univariate importance always exists
     if is_instance_of(clf, TREE_REGRESSORS):
