@@ -1,7 +1,8 @@
 ---
-#- include: python-init.yml
-#- include: python-env.yml 
-#- include: conda-package.yml package_name=jupyter
+- include: python-init.yml
+- include: python-env.yml 
+- include: conda-package.yml conda_package_list="jupyter pandas matplotlib scikit-learn"
+- include: pip-package.yml pip_package_list="colormath"
 - include: git-repos.yml 
   vars:
      py_env_paths:
@@ -10,6 +11,6 @@
         - functional/ml/python
 - include: jupyter-notebook.yml 
   vars:
-     notebook_password_hash: "sha1:afc154d82c0f:f333cbd905ab7345cfae7103ae7517372fad1474"
+     notebook_password_hash: "sha1:426dd88b0dc5:8294029f5f923dfc55edad0c83b64fc885d0d5d0"
      notebook_dir: /home/{{anaconda_user}}/repos/portfolio/demonstrative/python/notebooks
      notebook_port: 9081
