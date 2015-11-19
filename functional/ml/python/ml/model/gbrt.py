@@ -9,21 +9,22 @@ from sklearn.cross_validation import train_test_split
 from sklearn.grid_search import ParameterGrid
 
 
-def get_loss_grid(gbrt, X, y, param_grid, test_size=.3, **kwargs):
+# def get_loss_grid(gbrt, X, y, param_grid, test_size=.3, **kwargs):
+#
+#     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, **kwargs)
+#
+#     gbrt.fit(X_train, y_train)
+#     n_estimators = len(gbrt.estimators_)
+#
+#     test_loss = np.empty(n_estimators)
+#     for i, pred in enumerate(gbrt.staged_predict(X_test)):
+#         test_loss[i] = gbrt.loss_(y_test, pred)
+#     return pd.DataFrame({
+#         'n_estimators': np.arange(n_estimators) + 1,
+#         'training_loss': gbrt.train_score_,
+#         'test_loss': test_loss
+#     })
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, **kwargs)
-
-    gbrt.fit(X_train, y_train)
-    n_estimators = len(gbrt.estimators_)
-
-    test_loss = np.empty(n_estimators)
-    for i, pred in enumerate(gbrt.staged_predict(X_test)):
-        test_loss[i] = gbrt.loss_(y_test, pred)
-    return pd.DataFrame({
-        'n_estimators': np.arange(n_estimators) + 1,
-        'training_loss': gbrt.train_score_,
-        'test_loss': test_loss
-    })
 
 def get_loss(gbrt, X, y, test_size=.3, **kwargs):
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, **kwargs)

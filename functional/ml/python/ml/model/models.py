@@ -55,7 +55,7 @@ def run_fold(args):
         }
         if kwargs.get('keep_X', False):
             fold_res['X_test'] = X_test
-        if mode == MODE_CLASSIFIER and kwargs.get('predict_proba', False):
+        if mode == MODE_CLASSIFIER and kwargs.get('predict_proba', True):
             fold_res['y_proba'] = model.predict_proba(X_test)
 
         res.append(fold_res)
@@ -133,16 +133,20 @@ def summarize_scores(res, score_func, use_proba=False):
     return pd.DataFrame(score_res, columns=['fold_id', 'model_name', 'score'])
 
 
-def summarize_curve(res):
+def summarize_curve(res, curve_func=roc_curve):
     preds = summarize_predictions(res)
 
     def get_curve(x):
+        model = x['model_name'].iloc[0]
+        if 'y_proba_1' not in x.columns:
+            print('Warning: No probability predictions found for model "{}"'.format(model))
+            return None
         if 'y_proba_2' in x.columns:
             raise ValueError('Curve summarizations are not available for multinomial classifiers')
-        fpr, tpr, _ = roc_curve(x['y_true'], x['y_proba_1'])
-        return pd.DataFrame({'fpr': fpr, 'tpr': tpr})
+        x, y, thresh = curve_func(x['y_true'], x['y_proba_1'])
+        return pd.DataFrame({'x': x, 'y': y, 'thresh': thresh})
     return preds.groupby(['model_name', 'fold_id']).apply(get_curve)\
-        .reset_index()[['model_name', 'fold_id', 'fpr', 'tpr']]
+        .reset_index()[['model_name', 'fold_id', 'x', 'y', 'thresh']]
 
 
 def summarize_predictions(res):
@@ -188,8 +192,47 @@ def summarize_importances(res):
     if len(imp_res) == 0:
         return None
     res = functools.reduce(pd.DataFrame.append, imp_res)
-    res.index.name = 'feature'
-    return res
+    #res.columns.name = 'feature'
+    return res.reset_index(drop=True)
+
+
+def summarize_weighted_importances(res, score_func, feat_agg=np.median, score_agg=np.median):
+    """
+    Computes model-accuracy-weighted feature scores across folds and model types
+
+    :param res: Result from model training
+    :param score_func: Scoring function used to compute model scores with
+    :param feat_agg: Feature importance aggregation function for a specific model type
+    :param score_agg: Model accuracy aggregation function across folds
+    :return: Series containing model-accuracy-weighted feature importances
+    """
+    feat_imp = summarize_importances(res)
+
+    # Compute feature scores across folds for each model
+    feat_imp = feat_imp.groupby('model_name')\
+        .apply(lambda x: x.drop(['fold_id', 'model_name'], axis=1).apply(feat_agg))
+
+    def scale_to_unit(x):
+        return (x - x.min())/(x.max() - x.min())
+
+    # Normalize each feature score per model to [0, 1]
+    feat_imp = feat_imp.apply(scale_to_unit, axis=1)
+
+    # Compute per-model scores and aggregate across folds to give a single
+    # value per model, and then use that value to compute per-model weight
+    scores = summarize_scores(res, score_func, use_proba=False)
+    scores = scores.groupby('model_name')['score'].apply(score_agg)
+    scores = scores / scores.sum()
+    #print(scores)
+
+    # Multiply each feature + model score times model weight and sum across
+    # models to give overall feature score
+    scores = feat_imp.apply(lambda x: x * scores.loc[x.name], axis=1).sum().order()
+    scores.index.name = 'feature'
+    scores.name = 'score'
+
+    # Return series with feature names in index and model-accuracy-weighted scores in value
+    return scores
 
 
 def summarize_grid_parameters(res):
