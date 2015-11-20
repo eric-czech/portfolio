@@ -19,24 +19,7 @@ data {
 }
 transformed data {
   real log_unif;
-  matrix[N_CP, N_UID] z_above;
-  matrix[N_CP, N_UID] z_below;
-
   log_unif <- -log(N_CP);
-
-  z_above <- rep_matrix(0, N_CP, N_UID);
-  z_below <- rep_matrix(0, N_CP, N_UID);  
-  for (s in 1:N_CP){
-    // Loop over all ~10k observations and tally the number of z values above
-    // and below the change point for each patient
-    for (i in 1:N_OBS){
-      if (z[i] > z_cutpoints[s]){
-        z_above[s, uid[i]] <- z_above[s, uid[i]] + 1;
-      }else{
-        z_below[s, uid[i]] <- z_below[s, uid[i]] + 1;
-      }
-    }
-  }
 }
 parameters {
   real alpha;          // Intercept for logit model
@@ -52,12 +35,26 @@ transformed parameters {
 
   // Loop over change points and accumulate log probability of each
   for (s in 1:N_CP){
+    vector[N_UID] z_above;
+    vector[N_UID] z_below;
     vector[N_UID] y_hat;
+    z_above <- rep_vector(0, N_UID);
+    z_below <- rep_vector(0, N_UID);
+
+    // Loop over all ~10k observations and tally the number of z values above
+    // and below the change point for each patient
+    for (i in 1:N_OBS){
+      if (z[i] > z_cutpoints[s]){
+        z_above[uid[i]] <- z_above[uid[i]] + 1;
+      }else{
+        z_below[uid[i]] <- z_below[uid[i]] + 1;
+      }
+    }
 
     // Use the tallys calculated above to determine the contribution to 
     // log probability for each patient
     for (i in 1:N_UID){
-      y_hat[i] <- alpha + x[i] * beta + beta_z_lo * z_below[s, i] + beta_z_hi * z_above[s, i];
+      y_hat[i] <- alpha + x[i] * beta + beta_z_lo * z_below[i] + beta_z_hi * z_above[i];
     }
     lp[s] <- lp[s] + bernoulli_logit_log(y, y_hat);
   }

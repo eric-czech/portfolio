@@ -11,8 +11,13 @@ d <- read.csv('~/data/ptbo2/export/data_long_cutpoint_72hr.csv', stringsAsFactor
 
 features <- c('pbto2', 'age', 'marshall', 'gcs', 'sex')
 scale <- function(x) (x - mean(x)) / sd(x)
+
+sample.uids <- function(d, frac=1) {
+  uids <- sample(unique(d$uid), size = floor(length(unique(d$uid)) * frac), replace = F)
+  d %>% filter(uid %in% uids)
+}
 d.stan <- d %>% 
-  #sample_frac(.3) %>% 
+  sample.uids(frac=.5) %>%
   mutate(outcome=gos.3.binary) %>% 
   mutate_each_(funs(scale), features) %>%
   dplyr::select_(.dots=c(features, 'outcome', 'uid')) %>%
@@ -22,7 +27,7 @@ d.stan <- d %>%
 ### Stan
 
 d.stan.uid <- d.stan %>% group_by(uid) %>% do({head(., 1)}) %>% ungroup %>% arrange(uid)
-n.cp <- 150
+n.cp <- 151
 scale.cutpoint <- function(x) (x - mean(d$pbto2)) / sd(d$pbto2)
 
 d.model <- list(
@@ -32,9 +37,9 @@ d.model <- list(
   N_CP = n.cp,
   y = d.stan.uid %>% .$outcome %>% as.integer,
   x = d.stan.uid %>% dplyr::select(-outcome, -pbto2, -uid),
-  pbto2 = d.stan$pbto2,
+  z = d.stan$pbto2,
   uid = d.stan$uid,
-  pbto2_cutpoints = scale.cutpoint(seq(1, 150, length.out=n.cp))
+  z_cutpoints = scale.cutpoint(seq(0, 150, length.out=n.cp))
 )
 
 # Run the sampler
@@ -45,12 +50,16 @@ init_fun <- function() { list(
   alpha = 0
 )} 
 setwd('~/repos/portfolio/demonstrative/R/pbto2/models/stan')
+model.file <- 'cutpoint_rollup_binom_marginal_slow.stan'
 model.file <- 'cutpoint_rollup_binom_marginal.stan'
 
 
 posterior <- stan(model.file, data = d.model,
-                  warmup = 100, iter = 600, thin = 5, 
-                  chains = 16, verbose = FALSE)
+                  warmup = 25, iter = 75, thin = 5, 
+                  chains = 1, verbose = FALSE)
+# posterior <- stan(model.file, data = d.model,
+#                   warmup = 100, iter = 600, thin = 5, 
+#                   chains = 16, verbose = FALSE)
 
 # Running parallel chains on Mac
 # library(parallel) # or some other parallelizing package
@@ -66,7 +75,7 @@ posterior <- stan(model.file, data = d.model,
 
 post <- rstan::extract(posterior)
 
-rstan::traceplot(posterior, c('beta', 'beta_pbto2_lo', 'beta_pbto2_hi', 'pbto2_cutpoint_idx', 'pbto2_cutpoint'))
+rstan::traceplot(posterior, c('beta', 'beta_z_lo', 'beta_z_hi', 'z_cutpoint_idx', 'z_cutpoint'))
 plot(posterior)
 
 
@@ -85,9 +94,9 @@ d.lp %>%
 
 unscale <- function(x, var) x * sd(d[,var]) + mean(d[,var])
 beta.post <- data.frame(post$beta) %>% setNames(features[-1]) %>% dplyr::mutate(samp_id=1:nrow(.))
-beta.post$pbto2_cp <- unscale(post$pbto2_cutpoint %>% as.numeric, 'pbto2')
-beta.post$pbto2_hi <- post$beta_pbto2_hi %>% as.numeric
-beta.post$pbto2_lo <- post$beta_pbto2_lo %>% as.numeric
+beta.post$pbto2_cp <- unscale(post$z_cutpoint %>% as.numeric, 'pbto2')
+beta.post$pbto2_hi <- post$beta_z_hi %>% as.numeric
+beta.post$pbto2_lo <- post$beta_z_lo %>% as.numeric
 
 p <- beta.post %>% 
   ggplot(aes(x=pbto2_cp)) + geom_histogram(binwidth=1, alpha=.5) + 
