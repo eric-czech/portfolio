@@ -45,9 +45,9 @@ setwd('/Users/eczech/repos/portfolio/demonstrative/R/pbto2/models/stan')
 model.file <- 'cutpoint_rollup_binom_marginal.stan'
 
 
-# posterior <- stan(model.file, data = d.model,
-#                   warmup = 10, iter = 50, thin = 1, 
-#                   chains = 1, verbose = FALSE, init=init_fun)
+posterior <- stan(model.file, data = d.model,
+                  warmup = 10, iter = 50, thin = 1, 
+                  chains = 1, verbose = FALSE, init=init_fun)
 
 library(parallel) # or some other parallelizing package
 n.chains <- 3
