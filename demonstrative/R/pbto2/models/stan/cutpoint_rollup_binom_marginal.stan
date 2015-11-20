@@ -25,6 +25,7 @@ transformed parameters {
   for (s in 1:N_CP){
     vector[N_UID] x_above;
     vector[N_UID] x_below;
+    vector[N_UID] y_hat;
     x_above <- rep_vector(0, N_UID);
     x_below <- rep_vector(0, N_UID);
     for (i in 1:N_OBS){
@@ -37,8 +38,9 @@ transformed parameters {
     for (i in 1:N_UID){
       //x_above[i] <- x_above[i] / (x_above[i] + x_below[i]);
       //x_below[i] <- x_below[i] / (x_above[i] + x_below[i]);
-      lp[s] <- lp[s] + bernoulli_logit_log(y[i], alpha + x[i] * beta + beta_pbto2_lo * x_below[i] + beta_pbto2_hi * x_above[i]);
+      y_hat[i] <- alpha + x[i] * beta + beta_pbto2_lo * x_below[i] + beta_pbto2_hi * x_above[i];
     }
+    lp[s] <- lp[s] + bernoulli_logit_log(y, y_hat);
   }
 }
 model {

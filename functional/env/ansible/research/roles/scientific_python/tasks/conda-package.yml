@@ -1,5 +1,5 @@
 ---
-- name: Install Package
-  shell: "{{anaconda_home}}/bin/conda install -y -p {{anaconda_home}}/envs/{{env_name}} {{package_name}} executable=/bin/bash"
-- name: Update Package
-  shell: "{{anaconda_home}}/bin/conda update -y -p {{anaconda_home}}/envs/{{env_name}} {{package_name}} executable=/bin/bash"
+- name: Install Packages
+  shell: "{{anaconda_home}}/envs/{{env_name}}/bin/conda install -y {{conda_package_list}} executable=/bin/bash"
+- name: Update Packages
+  shell: "{{anaconda_home}}/envs/{{env_name}}/bin/conda update -y {{conda_package_list}} executable=/bin/bash"

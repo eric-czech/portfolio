@@ -3,7 +3,15 @@
 #  shell: "{{anaconda_home}}/envs/{{env_name}}/bin/jupyter-notebook --generate-config creates=~/.jupyter/jupyter_notebook_config.py executable=/bin/bash"
 - name: Create Jupyter Notebook Configuration Dir
   file: path=~/.jupyter state=directory
-- name: Create Jupyter Notebook Configuration File
+- name: Create Jupyter Log Dir
+  file: path=~/.jupyter/logs state=directory
+- name: Create Jupyter Notebook Configuration
   template: 
      src: jupyter_notebook_config.j2 
      dest: ~/.jupyter/jupyter_notebook_config.py 
+- name: Create Jupyter Upstart Configuration
+  become: yes
+  become_user: root
+  template:
+     src: jupyter_notebook_init.j2
+     dest: /etc/init/jupyter-{{env_name}}.conf

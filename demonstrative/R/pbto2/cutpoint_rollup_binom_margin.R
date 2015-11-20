@@ -4,12 +4,15 @@ library(ggplot2)
 library(rstan)
 library(reshape2)
 
-d <- read.csv('/Users/eczech/data/ptbo2/export/data_long_cutpoint_72hr.csv', stringsAsFactors=F)
+rstan_options(auto_write=T)
+options(mc.cores = parallel::detectCores())
+
+d <- read.csv('~/data/ptbo2/export/data_long_cutpoint_72hr.csv', stringsAsFactors=F)
 
 features <- c('pbto2', 'age', 'marshall', 'gcs', 'sex')
 scale <- function(x) (x - mean(x)) / sd(x)
 d.stan <- d %>% 
-  sample_frac(.05) %>% 
+  #sample_frac(.3) %>% 
   mutate(outcome=gos.3.binary) %>% 
   mutate_each_(funs(scale), features) %>%
   dplyr::select_(.dots=c(features, 'outcome', 'uid')) %>%
@@ -36,27 +39,31 @@ d.model <- list(
 
 # Run the sampler
 init_fun <- function() { list(
-  beta=rep(0, d.model$N_VARS),
+  beta=rep(0, 4),
   beta_pbto2_lo=0,
   beta_pbto2_hi=0,
   alpha = 0
 )} 
-setwd('/Users/eczech/repos/portfolio/demonstrative/R/pbto2/models/stan')
+setwd('~/repos/portfolio/demonstrative/R/pbto2/models/stan')
 model.file <- 'cutpoint_rollup_binom_marginal.stan'
 
 
 posterior <- stan(model.file, data = d.model,
-                  warmup = 10, iter = 50, thin = 1, 
-                  chains = 1, verbose = FALSE, init=init_fun)
+                  warmup = 100, iter = 600, thin = 5, 
+                  chains = 16, verbose = FALSE)
 
-library(parallel) # or some other parallelizing package
-n.chains <- 3
+# Running parallel chains on Mac
+# library(parallel) # or some other parallelizing package
+# n.chains <- 3
+# 
+# posterior <- mclapply(1:n.chains, mc.cores = n.chains, FUN = function(chain) {
+#   stan(file = model.file, data = d.model, warmup = 10, iter = 60, chains = 1, thin = 5, 
+#        verbose = FALSE, chain_id=chain)
+# })
+# posterior <- sflist2stanfit(posterior)
 
-posterior <- mclapply(1:n.chains, mc.cores = n.chains, FUN = function(chain) {
-  stan(file = model.file, data = d.model, warmup = 10, iter = 60, chains = 1, thin = 5, 
-       verbose = FALSE, chain_id=chain)
-})
-posterior <- sflist2stanfit(posterior)
+
+
 post <- rstan::extract(posterior)
 
 rstan::traceplot(posterior, c('beta', 'beta_pbto2_lo', 'beta_pbto2_hi', 'pbto2_cutpoint_idx', 'pbto2_cutpoint'))
