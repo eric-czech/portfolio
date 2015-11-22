@@ -6,7 +6,7 @@ from ml import query
 
 
 def get_raw_data():
-    d_exp = '/Users/eczech/data/ptbo2/export/data_clean.pkl'
+    d_exp = '/Users/eczech/data/pbto2/export/data_clean.pkl'
     d_exp = pd.read_pickle(d_exp)
     return d_exp.drop(['icp', 'hco3'], axis=1)
 
