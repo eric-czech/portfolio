@@ -7,7 +7,7 @@ library(reshape2)
 rstan_options(auto_write=T)
 options(mc.cores = parallel::detectCores())
 
-d <- read.csv('~/data/ptbo2/export/data_long_cutpoint_72hr.csv', stringsAsFactors=F)
+d <- read.csv('~/data/pbto2/export/data_model_input_72hr_tsa.csv', stringsAsFactors=F)
 
 features <- c('pbto2', 'age', 'marshall', 'gcs', 'sex')
 scale <- function(x) (x - mean(x)) / sd(x)
@@ -17,7 +17,7 @@ sample.uids <- function(d, frac=1) {
   d %>% filter(uid %in% uids)
 }
 d.stan <- d %>% 
-  sample.uids(frac=.5) %>%
+  #sample.uids(frac=.75) %>%
   mutate(outcome=gos.3.binary) %>% 
   mutate_each_(funs(scale), features) %>%
   dplyr::select_(.dots=c(features, 'outcome', 'uid')) %>%
@@ -27,7 +27,7 @@ d.stan <- d %>%
 ### Stan
 
 d.stan.uid <- d.stan %>% group_by(uid) %>% do({head(., 1)}) %>% ungroup %>% arrange(uid)
-n.cp <- 151
+n.cp <- 150
 scale.cutpoint <- function(x) (x - mean(d$pbto2)) / sd(d$pbto2)
 
 d.model <- list(
@@ -39,7 +39,7 @@ d.model <- list(
   x = d.stan.uid %>% dplyr::select(-outcome, -pbto2, -uid),
   z = d.stan$pbto2,
   uid = d.stan$uid,
-  z_cutpoints = scale.cutpoint(seq(0, 150, length.out=n.cp))
+  z_cutpoints = scale.cutpoint(seq(3, 30, length.out=n.cp))
 )
 
 # Run the sampler
@@ -50,16 +50,16 @@ init_fun <- function() { list(
   alpha = 0
 )} 
 setwd('~/repos/portfolio/demonstrative/R/pbto2/models/stan')
-model.file <- 'cutpoint_rollup_binom_marginal_slow.stan'
+#model.file <- 'cutpoint_rollup_binom_marginal_slow.stan'
 model.file <- 'cutpoint_rollup_binom_marginal.stan'
 
 
-posterior <- stan(model.file, data = d.model,
-                  warmup = 25, iter = 75, thin = 5, 
-                  chains = 1, verbose = FALSE)
 # posterior <- stan(model.file, data = d.model,
-#                   warmup = 100, iter = 600, thin = 5, 
-#                   chains = 16, verbose = FALSE)
+#                   warmup = 25, iter = 75, thin = 5, 
+#                   chains = 1, verbose = FALSE)
+posterior <- stan(model.file, data = d.model,
+                  warmup = 150, iter = 4000, thin = 5, 
+                  chains = 14, verbose = FALSE)
 
 # Running parallel chains on Mac
 # library(parallel) # or some other parallelizing package
@@ -103,7 +103,14 @@ p <- beta.post %>%
   theme_bw() + ggtitle('Pbto2 Cutpoint Estimates') + 
   xlab('Pbto2 Cutoff')
 p
+
+p <- beta.post %>% 
+  ggplot(aes(x=pbto2_cp)) + geom_freqpoly(binwidth=.5) + 
+  theme_bw() + ggtitle('Pbto2 Cutpoint Estimates') + 
+  xlab('Pbto2 Cutoff')
+p
 #p + ggsave('/Users/eczech/data/ptbo2/images/pbto2_cp1.png')
+
 
 p <- beta.post %>% 
   dplyr::select(pbto2_lo, pbto2_hi, samp_id) %>%
@@ -130,4 +137,5 @@ p <- beta.post %>% melt(id.vars='samp_id') %>%
 p
 #p + ggsave('/Users/eczech/data/ptbo2/images/coefs1.png')
 
-
+beta.post %>% select(pbto2_cp, pbto2_lo) %>% 
+  ggplot(aes(x=pbto2_cp, y=pbto2_lo)) + geom_point()
