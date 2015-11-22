@@ -1,4 +1,5 @@
 data {
+  int<lower=2> N_OUTCOME;
   int<lower=1> N_OBS;              // Total # of observations (~10k)
   int<lower=1> N_VARS;             // # of static covariates (~4)
   int<lower=2> N_UID;              // # patients (~300)
@@ -6,7 +7,7 @@ data {
   int<lower=1> N_T_CP;             // # cutpoints for t (~10)
     
   int<lower=1> uid[N_OBS];         // Patient id vector
-  int<lower=0, upper=1> y[N_UID];  // Vector of 0/1 outcomes
+  int<lower=1, upper=N_OUTCOME> y[N_UID];  // Vector of outcomes
   row_vector[N_VARS] x[N_UID];     // Matrix of static covariates
   real z[N_OBS];                   // Time varying covariate
   real z_cutpoints[N_Z_CP];          // Change point values for Z to marginalize over

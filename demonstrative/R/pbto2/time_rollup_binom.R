@@ -8,7 +8,7 @@ source('~/repos/portfolio/demonstrative/R/pbto2/common.R')
 rstan_options(auto_write=T)
 options(mc.cores = parallel::detectCores())
 
-d <- read.csv('~/data/pbto2/export/data_model_input_72hr_tsa.csv', stringsAsFactors=F)
+d <- read.csv('~/data/pbto2/export/data_model_input_120hr_tsa.csv', stringsAsFactors=F)
 
 features <- c('pbto2', 'age', 'marshall', 'gcs', 'sex')
 
@@ -25,9 +25,7 @@ d.stan <- d %>%
 d.stan.uid <- d.stan %>% group_by(uid) %>% do({head(., 1)}) %>% ungroup %>% arrange(uid)
 
 z.cp <- scale.var(seq(3, 30, length.out=28), d, 'pbto2')
-t.cp <- seq(720, 4320, 240) # Every 4 hours between 12 hours and 72 hours
-
-
+t.cp <- seq(1440*2, 1440 * 5, 720) # Every 12 hours between 12 hours and 72 hours
 
 d.model <- list(
   N_OBS = nrow(d.stan),
@@ -54,8 +52,9 @@ model.file <- 'time_rollup_binom.stan'
 #                   warmup = 25, iter = 75, thin = 5, 
 #                   chains = 1, verbose = FALSE)
 posterior <- stan(model.file, data = d.model,
-                  warmup = 50, iter = 100, thin = 5, 
-                  chains = 1, verbose = FALSE)
+                  warmup = 150, iter = 500, thin = 5, 
+                  chains = 14, verbose = FALSE)
+# save(posterior, file='~/data/pbto2/export/posterior_168hr_tsa.Rdata')
 
 # Running parallel chains on Mac
 # library(parallel) # or some other parallelizing package
@@ -81,4 +80,15 @@ plot.pbto2.cutoff(beta.post)
 plot.time.cutoff(beta.post)
 
 plot.beta.post(beta.post)
+
+plot.pbto2.coef(beta.post)
+
+beta.post %>% ggplot(aes(x=time_cp, y=pbto2_lo)) + geom_point()
+
+beta.post %>% ggplot(aes(x=time_cp, y=pbto2_cp)) + geom_point()
+
+beta.post %>% ggplot(aes(x=time_cp, y=pbto2_hi)) + geom_point()
+
+beta.post %>% ggplot(aes(x=pbto2_cp, y=pbto2_lo)) + geom_point()
+
 
