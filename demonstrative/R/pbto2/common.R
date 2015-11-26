@@ -4,6 +4,12 @@ scale.var <- function(x, d, var) (x - mean(d[,var])) / sd(d[,var])
 
 unscale.var <- function(x, d, var) x * sd(d[,var]) + mean(d[,var])
 
+gos.to.ord <- function(x){
+  if (x >= 4) 3
+  else if (x >= 2) 2
+  else 1
+}
+
 sample.uids <- function(d, frac=1) {
   uids <- sample(unique(d$uid), size = floor(length(unique(d$uid)) * frac), replace = F)
   d %>% filter(uid %in% uids)

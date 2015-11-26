@@ -14,12 +14,11 @@ data {
   int<lower=0> t_cutpoints[N_T_CP]; 
 }
 transformed data {
-  int n_cp;
+  real log_unif;
   int<lower=0> z_above[N_Z_CP, N_T_CP, N_UID];
   int<lower=0> z_below[N_Z_CP, N_T_CP, N_UID];
   
-  n_cp <- N_Z_CP * N_T_CP;
-
+  log_unif <- -log(N_Z_CP * N_T_CP);
   for (zi in 1:N_Z_CP){
     for (ti in 1:N_T_CP){
       for (ui in 1:N_UID){
@@ -52,22 +51,29 @@ parameters {
   real beta_z_hi;      // Coefficient for number of z measurements above change point
 }
 transformed parameters {
-  vector[n_cp] lp;
+  vector[N_Z_CP] zlp;
+  vector[N_T_CP] tlp;
+  vector[] lp;
   
   // Give change points uniform prior
-  lp <- rep_vector(-log(n_cp), n_cp);
+  lp <- rep_vector(-log(N_Z_CP * N_T_CP), N_Z_CP * N_T_CP);
+  tlp <- rep_vector(-log(N_T_CP), N_T_CP);
   
   // Loop over change points and accumulate log probability of each
   for (zi in 1:N_Z_CP){
     for (ti in 1:N_T_CP){
       vector[N_UID] y_hat;
+      real lp;
       
       // Use the tallys calculated above to determine the contribution to 
       // log probability for each patient
       for (i in 1:N_UID){
         y_hat[i] <- alpha + x[i] * beta + beta_z_lo * z_below[zi, ti, i] + beta_z_hi * z_above[zi, ti, i];
       }
-      lp[(zi - 1) * N_T_CP + ti] <- bernoulli_logit_log(y, y_hat);
+      lp <- bernoulli_logit_log(y, y_hat);
+      zlp[zi] <- zlp[zi] + lp;
+      tlp[ti] <- tlp[ti] + lp;
+      p <- p + exp(lp);
     }
   }
 }
@@ -76,20 +82,17 @@ model {
   beta ~ normal(0, 5);
   beta_z_lo ~ normal(0, 5);
   beta_z_hi ~ normal(0, 5);
-  increment_log_prob(log_sum_exp(lp));
+  increment_log_prob(log(p));
 }
 generated quantities {
   // Sample the cutpoint values for z and t on this step
-  int<lower=0> z_above_out[N_Z_CP, N_T_CP, N_UID];
-  int<lower=0, upper=n_cp-1> cutpoint_idx;
-  int<lower=1, upper=N_Z_CP> z_idx;
-  int<lower=1, upper=N_T_CP> t_idx;
+  int<lower=1, upper=N_Z_CP> z_cutpoint_idx;
+  int<lower=1, upper=N_T_CP> t_cutpoint_idx;
   real z_cutpoint;
   int t_cutpoint;
-  z_above_out <- z_above;
-  cutpoint_idx <- categorical_rng(softmax(lp)) - 1;
-  z_idx <- (cutpoint_idx/N_T_CP) + 1;
-  z_cutpoint <- z_cutpoints[z_idx];
-  t_idx <- (cutpoint_idx % N_T_CP) + 1;
-  t_cutpoint <- t_cutpoints[t_idx];
+  
+  z_cutpoint_idx <- categorical_rng(softmax(zlp));
+  z_cutpoint <- z_cutpoints[z_cutpoint_idx];
+  t_cutpoint_idx <- categorical_rng(softmax(tlp));
+  t_cutpoint <- t_cutpoints[t_cutpoint_idx];
 }

@@ -47,7 +47,7 @@ transformed data {
   }
 }
 parameters {
-  real alpha;          // Intercept for logit model
+  ordered[N_OUTCOME - 1] outcome_cutpoints; 
   vector[N_VARS] beta; // Coefficients of static covariates
   real beta_z_lo;      // Coefficient for number of z measurements below change point
   real beta_z_hi;      // Coefficient for number of z measurements above change point
@@ -62,18 +62,18 @@ transformed parameters {
   for (zi in 1:N_Z_CP){
     for (ti in 1:N_T_CP){
       vector[N_UID] y_hat;
+      int lp_idx;
+      lp_idx <- (zi - 1) * N_T_CP + ti;
       
       // Use the tallys calculated above to determine the contribution to 
       // log probability for each patient
       for (i in 1:N_UID){
-        y_hat[i] <- alpha + x[i] * beta + beta_z_lo * z_below[zi, ti, i] + beta_z_hi * z_above[zi, ti, i];
+        lp[lp_idx] <- lp[lp_idx] + ordered_logistic_log(y[i], x[i] * beta + beta_z_lo * z_below[zi, ti, i] + beta_z_hi * z_above[zi, ti, i], outcome_cutpoints);
       }
-      lp[(zi - 1) * N_T_CP + ti] <- bernoulli_logit_log(y, y_hat);
     }
   }
 }
 model {
-  alpha ~ normal(0, 100);
   beta ~ normal(0, 5);
   beta_z_lo ~ normal(0, 5);
   beta_z_hi ~ normal(0, 5);
@@ -81,13 +81,13 @@ model {
 }
 generated quantities {
   // Sample the cutpoint values for z and t on this step
-  int<lower=0> z_above_out[N_Z_CP, N_T_CP, N_UID];
+  int<lower=0> z_below_out[N_Z_CP, N_T_CP, N_UID];
   int<lower=0, upper=n_cp-1> cutpoint_idx;
   int<lower=1, upper=N_Z_CP> z_idx;
   int<lower=1, upper=N_T_CP> t_idx;
   real z_cutpoint;
   int t_cutpoint;
-  z_above_out <- z_above;
+  z_below_out <- z_below;
   cutpoint_idx <- categorical_rng(softmax(lp)) - 1;
   z_idx <- (cutpoint_idx/N_T_CP) + 1;
   z_cutpoint <- z_cutpoints[z_idx];
