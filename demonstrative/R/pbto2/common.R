@@ -1,5 +1,7 @@
 scale <- function(x) (x - mean(x)) / sd(x)
 
+scale.minmax <- function(x) (x - min(x)) / (max(x) - min(x))
+
 scale.var <- function(x, d, var) (x - mean(d[,var])) / sd(d[,var])
 
 unscale.var <- function(x, d, var) x * sd(d[,var]) + mean(d[,var])
@@ -7,6 +9,11 @@ unscale.var <- function(x, d, var) x * sd(d[,var]) + mean(d[,var])
 gos.to.ord <- function(x){
   if (x >= 4) 3
   else if (x >= 2) 2
+  else 1
+}
+
+gos.to.binom <- function(x){
+  if (x <= 3) 0
   else 1
 }
 
@@ -63,3 +70,18 @@ plot.pbto2.coef <- function(beta.post){
     ggtitle('Coefficient 95% Intevals for Pbto2 Above and Below Cutpoint') 
 }
 
+
+get.cleaned.data <- function(d, p, scale=T, sample.frac=NULL, outcome.func=gos.to.binom){
+  if (!is.null(sample.frac))
+    d <- d %>% sample.uids(frac=sample.frac)
+  d <- d %>% 
+    dplyr::rename(outcome=gos) %>%
+    dplyr::select_(.dots=c(p, 'outcome', 'uid')) %>%
+    na.omit()
+  
+  if (scale)
+    d <- d %>% mutate_each_(funs(scale), p)
+  
+  d %>% mutate(outcome=sapply(outcome, outcome.func)) %>%
+    mutate(uid=as.integer(factor(uid))) 
+}

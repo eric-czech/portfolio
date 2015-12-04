@@ -5,10 +5,14 @@ import numpy as np
 from ml import query
 
 
-def get_raw_data():
-    d_exp = '/Users/eczech/data/pbto2/export/data_clean.pkl'
+def get_raw_data(f=None):
+    fn = 'data_clean.pkl' if f is None else f
+    d_exp = '/Users/eczech/data/pbto2/export/{}'.format(fn)
     d_exp = pd.read_pickle(d_exp)
-    return d_exp.drop(['icp', 'hco3'], axis=1)
+    for c in ['icp', 'hco3']:
+        if c in d_exp:
+            d_exp = d_exp.drop(c, axis=1)
+    return d_exp
 
 
 def _get_feature_values(x):

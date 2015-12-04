@@ -135,11 +135,18 @@ def prep_pupil_size(d):
     return d
 
 
-def interp_timeseries(x):
-    """ Interpolate data points for each patient, filling values with those closest in time"""
-    x = x.set_index('datetime')
+# Deprecated
+# def interp_timeseries(x):
+#     """ Interpolate data points for each patient, filling values with those closest in time"""
+#     x = x.set_index('datetime')
+#     idx = pd.date_range(x.index.min(), x.index.max(), freq=str(DATE_FREQ_MIN)+'Min', name='datetime')
+#     return x.reindex(idx, method='nearest')
+
+
+def interp_timeseries_linear(x, limit=4):
+    x = x.set_index('datetime').drop('uid', axis=1)
     idx = pd.date_range(x.index.min(), x.index.max(), freq=str(DATE_FREQ_MIN)+'Min', name='datetime')
-    return x.reindex(idx, method='nearest')
+    return x.reindex(idx, method=None).interpolate(limit=limit)
 
 
 def convert_date(x):
@@ -148,3 +155,30 @@ def convert_date(x):
         return None
     # Return date converted to nearest frequency interval
     return pd.to_datetime(DATE_FREQ_MIN * round(r.value / (DATE_FREQ_MIN * 60 * 1.E9)), unit='m')
+
+
+def clean_bad_pbto2_values(d):
+    """ Removes bad PbtO2 measurements based on a visual inspection
+
+    See 2_data_models_long for details
+    :param d: Long format data frame with pbto2, datetime, and uid
+    :return: Data frame in same form with bad measurements removed
+    """
+    def remove_after_first_zero(df, var, uids):
+        d1 = df[~df['uid'].isin(uids)]
+        d2 = df[df['uid'].isin(uids)]
+        d2 = d2.groupby('uid', group_keys=False)\
+            .apply(lambda x: x[x['datetime'] < x[x[var] <= 0]['datetime'].min()])
+        return d1.append(d2)
+
+    rm_uids = [827]
+    d_clean = d[~d['uid'].isin(rm_uids)].copy()
+
+    rm_zero_uids = [751, 772]
+    d_clean = d_clean[(~d_clean['uid'].isin(rm_zero_uids)) | (d_clean['pbto2'] > 0)]
+
+    trim_uids = [566, 588, 593, 1001, 1007]
+    d_clean = remove_after_first_zero(d_clean, 'pbto2', trim_uids)
+
+    assert len(d['uid'].unique()) - len(rm_uids) == len(d_clean['uid'].unique())
+    return d_clean
