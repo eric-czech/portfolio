@@ -43,6 +43,10 @@ def get_classifier_fi(clf, columns):
     if is_instance_of(clf, TREE_CLASSIFIERS):
         res = clf.feature_importances_
 
+    # Return nothing if feature importance vector does not
+    # match shape of column list (can happen with decomposition in pipeline)
+    if res is not None and len(res) != len(columns):
+        return None
     return pd.Series(res, index=columns) if res is not None else res
 
 
@@ -63,5 +67,8 @@ def get_regressor_fi(clf, columns):
     if is_instance_of(clf, TREE_REGRESSORS):
         res = clf.feature_importances_
 
-
+    # Return nothing if feature importance vector does not
+    # match shape of column list (can happen with decomposition in pipeline)
+    if res is not None and len(res) != len(columns):
+        return None
     return pd.Series(res, index=columns) if res is not None else res
