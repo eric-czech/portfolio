@@ -52,9 +52,10 @@ model.file <- 'time_rollup_binom.stan'
 #                   warmup = 25, iter = 75, thin = 5, 
 #                   chains = 1, verbose = FALSE)
 posterior <- stan(model.file, data = d.model,
-                  warmup = 150, iter = 500, thin = 5, 
+                  warmup = 150, iter = 1000, thin = 5, 
                   chains = 14, verbose = FALSE)
 # save(posterior, file='~/data/pbto2/export/posterior_168hr_tsa.Rdata')
+save(posterior, file='~/data/pbto2/export/posterior_120hr_tsa.Rdata')
 
 # Running parallel chains on Mac
 # library(parallel) # or some other parallelizing package

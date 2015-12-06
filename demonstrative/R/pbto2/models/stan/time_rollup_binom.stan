@@ -80,13 +80,11 @@ model {
 }
 generated quantities {
   // Sample the cutpoint values for z and t on this step
-  int<lower=0> z_above_out[N_Z_CP, N_T_CP, N_UID];
   int<lower=0, upper=n_cp-1> cutpoint_idx;
   int<lower=1, upper=N_Z_CP> z_idx;
   int<lower=1, upper=N_T_CP> t_idx;
   real z_cutpoint;
   int t_cutpoint;
-  z_above_out <- z_above;
   cutpoint_idx <- categorical_rng(softmax(lp)) - 1;
   z_idx <- (cutpoint_idx/N_T_CP) + 1;
   z_cutpoint <- z_cutpoints[z_idx];
