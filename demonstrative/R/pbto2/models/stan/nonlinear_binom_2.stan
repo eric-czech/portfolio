@@ -15,12 +15,11 @@ parameters {
   real alpha;          // Intercept for logit model
   vector[N_VARS] beta; // Coefficients of static covariates
   real<lower=0, upper=1> p;
-  real betaz;
-  real<lower=0> b2;
-  real<lower=0> b1;
-  //ordered[2] c;
-  real<upper=0> c1;
-  real<lower=0> c2;
+  real<lower=-100, upper=100> betaz;
+  real<lower=-25, upper=25> b2;
+  real<lower=-25, upper=25> b1;
+  real<lower=-25, upper=0> c1;
+  real<lower=0, upper=25> c2;
 }
 transformed parameters {
   vector[N_UID] w;
@@ -46,13 +45,13 @@ transformed parameters {
   }
 }
 model {
-  alpha ~ normal(0, 1);
-  beta ~ normal(0, 1);
-  b1 ~ lognormal(0, 2);
-  b2 ~ lognormal(0, 2);
-  c1 ~ normal(-2, 2);
-  c2 ~ normal(2, 2);
-  betaz ~ normal(0, 1);
+  alpha ~ normal(0, 3);
+  beta ~ normal(0, 3);
+  //b1 ~ double_exponential(0, 10);
+  //b2 ~ double_exponential(0, 10);
+  c1 ~ normal(-2, 1);
+  c2 ~ normal(2, 1);
+  betaz ~ normal(0, 3);
   
   y ~ bernoulli_logit(alpha + x * beta + w);
 }

@@ -11,10 +11,11 @@ rstan_options(auto_write=T)
 options(mc.cores = parallel::detectCores())
 
 d <- read.csv('~/data/pbto2/export/data_stan_input.csv', stringsAsFactors=F)
+d$rand <- rnorm(n=nrow(d))
 
 #features <- c('pbto2', 'age', 'marshall', 'gcs', 'sex')
 static.features <- c('age', 'marshall', 'gcs', 'sex')
-ts.feature <- c('tsa_min')
+ts.feature <- c('icp1')
 features <- c(static.features, ts.feature)
 
 d.stan <- get.cleaned.data(d, features, scale=T, sample.frac=NULL, outcome.func=gos.to.binom)

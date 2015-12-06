@@ -3,7 +3,7 @@ library(ggplot2)
 library(gplots)
 
 #f <- '/Users/eczech/repos/misc/Charleston-Data-Analytics-Cancer-Genomics-Data-Challenge/modeling/data/data_n_ho_30_training.csv.gz'
-f <- '/tmp/d_tr.csv'
+f <- '/Users/eczech/data/meetups/genomics/feature_correlation.csv'
 #d <- read.table(gzfile(f), sep=',', header = T)
 d <- read.table(f, sep=',', header = T)
 
