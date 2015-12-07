@@ -15,7 +15,7 @@ d$rand <- rnorm(n=nrow(d))
 
 #features <- c('pbto2', 'age', 'marshall', 'gcs', 'sex')
 static.features <- c('age', 'marshall', 'gcs', 'sex')
-ts.feature <- c('icp1')
+ts.feature <- c('paco2')
 features <- c(static.features, ts.feature)
 
 d.stan <- get.cleaned.data(d, features, scale=T, sample.frac=NULL, outcome.func=gos.to.binom)
@@ -34,8 +34,8 @@ setwd('~/repos/portfolio/demonstrative/R/pbto2/models/stan')
 model.file <- 'nonlinear_binom_2.stan'
 
 posterior <- stan(model.file, data = d.model,
-                  warmup = 100, iter = 5000, thin = 15, 
-                  chains = 1, verbose = FALSE)
+                  warmup = 100, iter = 1000, thin = 15, 
+                  chains = 4, verbose = FALSE)
 
 # posterior <- stan(model.file, data = d.model,
 #                   warmup = 150, iter = 4000, thin = 5, 
@@ -74,13 +74,13 @@ y.samp <- foreach(i=1:n, .combine=rbind) %do% {
 } %>% mutate(a=(1-scale.minmax(a))^10)
 
 ggplot(NULL) + 
-  geom_line(aes(x=x, y=y), color='blue', size=1, data=y.main) + 
+  geom_line(aes(x=x, y=y), color='blue', size=1, data=y.main, alpha=1) + 
   geom_line(aes(x=x, y=y, group=i, alpha=a), data=y.samp) + 
   scale_alpha(range = c(.02, .1)) + theme_bw() +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
   xlab(ts.feature) + ylab(paste0('w(', ts.feature, ')')) + ggtitle('Timeseries Weight Function') + 
-  xlim(0, 100) + 
-  ggsave('/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/wt_actual_icp.png')
+  #xlim(-10, 175) + 
+  ggsave('~/repos/portfolio/demonstrative/R/pbto2/sim/images/wt_actual_rand.png')
 
 
 # bins = seq(0, max(fun.sim$y)+1, length.out = 500)
