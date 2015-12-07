@@ -15,7 +15,7 @@ d$rand <- rnorm(n=nrow(d))
 
 #features <- c('pbto2', 'age', 'marshall', 'gcs', 'sex')
 static.features <- c('age', 'marshall', 'gcs', 'sex')
-ts.feature <- c('paco2')
+ts.feature <- c('pha')
 features <- c(static.features, ts.feature)
 
 d.stan <- get.cleaned.data(d, features, scale=T, sample.frac=NULL, outcome.func=gos.to.binom)
@@ -80,7 +80,7 @@ ggplot(NULL) +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
   xlab(ts.feature) + ylab(paste0('w(', ts.feature, ')')) + ggtitle('Timeseries Weight Function') + 
   #xlim(-10, 175) + 
-  ggsave('~/repos/portfolio/demonstrative/R/pbto2/sim/images/wt_actual_rand.png')
+  ggsave('~/repos/portfolio/demonstrative/R/pbto2/sim/images/wt_actual_pha.png')
 
 
 # bins = seq(0, max(fun.sim$y)+1, length.out = 500)

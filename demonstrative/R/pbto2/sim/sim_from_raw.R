@@ -19,9 +19,9 @@ features <- c(static.features, ts.feature)
 
 d <- read.csv('~/data/pbto2/export/data_stan_input.csv', stringsAsFactors=F)
 
-br <- 0; p <- .3; bc <- 0;
+br <- -6; p <- .3; bc <- 0;
 a1 <- br * p; a2 <- (1 - p) * br;
-b1 <- 25; b2 <- -20;
+b1 <- 25; b2 <- 20;
 c1 <- -.6; c2 <- .55; # set based on quantiles (25/75%)
 
 # Use transformed actual data
@@ -44,6 +44,9 @@ d.stan <- dp %>% select(-r1, -r2, -p) %>%
   mutate(uid=as.integer(factor(uid)))
 
 # Diagnostics
+plot(x, double.logistic(x, a1, a2, b1, b2, c1, c2, bc), type='l')
+sapply(quantile(ds$pbto2, probs=c(.1, .25, .5, .75, .99)), function(x) abline(v=x))
+
 dp %>% group_by(uid) %>% summarise(r2=min(r2), o=min(outcome), p=min(p)) %>% 
   ungroup %>% arrange(r2) %>% melt(id.vars=c('uid', 'o')) %>% 
   ggplot(aes(x=value, color=factor(o))) + geom_density() + facet_wrap(~variable, scales='free')
