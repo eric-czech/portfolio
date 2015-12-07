@@ -21,7 +21,7 @@ d <- read.csv('~/data/pbto2/export/data_stan_input.csv', stringsAsFactors=F)
 
 br <- -6; p <- .3; bc <- 0;
 a1 <- br * p; a2 <- (1 - p) * br;
-b1 <- 25; b2 <- 20;
+b1 <- 25; b2 <- -20;
 c1 <- -.6; c2 <- .55; # set based on quantiles (25/75%)
 
 # Use transformed actual data

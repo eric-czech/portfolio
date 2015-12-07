@@ -15,7 +15,7 @@ d$rand <- rnorm(n=nrow(d))
 
 #features <- c('pbto2', 'age', 'marshall', 'gcs', 'sex')
 static.features <- c('age', 'marshall', 'gcs', 'sex')
-ts.feature <- c('pha')
+ts.feature <- c('icp1')
 features <- c(static.features, ts.feature)
 
 d.stan <- get.cleaned.data(d, features, scale=T, sample.frac=NULL, outcome.func=gos.to.binom)
@@ -34,7 +34,7 @@ setwd('~/repos/portfolio/demonstrative/R/pbto2/models/stan')
 model.file <- 'nonlinear_binom_2.stan'
 
 posterior <- stan(model.file, data = d.model,
-                  warmup = 100, iter = 1000, thin = 15, 
+                  warmup = 200, iter = 5000, thin = 30, 
                   chains = 4, verbose = FALSE)
 
 # posterior <- stan(model.file, data = d.model,
@@ -80,7 +80,7 @@ ggplot(NULL) +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
   xlab(ts.feature) + ylab(paste0('w(', ts.feature, ')')) + ggtitle('Timeseries Weight Function') + 
   #xlim(-10, 175) + 
-  ggsave('~/repos/portfolio/demonstrative/R/pbto2/sim/images/wt_actual_pha.png')
+  ggsave('~/repos/portfolio/demonstrative/R/pbto2/sim/images/wt_actual_pao2.png')
 
 
 # bins = seq(0, max(fun.sim$y)+1, length.out = 500)
