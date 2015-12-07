@@ -9,7 +9,9 @@ get.stan.data <- function(d.stan, static.features, ts.feature){
     y = d.stan.uid %>% .$outcome %>% as.integer,
     x = d.stan.uid[,static.features],
     z = d.stan[,ts.feature],
-    uid = d.stan$uid
+    uid = d.stan$uid,
+    min_z = min(d.stan[,ts.feature]),
+    max_z = max(d.stan[,ts.feature])
   )
 }
 

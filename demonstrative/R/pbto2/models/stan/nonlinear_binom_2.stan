@@ -2,24 +2,28 @@
 data {
   int<lower=1> N_OBS;              // Total # of observations (~10k)
   int<lower=1> N_VARS;             // # of static covariates (~4)
-    int<lower=2> N_UID;              // # patients (~300)
+  int<lower=2> N_UID;              // # patients (~300)
     
-    int<lower=1> uid[N_OBS];         // Patient id vector
+  int<lower=1> uid[N_OBS];         // Patient id vector
   int<lower=0, upper=1> y[N_UID];  // Vector of 0/1 outcomes
   //row_vector[N_VARS] x[N_UID];     // Matrix of static covariates
   matrix[N_UID, N_VARS] x;
   real z[N_OBS];                   // Time varying covariate
+  real min_z;
+  real max_z;
 }
 
 parameters {
   real alpha;          // Intercept for logit model
   vector[N_VARS] beta; // Coefficients of static covariates
   real<lower=0, upper=1> p;
-  real<lower=-100, upper=100> betaz;
-  real<lower=-25, upper=25> b2;
-  real<lower=-25, upper=25> b1;
-  real<lower=-25, upper=0> c1;
-  real<lower=0, upper=25> c2;
+  real<lower=-10, upper=0> betaz;
+  //real<lower=-25, upper=25> b2;
+  //real<lower=-25, upper=25> b1;
+  real b2;
+  real b1;
+  real<lower=min_z, upper=0> c1;
+  real<lower=0, upper=max_z> c2;
 }
 transformed parameters {
   vector[N_UID] w;
@@ -47,11 +51,11 @@ transformed parameters {
 model {
   alpha ~ normal(0, 3);
   beta ~ normal(0, 3);
-  //b1 ~ double_exponential(0, 10);
-  //b2 ~ double_exponential(0, 10);
-  c1 ~ normal(-2, 1);
-  c2 ~ normal(2, 1);
-  betaz ~ normal(0, 3);
+  b1 ~ normal(0, 10);
+  b2 ~ normal(0, 10);
+  c1 ~ normal(-2, 3);
+  c2 ~ normal(2, 3);
+  betaz ~ double_exponential(0, 3);
   
   y ~ bernoulli_logit(alpha + x * beta + w);
 }

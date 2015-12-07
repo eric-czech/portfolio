@@ -63,6 +63,10 @@ get.sim.data.from.actual <- function(ds){
 # d$pbto2 %>% hist(breaks=50)
 # hist(v.samp, breaks=50)
 
+# ts.v <- rlnorm(10000, 3.5, .5)-10
+# ts.v <- ifelse(ts.v < 0, 0, ts.v)
+# v.samp <- scale(ts.v)
+
 get.emp.dist <- function(d, var){
   v <- d[,var]
   v <- v[!is.na(v)]
@@ -72,27 +76,25 @@ get.emp.dist <- function(d, var){
   dist
 }
 
-get.sim.data <- function(d, n=100, seed=123){
-  set.seed(123)
+get.sim.data <- function(d, a1, a2, b1, b2, c1, c2, seed=123, n=100){
+  set.seed(seed)
   
-  ts.n.dist <- d %>% group_by(uid) %>% summarise(v=length(pbto2)) %>% 
-    group_by(v) %>% tally %>% setNames(c('v', 'ct'))
-  ts.n.dist$ct <- ts.n.dist$ct / sum(ts.n.dist$ct)
-  
-  v.samp <- rlnorm(10000, 3.5, .5)-10
-  v.samp <- ifelse(v.samp < 0, 0, v.samp)
-  v.samp <- scale(v.samp)
-  
+  ts.dist <- d %>% dplyr::select(uid, pbto2) %>% na.omit()
+  ts.value.unscaled <- ts.dist$pbto2
+  ts.value.scaled <- scale(ts.value.unscaled)
+  ts.dist <- ts.dist %>% mutate(pbto2=scale(pbto2)) %>%
+    group_by(uid) %>% summarise(m=mean(pbto2), s=sd(pbto2), n=length(pbto2))
+
   alpha <- 1
   b.age <- 2
   b.mar <- -.5
   b.gcs <- 1
   b.sex <- .01
-  
-  br <- -6; p <- .3; bc <- 0;
-  a1 <- br * p; a2 <- (1 - p) * br;
-  b1 <- 25; b2 <- -20;
-  c1 <- -.6; c2 <- .55; # set based on quantiles (25/75%)
+#   alpha <- 2
+#   b.age <- 0
+#   b.mar <- 0
+#   b.gcs <- 0
+#   b.sex <- 0
   
   age.dist <- get.emp.dist(d, 'age')
   mar.dist <- get.emp.dist(d, 'marshall')
@@ -100,16 +102,21 @@ get.sim.data <- function(d, n=100, seed=123){
   sex.dist <- get.emp.dist(d, 'sex')
   
   get.w <- function(x) 
-    sum(sapply(x, function(v) double.logistic(v, a1, a2, b1, b2, c1, c2, bc))) / length(x)
-  foreach(i=1:n, .combine=rbind) %do% {
+    sum(sapply(x, function(v) double.logistic(v, a1, a2, b1, b2, c1, c2))) / length(x)
+  res <- foreach(i=1:n, .combine=rbind) %do% {
     age <- sample(age.dist$v, prob=age.dist$ct, size=1)
     gcs <- sample(gcs.dist$v, prob=gcs.dist$ct, size=1)
     marshall <- sample(mar.dist$v, prob=mar.dist$ct, size=1)
     sex <- sample(sex.dist$v, prob=sex.dist$ct, size=1)
     r1 <- alpha + age * b.age + sex * b.sex + gcs * b.gcs + marshall * b.mar
-    n.ts <- sample(ts.n.dist$v, prob=ts.n.dist$ct, size=1)
-    v.ts <- sample(v.samp, size=n.ts)
+    
+    ts.id <- sample(1:nrow(ts.dist), size=1)
+    ts.rec <- ts.dist[ts.id,]
+    v.ts <- rnorm(n = ts.rec$n[1], mean = ts.rec$m[1], sd = ts.rec$s[1])
+    v.ts <- ifelse(v.ts < min(ts.value.scaled), min(ts.value.scaled), v.ts)
+    v.ts <- ifelse(v.ts > max(ts.value.scaled), max(ts.value.scaled), v.ts)
     r2 <- get.w(v.ts)
+    
     p <- 1 / (1 + exp(-(r1 + r2)))
     if (is.na(p))
       browser()
@@ -117,5 +124,6 @@ get.sim.data <- function(d, n=100, seed=123){
     
     data.frame(age, gcs, marshall, sex, outcome, uid=i, r1, r2, p, pbto2=v.ts)
   }
+  list(res=res, ts.value.unscaled=ts.value.unscaled)
 }
 
