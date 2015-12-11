@@ -3,31 +3,35 @@ title: "TBI Study Results"
 author: "Eric Czech"
 date: "December 11, 2015"
 output: ioslides_presentation
+#output: html_document
+widescreen: yes
 ---
+
+<br><br>
 
 # Data Description
 
 ## Raw Data Spreadsheet
 
-Raw data given as excel file with ~300 tabs like this:
+Raw data given as excel file with ~300 tabs, one for each patient, like this:
 
 <img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/raw_spreadsheet.png" height="338px" width="800px"/>
 
-## Patient Data
+## Patient Data {.smaller}
 
 Along with timeseries measurements, the following static covariates were given for each patient:
 
-- Age
-- Sex
+- Age and Sex
 - [GCS](https://en.wikipedia.org/wiki/Glasgow_Coma_Scale) (Glasgow Coma Scale) - Integer score from 3 (deep unconsciousness) to 15 (normal)
 - [Marshall Clasasification](http://neurodss.com/details.php?id=70) - Similar to GCS; Integer from 1 to 6 (lower is better)
 - Estimated Initial Time of Injury
+
 
 As well as an outcome score called "GOS" measured at 3, 6, 12, and 24 months:
 
 - GOS - 1=Dead, 2-3=Severely Disabled, 4-5=Good Outcome
 
-## Data Preparation
+## Data Preparation {.smaller}
 
 For the sake of modeling, the following assumptions were made:
 
@@ -51,6 +55,9 @@ library(reshape2)
 library(ggplot2)
 library(dplyr)
 library(plotly)
+library(xtable)
+library(stringr)
+
 source('/Users/eczech/repos/portfolio/demonstrative/R/pbto2/common.R')
 
 d <- get.wide.data(scale.vars=F, outcome.func=gos.to.ord)
@@ -61,7 +68,7 @@ p.sec <- p[!p %in% p.main]
 
 Frequency of non-time-dependent values:
 
-```{r, echo=FALSE, warning=FALSE, message=FALSE}
+```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.align='center'}
 p <- d[,p.main] %>% melt(id.vars=NULL) %>%
   ggplot(aes(x=value)) + geom_histogram(binwidth=NULL) + 
   facet_wrap(~variable, scales='free') + theme_bw()
@@ -73,8 +80,7 @@ ggplotly(p)
 
 Relationships between static variables and outcomes are pretty clear:
 
-```{r, echo=FALSE}
-
+```{r, echo=FALSE, fig.align='center'}
 age.labels <- quantile(d$age)
 d.stat <- d[,c(p.main, c('gos', 'uid'))] %>% 
   mutate(age=cut(d$age, breaks=c(0, age.labels), labels=age.labels, include.lowest = T)) %>% 
@@ -93,51 +99,150 @@ d.stat %>% mutate(Outcome=factor(gos, levels=1:3, labels=c('Dead', 'Bad', 'Good'
 ```
 
 
-## Blood Gas Measurements
+## Blood Gas Measurements {.smaller}
 
-Timeseries measurments for 4 random patients:
+Timeseries measurements for 4 random patients:
 
-```{r, echo=FALSE}
-ts.features <- c('pbto2', 'pao2', 'icp1', 'paco2')
-d <- get.long.data(c(ts.features, 'tsi_min'), scale.vars=F, reset.uid=F, rm.na=F)
+```{r, echo=FALSE, fig.align='center'}
+static.features <- c('gcs', 'marshall', 'sex', 'age')
+ts.features <- c('pbto2', 'pao2', 'icp1', 'paco2', 'pha', 'map')
+
+d.ts <- get.long.data(c(static.features, ts.features, 'tsi_min'), scale.vars=F, reset.uid=F, rm.na=F)
+
 set.seed(567)
 uids <- sample(unique(d$uid), replace=F, size=4)
-p <- d %>% filter(uid %in% uids) %>%
+p <- d.ts %>% select(-one_of(static.features)) %>% 
+  filter(uid %in% uids) %>%
   mutate(hsi=tsi_min/60) %>% select(-tsi_min, -outcome) %>%
   melt(id.vars=c('uid', 'hsi')) %>% 
   ggplot(aes(x=hsi, y=value, color=factor(uid))) + geom_line() + 
   facet_grid(variable~uid, scales='free') + theme_bw() + 
-  theme(panel.grid.minor=element_blank())
+  theme(panel.grid.minor=element_blank()) + xlab('Hours Since Injury')
 ggplotly(p)
-#p
 ```
 
-## Blood Gas Correlations
+## Blood Gas Measurements {.smaller}
 
+Some observations on timeseries values:
 
+- Some quantities are sparse (measured more often for sicker people)
+- There are weak correlations between several pairs of variables
+- The amount of time between injury and first measurement can vary a lot:
 
+```{r, echo=FALSE, fig.height=3, fig.align='center'}
+p <- d.ts %>% group_by(uid) %>% summarise(time=min(tsi_min)) %>% 
+  mutate(time=floor(time/60)) %>% ggplot(aes(x=time)) + geom_histogram(binwidth=1) +
+  theme_bw() + xlab('Hours Between Injury and First Measurement') + ylab('Patient Count') +
+  ggtitle('Time Between Injury and Treatment')
+ggplotly(p)
+```
 
-## Other Stuff
+## Global Trends {.smaller}
+Overall trends in measurements across all patients:
+```{r, echo=FALSE, fig.align='center', fig.height=4}
+d.ts[,c(ts.features, 'uid', 'tsi_min')] %>% 
+  mutate(time=3*floor(tsi_min/(60*3))) %>% dplyr::select(-tsi_min) %>%
+  group_by(uid, time) %>% summarise_each(funs(mean(., na.rm=T))) %>% 
+  melt(id.vars=c('uid', 'time')) %>% na.omit() %>% 
+  ggplot(aes(x=time, y=value, color=factor(uid))) + geom_jitter(alpha=.75) + 
+  guides(color=F)  + theme_bw() + xlab('Hours Since Injury') + ylab('Value') +
+  facet_wrap(~variable, scales='free') + 
+  geom_smooth(aes(color=NULL), se=F, method='loess', color='black', size=1.5)
+  
+```
 
-Binary GLM Model
-========================================================
+Things should level off by hour 48, validating the assumption that earlier measurements are more relevant.
 
-Exhaustive GLM Model Results
-========================================================
+# Modeling
 
-<!--Results from a few ordinal GLMs -->
+## Data Input {.smaller}
+A big challenge involves working around the fact that this model for the data below is not valid:
+
+<center>```glm(outcome ~ age + pbto2, family='binomial')```</center>
+
 ```{r, echo=FALSE}
+p <- d.ts %>% na.omit() %>% dplyr::select(age, pbto2, uid, tsi_min, outcome)
+rbind(
+  p %>% filter(outcome==0) %>% head(3),
+  p %>% filter(outcome==1) %>% head(2)
+) %>%
+  knitr::kable()
+```
+
+## Data Input {.smaller}
+
+Repeating the non-time-dependent variables like this leads to confidence intervals on coefficients that are unrealistically small (and not valid).
+
+Possible Workarounds:
+
+1. Take the mean of each timeseries and use that as a single variable
+  <br>*This doesn't work -- all timeseries variables become insignificant*
+2. Take multiple distribution statistics (e.g. percentiles) and use those all as variables
+  <br>*This works better, but has a relatively useless interpretation*
+3. Try to find "threshold" values where time spent above or below those values become variables
+  <br>*This is best, though it introduces thresholds as a variable*
+
+All of the models that follow take approach 3, though the way they deal with the thresholds will differ.
+
+## Finding Good Thresholds {.smaller}
+
+As a first attempt at modeling, all timeseries variables were separated into ranges based on known guidelines for safe values (Primarily from this [Lab Value Guide](http://www.globalrph.com/abg_analysis.htm)).
+
+For example, the ```PaCO2``` variable was split into three new variables:
+
+- **paco2_0_35** - % of time spent by patient w/ ```PaCO2``` value in [0, 35)
+- **paco2_35_45** - % of time spent by patient w/ ```PaCO2``` value in [35, 45)
+- **paco2_45_inf** - % of time spent by patient w/ ```PaCO2``` value in [45, +Inf)
+
+For all variables, the known "safe range" was then dropped from the model to avoid linear dependence (percentages across all variables would add up to 1).  This leaves only variables indicating time spent at dangerous levels.
+
+## Binary Outcome Dataset {.smallest}
+
+Modeling input dataset; includes static covariates and timeseries summaries:
+```{r, echo=FALSE, fig.align='center'}
+
+d.stat <- d  %>% melt(id.vars=c('uid', 'gos')) %>% 
+  group_by(variable) %>% summarise(
+    mean=mean(value, na.rm=T), 
+    sd=sd(value, na.rm=T),
+    min=min(value, na.rm=T),
+    max=max(value, na.rm=T)
+  ) %>% mutate_each(funs(round(., 2)), -variable) %>%
+  mutate(type = ifelse(variable %in% static.features, 'Static', 'Timeseries')) %>%
+  arrange(type)
+
+d.stat %>% data.frame #%>% knitr::kable(pad=0, padding=0)
+```
+
+
+## Binary GLM Results 
+
+Best model selected through exhaustive AIC search:
+
+<center>```glmulti('gos ~ .', family='binomial', level=1)```</center>
+<center>
+```{r, echo=FALSE, results='asis'}
+
 glmulti.env <- new.env()
 glmulti.res <- load(file='/Users/eczech/data/pbto2/export/glmulti_res_no_interp.Rdata', envir=glmulti.env)
 glmulti.res <- glmulti.env$glm.res
-knitr::kable(coef(glmulti.res))
+
+glm.res <- glmulti.res@objects[[1]]
+coef(summary(glm.res, digits=2)) %>% .[order(.[,4]),] %>% xtable(digits=3) %>% print(type='html')
 ```
+</center>
 
+## Parameter Averages 
+Parameter estimates averaged over all models (main effects only):
+<center>
+```{r, echo=FALSE, results='asis'}
+coef(glmulti.res)[,-2] %>% .[order(.[,3]),] %>% xtable(digits=3) %>% print(type='html')
+```
+</center>
 
-Exhaustive Model Results
-========================================================
-```{r, echo=FALSE}
-library(stringr)
+## Parameter Average Plot {.smaller}
+Plot of 95% Confidence Intervals over all models, sized by importance:
+```{r, echo=FALSE, fig.align='center'}
 cf <- coef(glmulti.res) %>% data.frame %>% setNames(c('est', 'var', 'num_models', 'imp', 'se'))
 #cf <- coef(glm.res) %>% data.frame %>% setNames(c('est', 'var', 'num_models', 'imp', 'se'))
 variable.order <- order(cf$est)
@@ -154,9 +259,35 @@ cf %>% add_rownames('variable') %>%
 ```
 
 
-Nonlinear Modeling 
-========================================================
-A modified model:
+# Nonlinear Modeling 
+
+## An Improved Model {.smaller}
+
+A potential improvement on the linear models would involve not needing to set "threshold" ranges for blood gas measurements manually.  The most basic version of this kind of model would involve a single threshold and a step function where having blood gas values on one side of that function has a different effect that the other side.
+
+A generalization of this could allow more than one threshold as well as the possibility for gradual shifts between regions of values where effects differ.
+
+```{r, echo=FALSE, fig.align='center', fig.height=3}
+double.logistic <- function(x, a1, a2, b1, b2, c1, c2, c=0){
+  r1 <- a1 / (1 + exp(b1 * (x - c1)))
+  r2 <- a2 / (1 + exp(b2 * (x - c2)))
+  r1 + r2
+}
+x <- seq(-10, 10, length.out = 100)
+data.frame(
+  x,
+  Double_Logistic = double.logistic(x, 5, 5, -1, 1, -5, 5),
+  Step_Function = double.logistic(x, 0, 5, -100, 100, 0, 0)
+) %>% melt(id.vars='x') %>% ggplot(aes(x=x, y=value, color=variable)) + geom_line() + 
+  facet_wrap(~variable, scales='free', nrow=2) + theme_bw() +
+  guides(color=guide_legend(title='Function Type')) + 
+  ylab('Effect on Outcome') + xlab('Blood Gas Level')
+
+```
+
+## Nonlinear Model {.smaller}
+
+A modified logistic model:
 
 $$ logit(y_i) = \alpha + \beta \cdot X_i + f(G_{ij}) $$
 
@@ -169,18 +300,15 @@ and
 $$ f(G_i) = \frac{1}{n_i} \sum_j{ \frac{c_1}{1 + e^{-c_2(G_{ij} - c_3)}} + \frac{c_4}{1 + e^{-c_5(G_{ij} - c_6)}}  } $$
 $$ n_i = \text{ length of timeseries for patient }i $$
 
-Double Logistic Function Examples
-========================================================
+The "double logistic" function definition for $f$ allows for flexiblity in thresholds and graduated changes.
+
+## Double Logistic Function Examples
 
 ```{r, echo=FALSE, warnings=FALSE, fig.align='center'}
 library(ggplot2)
 library(dplyr)
 library(reshape2)
-double.logistic <- function(x, a1, a2, b1, b2, c1, c2, c=0){
-  r1 <- a1 / (1 + exp(b1 * (x - c1)))
-  r2 <- a2 / (1 + exp(b2 * (x - c2)))
-  r1 + r2
-}
+
 x <- seq(-10, 10, length.out = 100)
 data.frame(
   x,
@@ -194,8 +322,7 @@ data.frame(
   ggplot(aes(x=x, y=value)) + geom_line() + facet_wrap(~variable) + theme_bw() + ylab('y')
 ```
 
-Random Functions
-========================================================
+## Random Functions
 
 These are functions drawn from the priors in the model and show all possibilities:
 
@@ -228,31 +355,31 @@ By semi-simulated, I mean by taking the real data and hard coding coefficient / 
 Results - Intracranial Pressure levels
 ========================================================
 <center>
-<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/actual_icp1.png" width="600px" height="600px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_icp1.png" width="600px" height="600px"/>
 </center>
 
 Results (PaCO2 levels)
 ========================================================
 <center>
-<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/actual_paco2.png" width="600px" height="600px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_paco2.png" width="600px" height="600px"/>
 </center>
 
 Results (pH levels)
 ========================================================
 <center>
-<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/actual_pha.png" width="600px" height="600px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_pha.png" width="600px" height="600px"/>
 </center>
 
 Results - PaO2 levels
 ========================================================
 <center>
-<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/actual_pao2.png" width="600px" height="600px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_pao2.png" width="600px" height="600px"/>
 </center>
 
 Results - PbtO2 levels
 ========================================================
 <center>
-<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/actual_pbto2.png" width="600px" height="600px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_pbto2.png" width="600px" height="600px"/>
 </center>
 
 

@@ -87,7 +87,7 @@ dp %>% group_by(uid) %>% summarise(r2=min(r2), o=min(outcome), p=min(p)) %>%
 d.model <- get.stan.data(d.stan, static.features, 'value')
 
 setwd('~/repos/portfolio/demonstrative/R/pbto2/models/stan')
-model.file <- 'nonlinear_binom_2.stan'
+model.file <- 'nonlinear_binom.stan'
 
 posterior <- stan(model.file, data = d.model,
                   warmup = 100, iter = 1000, thin = 2, 

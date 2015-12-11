@@ -8,7 +8,7 @@ source('/Users/eczech/repos/portfolio/demonstrative/R/pbto2/common.R')
 #do <- get.wide.data(outcome.func=gos.to.ord)
 db <- get.wide.data(outcome.func=gos.to.binom)
 
-p <- db %>% select(-gos) %>% names
+p <- db %>% select(-gos, -uid) %>% names
 p.main <- c('age', 'marshall', 'gcs', 'sex')
 p.sec <- p[!p %in% p.main]
 
