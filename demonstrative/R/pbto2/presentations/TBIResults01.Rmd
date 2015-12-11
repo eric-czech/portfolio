@@ -1,0 +1,259 @@
+---
+title: "TBI Study Results"
+author: "Eric Czech"
+date: "December 11, 2015"
+output: ioslides_presentation
+---
+
+# Data Description
+
+## Raw Data Spreadsheet
+
+Raw data given as excel file with ~300 tabs like this:
+
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/raw_spreadsheet.png" height="338px" width="800px"/>
+
+## Patient Data
+
+Along with timeseries measurements, the following static covariates were given for each patient:
+
+- Age
+- Sex
+- [GCS](https://en.wikipedia.org/wiki/Glasgow_Coma_Scale) (Glasgow Coma Scale) - Integer score from 3 (deep unconsciousness) to 15 (normal)
+- [Marshall Clasasification](http://neurodss.com/details.php?id=70) - Similar to GCS; Integer from 1 to 6 (lower is better)
+- Estimated Initial Time of Injury
+
+As well as an outcome score called "GOS" measured at 3, 6, 12, and 24 months:
+
+- GOS - 1=Dead, 2-3=Severely Disabled, 4-5=Good Outcome
+
+## Data Preparation
+
+For the sake of modeling, the following assumptions were made:
+
+- Only measurments within 48 hours of initial injury were considered
+- Patients with no GCS or Marshall score were excluded
+- Patients with less than 8 hours of PbtO2 measurements were also excluded 
+- Only the 3 month GOS outcome was used, using the 6 month GOS where 3 month not available
+
+__There were 339 patients in raw data but only 268 in filtered dataset.__
+
+*Note: Of 268 patients in filtered set, 18 had missing 3 month GOS*
+
+# Descriptive Stats
+
+## Static Variable Distributions
+
+```{r, echo=FALSE, include=FALSE}
+# Initialize libraries and datasets
+
+library(reshape2)
+library(ggplot2)
+library(dplyr)
+library(plotly)
+source('/Users/eczech/repos/portfolio/demonstrative/R/pbto2/common.R')
+
+d <- get.wide.data(scale.vars=F, outcome.func=gos.to.ord)
+p <- d %>% select(-gos) %>% names
+p.main <- c('age', 'marshall', 'gcs', 'sex')
+p.sec <- p[!p %in% p.main]
+```
+
+Frequency of non-time-dependent values:
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+p <- d[,p.main] %>% melt(id.vars=NULL) %>%
+  ggplot(aes(x=value)) + geom_histogram(binwidth=NULL) + 
+  facet_wrap(~variable, scales='free') + theme_bw()
+ggplotly(p)
+```
+
+
+## Comparing Variables to Outcome
+
+Relationships between static variables and outcomes are pretty clear:
+
+```{r, echo=FALSE}
+
+age.labels <- quantile(d$age)
+d.stat <- d[,c(p.main, c('gos', 'uid'))] %>% 
+  mutate(age=cut(d$age, breaks=c(0, age.labels), labels=age.labels, include.lowest = T)) %>% 
+  mutate_each(funs(as.character)) %>%
+  mutate(age = paste('<=', age, sep='')) %>%
+  melt(id.vars=c('uid', 'gos')) %>% 
+  group_by(variable, value, gos) %>% tally %>%
+  group_by(variable, value) %>% do({mutate(., pct=n/sum(n))}) %>% ungroup
+
+d.stat %>% mutate(Outcome=factor(gos, levels=1:3, labels=c('Dead', 'Bad', 'Good'))) %>% 
+  ggplot(aes(x=value, y=pct, fill=Outcome)) + 
+  geom_bar(stat='identity') + theme_bw() + 
+  facet_wrap(~variable, scales='free') + 
+  scale_fill_manual(values=c('Dead'='red3', 'Bad'='yellow3', 'Good'='green4')) + 
+  xlab('Variable Value') + ylab('Fraction of Patients')
+```
+
+
+## Blood Gas Measurements
+
+Timeseries measurments for 4 random patients:
+
+```{r, echo=FALSE}
+ts.features <- c('pbto2', 'pao2', 'icp1', 'paco2')
+d <- get.long.data(c(ts.features, 'tsi_min'), scale.vars=F, reset.uid=F, rm.na=F)
+set.seed(567)
+uids <- sample(unique(d$uid), replace=F, size=4)
+p <- d %>% filter(uid %in% uids) %>%
+  mutate(hsi=tsi_min/60) %>% select(-tsi_min, -outcome) %>%
+  melt(id.vars=c('uid', 'hsi')) %>% 
+  ggplot(aes(x=hsi, y=value, color=factor(uid))) + geom_line() + 
+  facet_grid(variable~uid, scales='free') + theme_bw() + 
+  theme(panel.grid.minor=element_blank())
+ggplotly(p)
+#p
+```
+
+## Blood Gas Correlations
+
+
+
+
+## Other Stuff
+
+Binary GLM Model
+========================================================
+
+Exhaustive GLM Model Results
+========================================================
+
+<!--Results from a few ordinal GLMs -->
+```{r, echo=FALSE}
+glmulti.env <- new.env()
+glmulti.res <- load(file='/Users/eczech/data/pbto2/export/glmulti_res_no_interp.Rdata', envir=glmulti.env)
+glmulti.res <- glmulti.env$glm.res
+knitr::kable(coef(glmulti.res))
+```
+
+
+Exhaustive Model Results
+========================================================
+```{r, echo=FALSE}
+library(stringr)
+cf <- coef(glmulti.res) %>% data.frame %>% setNames(c('est', 'var', 'num_models', 'imp', 'se'))
+#cf <- coef(glm.res) %>% data.frame %>% setNames(c('est', 'var', 'num_models', 'imp', 'se'))
+variable.order <- order(cf$est)
+cf %>% add_rownames('variable') %>% 
+  mutate(quantity=str_extract(variable, '^.*?(?=_)')) %>%
+  mutate(variable=factor(variable, levels=.$variable[variable.order])) %>%
+  ggplot(aes(x=variable, y=est, ymin=est - se, ymax=est + se, size=imp, alpha=imp, color=quantity)) +
+  geom_hline(yintercept=0, linetype='dashed', alpha=.3) +
+  geom_pointrange() +
+  theme_bw() + coord_flip() + theme(panel.grid.major=element_blank()) +
+  scale_size(range=c(.5, 1)) + scale_alpha(range = c(.7, 1)) +
+  guides(size=guide_legend(title="Importance"), color=guide_legend(title='Quantity'), alpha=F) +
+  ylab('Coefficient Value') + xlab('Variable') 
+```
+
+
+Nonlinear Modeling 
+========================================================
+A modified model:
+
+$$ logit(y_i) = \alpha + \beta \cdot X_i + f(G_{ij}) $$
+
+where
+
+$$ X_i = [Gender_i, Age_i, CommaScore_i, MarshallScore_i] $$
+
+and
+
+$$ f(G_i) = \frac{1}{n_i} \sum_j{ \frac{c_1}{1 + e^{-c_2(G_{ij} - c_3)}} + \frac{c_4}{1 + e^{-c_5(G_{ij} - c_6)}}  } $$
+$$ n_i = \text{ length of timeseries for patient }i $$
+
+Double Logistic Function Examples
+========================================================
+
+```{r, echo=FALSE, warnings=FALSE, fig.align='center'}
+library(ggplot2)
+library(dplyr)
+library(reshape2)
+double.logistic <- function(x, a1, a2, b1, b2, c1, c2, c=0){
+  r1 <- a1 / (1 + exp(b1 * (x - c1)))
+  r2 <- a2 / (1 + exp(b2 * (x - c2)))
+  r1 + r2
+}
+x <- seq(-10, 10, length.out = 100)
+data.frame(
+  x,
+  y1 = double.logistic(x, 5, 5, -10, 10, -3, 3),
+  y2 = double.logistic(x, 5, 5, 10, -10, -3, 3),
+  y3 = double.logistic(x, 5, 5, -1, 1, -5, 5),
+  y4 = double.logistic(x, 0, 5, -1, .5, -5, 5),
+  y5 = double.logistic(x, 5, 5, 2, 2, -5, 5),
+  y6 = double.logistic(x, 5, 5, .5, .5, -5, 5)
+) %>% melt(id.vars='x') %>% 
+  ggplot(aes(x=x, y=value)) + geom_line() + facet_wrap(~variable) + theme_bw() + ylab('y')
+```
+
+Random Functions
+========================================================
+
+These are functions drawn from the priors in the model and show all possibilities:
+
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_prior.png" height="500px" width="500px"/>
+
+Nonlinear Effects
+========================================================
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/NonlinearEffect.png", width="600px"/>
+
+Sample Size Effects (Fully Simulated Data)
+========================================================
+
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_800.png" width="300px" height="300px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_600.png" width="300px" height="300px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_400.png" width="300px" height="300px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_250.png" width="300px" height="300px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_100.png" width="300px" height="300px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_50.png" width="300px" height="300px"/>
+
+
+Function Forms on Semi-Simulated Data
+========================================================
+By semi-simulated, I mean by taking the real data and hard coding coefficient / function values.
+
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/act_upward.png" width="300px" height="300px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/act_slope.png" width="300px" height="300px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/act_downward.png" width="300px" height="300px"/>
+
+
+Results - Intracranial Pressure levels
+========================================================
+<center>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/actual_icp1.png" width="600px" height="600px"/>
+</center>
+
+Results (PaCO2 levels)
+========================================================
+<center>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/actual_paco2.png" width="600px" height="600px"/>
+</center>
+
+Results (pH levels)
+========================================================
+<center>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/actual_pha.png" width="600px" height="600px"/>
+</center>
+
+Results - PaO2 levels
+========================================================
+<center>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/actual_pao2.png" width="600px" height="600px"/>
+</center>
+
+Results - PbtO2 levels
+========================================================
+<center>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/actual_pbto2.png" width="600px" height="600px"/>
+</center>
+
+
+

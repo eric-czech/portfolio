@@ -13,12 +13,8 @@ rstan_options(auto_write=T)
 options(mc.cores = parallel::detectCores())
 
 static.features <- c('age', 'marshall', 'gcs', 'sex')
-#static.features <- c('age', 'sex')
 ts.feature <- 'pbto2'
 features <- c(static.features, ts.feature)
-
-d <- read.csv('~/data/pbto2/export/data_stan_input.csv', stringsAsFactors=F)
-
 
 # Upward bend
 # br <- -6; p <- .3; bc <- 0;
@@ -52,8 +48,9 @@ c1 <- -.6; c2 <- .55; # set based on quantiles (25/75%)
 
 
 # Use transformed actual data
-ds <- get.cleaned.data(d, features, scale=T, sample.frac=NULL, outcome.func=gos.to.binom)
-du <- get.cleaned.data(d, features, scale=F, sample.frac=NULL, outcome.func=gos.to.binom)
+du <- get.long.data(features, scale.vars=F, outcome.func=gos.to.binom, reset.uid=T)
+ds <- du %>% mutate_each_(funs(scale), features)
+
 n.uid <- length(unique(ds$uid))
 v <- du[,ts.feature]
 unscaled.value <- function(x) x * sd(v) + mean(v)
