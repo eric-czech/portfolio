@@ -2,8 +2,8 @@
 title: "TBI Study Results"
 author: "Eric Czech"
 date: "December 11, 2015"
-output: ioslides_presentation
-#output: html_document
+#output: ioslides_presentation
+output: html_document
 widescreen: yes
 ---
 
@@ -68,19 +68,21 @@ p.sec <- p[!p %in% p.main]
 
 Frequency of non-time-dependent values:
 
-```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.align='center'}
+<center>
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
 p <- d[,p.main] %>% melt(id.vars=NULL) %>%
   ggplot(aes(x=value)) + geom_histogram(binwidth=NULL) + 
   facet_wrap(~variable, scales='free') + theme_bw()
 ggplotly(p)
 ```
-
+</center>
 
 ## Comparing Variables to Outcome
 
 Relationships between static variables and outcomes are pretty clear:
 
-```{r, echo=FALSE, fig.align='center'}
+<center>
+```{r, echo=FALSE}
 age.labels <- quantile(d$age)
 d.stat <- d[,c(p.main, c('gos', 'uid'))] %>% 
   mutate(age=cut(d$age, breaks=c(0, age.labels), labels=age.labels, include.lowest = T)) %>% 
@@ -97,13 +99,14 @@ d.stat %>% mutate(Outcome=factor(gos, levels=1:3, labels=c('Dead', 'Bad', 'Good'
   scale_fill_manual(values=c('Dead'='red3', 'Bad'='yellow3', 'Good'='green4')) + 
   xlab('Variable Value') + ylab('Fraction of Patients')
 ```
-
+</center>
 
 ## Blood Gas Measurements {.smaller}
 
 Timeseries measurements for 4 random patients:
 
-```{r, echo=FALSE, fig.align='center'}
+<center>
+```{r, echo=FALSE}
 static.features <- c('gcs', 'marshall', 'sex', 'age')
 ts.features <- c('pbto2', 'pao2', 'icp1', 'paco2', 'pha', 'map')
 
@@ -120,6 +123,7 @@ p <- d.ts %>% select(-one_of(static.features)) %>%
   theme(panel.grid.minor=element_blank()) + xlab('Hours Since Injury')
 ggplotly(p)
 ```
+</center>
 
 ## Blood Gas Measurements {.smaller}
 
@@ -129,17 +133,20 @@ Some observations on timeseries values:
 - There are weak correlations between several pairs of variables
 - The amount of time between injury and first measurement can vary a lot:
 
-```{r, echo=FALSE, fig.height=3, fig.align='center'}
+<center>
+```{r, echo=FALSE, fig.height=3}
 p <- d.ts %>% group_by(uid) %>% summarise(time=min(tsi_min)) %>% 
   mutate(time=floor(time/60)) %>% ggplot(aes(x=time)) + geom_histogram(binwidth=1) +
   theme_bw() + xlab('Hours Between Injury and First Measurement') + ylab('Patient Count') +
   ggtitle('Time Between Injury and Treatment')
 ggplotly(p)
 ```
+</center>
 
 ## Global Trends {.smaller}
 Overall trends in measurements across all patients:
-```{r, echo=FALSE, fig.align='center', fig.height=4}
+<center>
+```{r, echo=FALSE, fig.height=4}
 d.ts[,c(ts.features, 'uid', 'tsi_min')] %>% 
   mutate(time=3*floor(tsi_min/(60*3))) %>% dplyr::select(-tsi_min) %>%
   group_by(uid, time) %>% summarise_each(funs(mean(., na.rm=T))) %>% 
@@ -148,8 +155,8 @@ d.ts[,c(ts.features, 'uid', 'tsi_min')] %>%
   guides(color=F)  + theme_bw() + xlab('Hours Since Injury') + ylab('Value') +
   facet_wrap(~variable, scales='free') + 
   geom_smooth(aes(color=NULL), se=F, method='loess', color='black', size=1.5)
-  
 ```
+</center>
 
 Things should level off by hour 48, validating the assumption that earlier measurements are more relevant.
 
@@ -196,10 +203,11 @@ For example, the ```PaCO2``` variable was split into three new variables:
 
 For all variables, the known "safe range" was then dropped from the model to avoid linear dependence (percentages across all variables would add up to 1).  This leaves only variables indicating time spent at dangerous levels.
 
-## Binary Outcome Dataset {.smallest}
+## Binary Outcome Dataset 
 
 Modeling input dataset; includes static covariates and timeseries summaries:
-```{r, echo=FALSE, fig.align='center'}
+<center>
+```{r, echo=FALSE}
 
 d.stat <- d  %>% melt(id.vars=c('uid', 'gos')) %>% 
   group_by(variable) %>% summarise(
@@ -207,13 +215,14 @@ d.stat <- d  %>% melt(id.vars=c('uid', 'gos')) %>%
     sd=sd(value, na.rm=T),
     min=min(value, na.rm=T),
     max=max(value, na.rm=T)
-  ) %>% mutate_each(funs(round(., 2)), -variable) %>%
-  mutate(type = ifelse(variable %in% static.features, 'Static', 'Timeseries')) %>%
+  ) %>% mutate_each(funs(round(., 2)), -variable) %>% 
+  mutate(type = ifelse(variable %in% static.features, 'Static', 'GasRange')) %>%
   arrange(type)
 
-d.stat %>% data.frame #%>% knitr::kable(pad=0, padding=0)
-```
 
+d.stat %>% data.frame
+```
+</center>
 
 ## Binary GLM Results 
 
@@ -242,7 +251,8 @@ coef(glmulti.res)[,-2] %>% .[order(.[,3]),] %>% xtable(digits=3) %>% print(type=
 
 ## Parameter Average Plot {.smaller}
 Plot of 95% Confidence Intervals over all models, sized by importance:
-```{r, echo=FALSE, fig.align='center'}
+<center>
+```{r, echo=FALSE}
 cf <- coef(glmulti.res) %>% data.frame %>% setNames(c('est', 'var', 'num_models', 'imp', 'se'))
 #cf <- coef(glm.res) %>% data.frame %>% setNames(c('est', 'var', 'num_models', 'imp', 'se'))
 variable.order <- order(cf$est)
@@ -257,7 +267,7 @@ cf %>% add_rownames('variable') %>%
   guides(size=guide_legend(title="Importance"), color=guide_legend(title='Quantity'), alpha=F) +
   ylab('Coefficient Value') + xlab('Variable') 
 ```
-
+</center>
 
 # Nonlinear Modeling 
 
@@ -267,7 +277,8 @@ A potential improvement on the linear models would involve not needing to set "t
 
 A generalization of this could allow more than one threshold as well as the possibility for gradual shifts between regions of values where effects differ.
 
-```{r, echo=FALSE, fig.align='center', fig.height=3}
+<center>
+```{r, echo=FALSE, fig.height=3}
 double.logistic <- function(x, a1, a2, b1, b2, c1, c2, c=0){
   r1 <- a1 / (1 + exp(b1 * (x - c1)))
   r2 <- a2 / (1 + exp(b2 * (x - c2)))
@@ -284,6 +295,7 @@ data.frame(
   ylab('Effect on Outcome') + xlab('Blood Gas Level')
 
 ```
+</center>
 
 ## Nonlinear Model {.smaller}
 
@@ -302,9 +314,16 @@ $$ n_i = \text{ length of timeseries for patient }i $$
 
 The "double logistic" function definition for $f$ allows for flexiblity in thresholds and graduated changes.
 
+## What Does Nonlinear Effect Mean? {.smaller}
+This is the format that all nonlinear effects will be shown in:
+<center>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/NonlinearEffect.png", width="45%" height="45%"/>
+</center>
+
 ## Double Logistic Function Examples
 
-```{r, echo=FALSE, warnings=FALSE, fig.align='center'}
+<center>
+```{r, echo=FALSE, warnings=FALSE}
 library(ggplot2)
 library(dplyr)
 library(reshape2)
@@ -321,66 +340,61 @@ data.frame(
 ) %>% melt(id.vars='x') %>% 
   ggplot(aes(x=x, y=value)) + geom_line() + facet_wrap(~variable) + theme_bw() + ylab('y')
 ```
+</center>
 
-## Random Functions
+## Implementation {.smaller}
 
-These are functions drawn from the priors in the model and show all possibilities:
+MCMC sampling model used: [Model on Github](https://github.com/eric-czech/portfolio/blob/master/demonstrative/R/pbto2/models/stan/nonlinear_binom.stan)
 
-<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_prior.png" height="500px" width="500px"/>
+These are effect functions drawn from the priors in the model to show possibilities and biases the model begins with:
 
-Nonlinear Effects
-========================================================
-<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/NonlinearEffect.png", width="600px"/>
-
-Sample Size Effects (Fully Simulated Data)
-========================================================
-
-<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_800.png" width="300px" height="300px"/>
-<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_600.png" width="300px" height="300px"/>
-<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_400.png" width="300px" height="300px"/>
-<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_250.png" width="300px" height="300px"/>
-<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_100.png" width="300px" height="300px"/>
-<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_50.png" width="300px" height="300px"/>
+<center><img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_prior.png" height="45%" width="45%"/></center>
 
 
-Function Forms on Semi-Simulated Data
-========================================================
-By semi-simulated, I mean by taking the real data and hard coding coefficient / function values.
+## Sample Size Effects (Fully Simulated Data)
+
+<center>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_800.png" width="250px" height="250px/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_600.png" width="250px" height="250px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_400.png" width="250px" height="250px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_250.png" width="250px" height="250px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_100.png" width="250px" height="250px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_50.png" width="250px" height="250px"/>
+</center>
+
+## Function Forms on Semi-Simulated Data
+
+Parameter recovery after hard coding coefficient / function values for the **actual** (rather than simulated) data:
 
 <img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/act_upward.png" width="300px" height="300px"/>
 <img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/act_slope.png" width="300px" height="300px"/>
 <img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/act_downward.png" width="300px" height="300px"/>
 
 
-Results - Intracranial Pressure levels
-========================================================
-<center>
-<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_icp1.png" width="600px" height="600px"/>
+## Results - Intracranial Pressure levels
+<center> 
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_icp1.png" width="500px" height="500px"/>
 </center>
 
-Results (PaCO2 levels)
-========================================================
-<center>
-<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_paco2.png" width="600px" height="600px"/>
+## Results (PaCO2 levels)
+<center> 
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_paco2.png" width="500px" height="500px"/>
 </center>
 
-Results (pH levels)
-========================================================
+##Results (pH levels)
 <center>
-<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_pha.png" width="600px" height="600px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_pha.png" width="500px" height="500px"/>
 </center>
 
-Results - PaO2 levels
-========================================================
+##Results - PaO2 levels
 <center>
-<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_pao2.png" width="600px" height="600px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_pao2.png" width="500px" height="500px"/>
 </center>
 
-Results - PbtO2 levels
-========================================================
+##Results - PbtO2 levels
 <center>
-<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_pbto2.png" width="600px" height="600px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_pbto2.png" width="500px" height="500px"/>
 </center>
 
-
+# Done
 
