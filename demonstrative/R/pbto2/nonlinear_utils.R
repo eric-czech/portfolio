@@ -1,8 +1,9 @@
 
-get.stan.data <- function(d.stan, static.features, ts.feature){
+get.stan.data <- function(d.stan, static.features, ts.feature, n.outcome=3){
   d.stan <- data.frame(d.stan)
   d.stan.uid <- d.stan %>% group_by(uid) %>% do({head(., 1)}) %>% ungroup %>% arrange(uid) %>% data.frame
   list(
+    N_OUTCOME = n.outcome,
     N_OBS = nrow(d.stan),
     N_VARS = length(static.features),
     N_UID = max(d.stan$uid),
@@ -14,6 +15,7 @@ get.stan.data <- function(d.stan, static.features, ts.feature){
     max_z = max(d.stan[,ts.feature])
   )
 }
+
 
 double.logistic <- function(x, a1, a2, b1, b2, c1, c2, c=0){
   r1 <- a1 / (1 + exp(b1 * (x - c1)))

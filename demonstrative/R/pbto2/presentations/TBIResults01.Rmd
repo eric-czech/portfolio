@@ -301,15 +301,16 @@ data.frame(
 
 A modified logistic model:
 
-$$ logit(y_i) = \alpha + \beta \cdot X_i + f(G_{ij}) $$
+$$ logit(Pr(y_i = 1)) = \alpha + \beta \cdot X_i + f(G_{ij}) $$
 
 where
 
-$$ X_i = [Gender_i, Age_i, CommaScore_i, MarshallScore_i] $$
+$$ X_i = [{Gender}_i, {Age}_i, {CommaScore}_i, {MarshallScore}_i], $$
+$$ y_i = \{ 0 \text{ if }{GOS}_i \in [1, 2, 3], 1 \text{ if }{GOS}_i \in [4, 5] \} $$
 
 and
 
-$$ f(G_i) = \frac{1}{n_i} \sum_j{ \frac{c_1}{1 + e^{-c_2(G_{ij} - c_3)}} + \frac{c_4}{1 + e^{-c_5(G_{ij} - c_6)}}  } $$
+$$ f(G_i) = \frac{1}{n_i} \sum_j^{n_i}{ \frac{c_1}{1 + e^{-c_2(G_{ij} - c_3)}} + \frac{c_4}{1 + e^{-c_5(G_{ij} - c_6)}}  } $$
 $$ n_i = \text{ length of timeseries for patient }i $$
 
 The "double logistic" function definition for $f$ allows for flexiblity in thresholds and graduated changes.
@@ -396,5 +397,30 @@ Parameter recovery after hard coding coefficient / function values for the **act
 <img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_pbto2.png" width="500px" height="500px"/>
 </center>
 
-# Done
+# Ordered Logistic Modeling 
 
+## Nonlinear, Ordered Logit Model {.smaller}
+
+Going one step further to model more than 2 outcomes:
+
+$$ logit(Pr(y_i \leq k)) = \alpha_k + \beta \cdot X_i + f(G_{ij}) $$
+$$ => Pr(y_i = k) = Pr(y_i \leq k) - Pr(y_i \leq k - 1), $$
+$$ k \in [1, 2, 3] $$
+
+where
+
+$$ X_i = [{Gender}_i, {Age}_i, {CommaScore}_i, {MarshallScore}_i], $$
+$$ y_i = \{ 1 \text{ if }{GOS}_i = 1, 2 \text{ if }{GOS}_i \in [2,3], 3 \text{ if }{GOS}_i \in [4,5] \} $$
+
+and
+
+$$ f(G_i) = \frac{1}{n_i} \sum_j^{n_i}{ \frac{c_1}{1 + e^{-c_2(G_{ij} - c_3)}} + \frac{c_4}{1 + e^{-c_5(G_{ij} - c_6)}}  } $$
+$$ n_i = \text{ length of timeseries for patient }i $$
+
+This is essentially equivalent to the binary model except it introduces one extra parameter for another intercept (2 intercepts are required to separate 3 outcome classes).
+
+## Ordered Logistic Results
+
+Generally speaking the results from 3-class, ordered logistic models were little different from 2-class models for the same thing.  Regardless, here are some of the fitted functions for the different blood gases under this model:
+
+<center>[Ordered Logistic Results](https://github.com/eric-czech/portfolio/tree/master/demonstrative/R/pbto2/presentations/images/no_interp_ord)</center>

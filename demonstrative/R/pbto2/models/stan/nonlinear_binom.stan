@@ -1,15 +1,15 @@
 
 data {
-  int<lower=1> N_OBS;              // Total # of observations (~10k)
+  int<lower=1> N_OBS;              // Total # of observations in time (~5k)
   int<lower=1> N_VARS;             // # of static covariates (~4)
   int<lower=2> N_UID;              // # patients (~300)
     
   int<lower=1> uid[N_OBS];         // Patient id vector
   int<lower=0, upper=1> y[N_UID];  // Vector of 0/1 outcomes
-  matrix[N_UID, N_VARS] x;
+  matrix[N_UID, N_VARS] x;         // Static covariate matrix
   real z[N_OBS];                   // Time varying covariate
-  real min_z;
-  real max_z;
+  real min_z;                      // Minimum value for lower center
+  real max_z;                      // Maximum value for upper center
 }
 
 parameters {
