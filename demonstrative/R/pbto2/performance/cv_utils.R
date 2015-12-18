@@ -14,6 +14,7 @@ extract.waic <- function(res){
     }
     rbind(
       extract(r$ml.fl, 'Double Logistic'),
+      extract(r$ms.fl, 'Single Logistic'),
       extract(r$mw.fl, 'Wide'),
       extract(r$mn.fl, 'Null')
     )
@@ -32,6 +33,8 @@ extract.rhat <- function(res){
     rbind(
       extract(r$ml.fl, 'Double Logistic', 'Full'),
       extract(r$ml.cv, 'Double Logistic', 'CV'),
+      extract(r$ms.fl, 'Single Logistic', 'Full'),
+      extract(r$ms.cv, 'Single Logistic', 'CV'),
       extract(r$mw.fl, 'Wide', 'Full'),
       extract(r$mw.cv, 'Wide', 'CV'),
       extract(r$mn.fl, 'Null', 'Full'),
@@ -56,6 +59,7 @@ extract.predictions <- function(res){
   foreach(r=res, .combine=rbind)%do%{
     rbind(
       extract(r$dl, r$ml.cv, 'Double Logistic'),
+      extract(r$ds, r$ms.cv, 'Single Logistic'),
       extract(r$dw, r$mw.cv, 'Wide'),
       extract(r$dn, r$mn.cv, 'Null')
     ) %>% mutate(fold=r$fold)

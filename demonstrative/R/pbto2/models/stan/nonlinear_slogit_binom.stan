@@ -42,7 +42,7 @@ model {
   alpha ~ normal(0, 5);
   beta ~ normal(0, 5);
   sinh(b/d) ~ normal(0, 2);
-  c ~ normal(0, 5);
+  c ~ normal(0, 10);
   betaz ~ normal(0, 5); // Less regularized
   
   y ~ bernoulli_logit(alpha + x * beta + w);

@@ -13,7 +13,7 @@ rstan_options(auto_write=T)
 options(mc.cores = parallel::detectCores())
 
 static.features <- c('age', 'marshall', 'gcs', 'sex')
-ts.feature <- c('icp1')
+ts.feature <- c('pao2')
 features <- c(static.features, ts.feature)
 
 dsu <- get.long.data(features, scale.vars=F, outcome.func=gos.to.binom, reset.uid=T)

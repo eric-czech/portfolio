@@ -50,12 +50,14 @@ k <- 10
 folds <- cvFolds(length(uids), K = k, type = 'random')
 
 setwd('~/repos/portfolio/demonstrative/R/pbto2/models/stan')
-nonlin.model <- 'nonlinear_binom_kfold.stan'
+dlogit.model <- 'nonlinear_binom_kfold.stan'
+slogit.model <- 'nonlinear_slogit_binom_kfold.stan'
 linear.model <- 'logistic_regression_kfold.stan'
 
 reset.uid <- function(d) d %>% mutate(uid=as.integer(factor(uid)))
 
 run.fold <- function(fold, ...){
+  print(paste0('Running fold number ', fold))
   uid.tr <- uids[folds$subsets[folds$which != fold]]
   uid.ho <- uids[folds$subsets[folds$which == fold]]
 
@@ -81,12 +83,19 @@ run.fold <- function(fold, ...){
   dn.stan.fl <- get.wide.model.data(dw.all[,null.feat], static.features, d.ho=head(dw.ho[,null.feat], 2))
   
   #browser()
-  # Run nonlinear, unaggregated timeseries model
-  ml.cv <- stan(nonlin.model, data = dl.stan.cv, ...)
+  # Run nonlinear, double logistic, unaggregated timeseries model
+  ml.cv <- stan(dlogit.model, data = dl.stan.cv, ...)
   if (fold == 1)
-    ml.fl <- stan(nonlin.model, data = dl.stan.fl, ...)
+    ml.fl <- stan(dlogit.model, data = dl.stan.fl, ...)
   else
     ml.fl <- NULL
+  
+  # Run nonlinear, single logistic, unaggregated timeseries model
+  ms.cv <- stan(slogit.model, data = dl.stan.cv, ...)
+  if (fold == 1)
+    ms.fl <- stan(slogit.model, data = dl.stan.fl, ...)
+  else
+    ms.fl <- NULL
   
   # Run linear, aggregated timeseries model
   mw.cv <- stan(linear.model, data = dw.stan.cv, ...)
@@ -104,16 +113,23 @@ run.fold <- function(fold, ...){
   
   list(
     fold=fold,
-    dl=dl.stan.cv, ml.cv=ml.cv, ml.fl=ml.fl, 
-    dw=dw.stan.cv, mw.cv=mw.cv, mw.fl=mw.fl, 
-    dn=dn.stan.cv, mn.cv=mn.cv, mn.fl=mn.fl
+    dl=dl.stan.cv, ml.cv=ml.cv, ml.fl=ml.fl, # Double logistic results
+    ds=dl.stan.cv, ms.cv=ms.cv, ms.fl=ms.fl, # Single logistic results
+    dw=dw.stan.cv, mw.cv=mw.cv, mw.fl=mw.fl, # Aggregated linear results
+    dn=dn.stan.cv, mn.cv=mn.cv, mn.fl=mn.fl  # Null results
   )
 }
 
 
+# res <- foreach(i=1:k) %do% run.fold(i, warmup = 100, iter = 1000, thin = 3, chains = 1, verbose = FALSE)
+
 registerDoMC(6) # Only run this once to avoid crashes
 res <- foreach(i=1:k) %dopar% run.fold(i, warmup = 100, iter = 1000, thin = 3, 
                                               chains = 1, verbose = FALSE)
+
+res.file <- sprintf('/Users/eczech/data/pbto2/cache/res_%s.Rdata', ts.feature)
+save(res, file=res.file)
+
 #posteriors <- foreach(i=1:k) %do% run.fold(i)
 
 # pars <- c('beta', 'betaz', 'a1', 'a2', 'b1', 'b2', 'c', 'alpha', 'p')
@@ -126,11 +142,18 @@ rhat <- extract.rhat(res)
 plot.rhat(rhat)
 
 waic <- extract.waic(res)
-
-
+waic
 
 preds <- extract.predictions(res)
 
+# compute.fold.logloss <- function(preds){
+#   preds %>% group_by(model, fold) %>% do({
+#     
+#     p <- prediction(.$y.pred, .$y.true)
+#     auc <- p %>% performance('auc') %>% .@y.values
+#     data.frame(auc=auc[[1]])
+#   })
+# }
 compute.fold.auc <- function(preds){
   preds %>% group_by(model, fold) %>% do({
     p <- prediction(.$y.pred, .$y.true)
