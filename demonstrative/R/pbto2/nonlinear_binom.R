@@ -13,15 +13,13 @@ rstan_options(auto_write=T)
 options(mc.cores = parallel::detectCores())
 
 static.features <- c('age', 'marshall', 'gcs', 'sex')
-ts.feature <- c('map')
+ts.feature <- c('pbto2')
 features <- c(static.features, ts.feature)
 
 dsu <- get.long.data(features, scale.vars=F, outcome.func=gos.to.binom, reset.uid=T)
 dsu$rand <- rnorm(n = nrow(dsu))
 unscaled.value <- function(x, var) x * sd(dsu[,var]) + mean(dsu[,var])
 d.stan <- dsu %>% mutate_each_(funs(scale), features)
-
-print(paste0('length before = ', nrow(d), ', length after = ', nrow(d.stan)))
 
 if (sum(is.na(d.stan[,ts.feature])) > 0)
   stop('Found na ts values')
@@ -34,7 +32,7 @@ model.file <- 'nonlinear_binom.stan'
 
 posterior <- stan(model.file, data = d.model,
                   warmup = 200, iter = 5000, thin = 30, 
-                  chains = 4, verbose = FALSE)
+                  chains = 1, verbose = FALSE)
 
 # posterior <- stan(model.file, data = d.model,
 #                   warmup = 150, iter = 4000, thin = 5, 

@@ -74,7 +74,7 @@ plot.pbto2.coef <- function(beta.post){
 DATA_CONFIG <- 'config2'
 #DATA_CONFIG <- 'config1'
 
-get.wide.data <- function(scale.vars=T, outcome.func=gos.to.binom){
+get.wide.data <- function(scale.vars=T, outcome.func=gos.to.binom, reset.uid=F){
   d <- read.csv(sprintf('/Users/eczech/data/pbto2/final/%s/data_wide.csv', DATA_CONFIG)) %>% 
     mutate_each(funs(as.numeric)) %>%
     # Remove pct values in "normal" ranges for blood gases
@@ -83,6 +83,9 @@ get.wide.data <- function(scale.vars=T, outcome.func=gos.to.binom){
   
   if (scale.vars)
     d <- d %>% mutate_each(funs(scale), -gos)
+  
+  if (reset.uid)
+    d <- d %>% mutate(uid=as.integer(factor(uid)))
   
   d
 }
@@ -108,5 +111,22 @@ get.long.data <- function(p, scale.vars=T, outcome.func=gos.to.binom, sample.fra
     d <- d %>% mutate(uid=as.integer(factor(uid)))
   
   d
+}
+
+
+get.wide.model.data <- function(d, features, d.ho=NULL, outcome.var='gos'){
+  d <- data.frame(d)
+  r <- list(
+    N_OBS = nrow(d),
+    N_VARS = length(features),
+    y = as.integer(d[,outcome.var]),
+    x = d[,features]
+  )
+  if (!is.null(d.ho)){
+    r[['N_OBS_HO']] <- nrow(d.ho)
+    r[['x_ho']] <- d.ho[,features]
+    r[['y_ho']] <- as.integer(d.ho[,outcome.var])
+  }
+  r
 }
 

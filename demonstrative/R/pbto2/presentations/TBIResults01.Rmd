@@ -2,7 +2,7 @@
 title: "TBI Study Results"
 author: "Eric Czech"
 date: "December 11, 2015"
-#output: ioslides_presentation
+output: ioslides_presentation
 output: html_document
 widescreen: yes
 ---
@@ -424,3 +424,5 @@ This is essentially equivalent to the binary model except it introduces one extr
 Generally speaking the results from 3-class, ordered logistic models were little different from 2-class models for the same thing.  Regardless, here are some of the fitted functions for the different blood gases under this model:
 
 <center>[Ordered Logistic Results](https://github.com/eric-czech/portfolio/tree/master/demonstrative/R/pbto2/presentations/images/no_interp_ord)</center>
+
+# Done

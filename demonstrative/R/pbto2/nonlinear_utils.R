@@ -1,7 +1,13 @@
+library(foreach)
+library(dplyr)
+
+get.first.row <- function(d){
+  foreach(u=unique(d$uid), .combine=rbind) %do% {subset(d, uid == u) %>% head(1)}
+}
 
 get.stan.data <- function(d.stan, static.features, ts.feature, n.outcome=3){
   d.stan <- data.frame(d.stan)
-  d.stan.uid <- d.stan %>% group_by(uid) %>% do({head(., 1)}) %>% ungroup %>% arrange(uid) %>% data.frame
+  d.stan.uid <- get.first.row(d.stan)
   list(
     N_OUTCOME = n.outcome,
     N_OBS = nrow(d.stan),
@@ -16,12 +22,41 @@ get.stan.data <- function(d.stan, static.features, ts.feature, n.outcome=3){
   )
 }
 
+get.stan.data.cv <- function(d.tr, d.ho, static.features, ts.feature, n.outcome=3){
+  d.tr <- data.frame(d.tr)
+  d.ho <- data.frame(d.ho)
+  d.uid.tr <- get.first.row(d.tr)
+  d.uid.ho <- get.first.row(d.ho)
+  list(
+    N_OUTCOME = n.outcome,
+    N_OBS = nrow(d.tr),
+    N_OBS_HO = nrow(d.ho),
+    N_VARS = length(static.features),
+    N_UID = max(d.tr$uid),
+    N_UID_HO = max(d.ho$uid),
+    y = d.uid.tr %>% .$outcome %>% as.integer,
+    y_ho = d.uid.ho %>% .$outcome %>% as.integer,
+    x = d.uid.tr[,static.features],
+    x_ho = d.uid.ho[,static.features],
+    z = d.tr[,ts.feature],
+    z_ho = d.ho[,ts.feature],
+    uid = d.tr$uid,
+    uid_ho = d.ho$uid,
+    min_z = min(d.tr[,ts.feature]),
+    max_z = max(d.tr[,ts.feature])
+  )
+}
+
 
 double.logistic <- function(x, a1, a2, b1, b2, c1, c2, c=0){
   r1 <- a1 / (1 + exp(b1 * (x - c1)))
   r2 <- a2 / (1 + exp(b2 * (x - c2)))
   #.5 * (r1 + r2)
   c + r1 + r2
+}
+
+single.logistic <- function(x, a, b, c){
+  a / (1 + exp(b * (x - c)))
 }
 
 get.mean.curve <- function(post, x, agg.func=median){
@@ -32,6 +67,13 @@ get.mean.curve <- function(post, x, agg.func=median){
   c1 = agg.func(post$c[,1])
   c2 = agg.func(post$c[,2])
   double.logistic(x, a1, a2, b1, b2, c1, c2)
+}
+
+get.slogit.mean.curve <- function(post, x, agg.func=median){
+  a = agg.func(post$betaz)
+  b = agg.func(post$b)
+  c = agg.func(post$c)
+  single.logistic(x, a, b, c)
 }
 
 
