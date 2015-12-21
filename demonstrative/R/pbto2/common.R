@@ -1,4 +1,4 @@
-scale <- function(x) (x - mean(x)) / sd(x)
+scale <- function(x, na.rm=F) (x - mean(x, na.rm=na.rm)) / sd(x, na.rm=na.rm)
 
 scale.minmax <- function(x) (x - min(x)) / (max(x) - min(x))
 
@@ -21,6 +21,8 @@ sample.uids <- function(d, frac=1) {
   uids <- sample(unique(d$uid), size = floor(length(unique(d$uid)) * frac), replace = F)
   d %>% filter(uid %in% uids)
 }
+
+reset.uid <- function(d) d %>% mutate(uid=as.integer(factor(uid)))
 
 compute.var.posteriors <- function(d, post){
   beta.post <- data.frame(post$beta) %>% setNames(features[-1]) %>% dplyr::mutate(samp_id=1:nrow(.))

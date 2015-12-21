@@ -54,8 +54,6 @@ dlogit.model <- 'nonlinear_binom_kfold.stan'
 slogit.model <- 'nonlinear_slogit_binom_kfold.stan'
 linear.model <- 'logistic_regression_kfold.stan'
 
-reset.uid <- function(d) d %>% mutate(uid=as.integer(factor(uid)))
-
 run.fold <- function(fold, ...){
   print(paste0('Running fold number ', fold))
   uid.tr <- uids[folds$subsets[folds$which != fold]]

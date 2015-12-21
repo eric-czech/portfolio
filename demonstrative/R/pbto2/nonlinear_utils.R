@@ -22,12 +22,15 @@ get.stan.data <- function(d.stan, static.features, ts.feature, n.outcome=3){
   )
 }
 
-get.stan.data.cv <- function(d.tr, d.ho, static.features, ts.feature, n.outcome=3, zmin=NULL, zmax=NULL){
+get.stan.data.cv <- function(d.tr, d.ho, static.features, ts.features, n.outcome=3, zmin=NULL, zmax=NULL, na.value=-999){
   d.tr <- data.frame(d.tr)
   d.ho <- data.frame(d.ho)
   d.uid.tr <- get.first.row(d.tr)
   d.uid.ho <- get.first.row(d.ho)
-  list(
+  
+  # Add static variable data
+  r <- list(
+    NA_VALUE = na.value,
     N_OUTCOME = n.outcome,
     N_OBS = nrow(d.tr),
     N_OBS_HO = nrow(d.ho),
@@ -38,13 +41,30 @@ get.stan.data.cv <- function(d.tr, d.ho, static.features, ts.feature, n.outcome=
     y_ho = d.uid.ho %>% .$outcome %>% as.integer,
     x = d.uid.tr[,static.features],
     x_ho = d.uid.ho[,static.features],
-    z = d.tr[,ts.feature],
-    z_ho = d.ho[,ts.feature],
     uid = d.tr$uid,
-    uid_ho = d.ho$uid,
-    min_z = ifelse(is.null(zmin), min(d.tr[,ts.feature]), zmin),
-    max_z = ifelse(is.null(zmax), max(d.tr[,ts.feature]), zmax)
+    uid_ho = d.ho$uid
   )
+  
+  
+  get.max <- function(d, f) ifelse(is.null(zmax), max(d[,f], na.rm=T), zmax)
+  get.min <- function(d, f) ifelse(is.null(zmin), min(d[,f], na.rm=T), zmin)
+  tr.na <- function(x) ifelse(is.na(x), na.value, x)
+  
+  # Add timeseries variable data
+  if (length(ts.features) == 1){
+    r[['z']] <- tr.na(d.tr[,ts.features])
+    r[['z_ho']] <- tr.na(d.ho[,ts.features])
+    r[['min_z']] <- get.min(d.tr, ts.features)
+    r[['max_z']] <- get.max(d.tr, ts.features)
+  } else {
+    for (i in 1:length(ts.features)){
+      r[[paste0('z', i)]] <- tr.na(d.tr[,ts.features[i]])
+      r[[paste0('z_ho', i)]] <- tr.na(d.ho[,ts.features[i]])
+      r[[paste0('min_z', i)]] <- get.min(d.tr, ts.features[i])
+      r[[paste0('max_z', i)]] <- get.max(d.tr, ts.features[i])
+    }
+  }
+  r
 }
 
 
