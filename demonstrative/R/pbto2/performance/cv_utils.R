@@ -65,3 +65,24 @@ extract.predictions <- function(res){
     ) %>% mutate(fold=r$fold)
   }
 }
+
+# Cross validation performance functions
+
+
+logloss <- function(actual, predicted, eps=0.00001) {
+  predicted <- pmin(pmax(predicted, eps), 1-eps)
+  -1/length(actual)*(sum(actual*log(predicted)+(1-actual)*log(1-predicted)))
+}
+compute.fold.logloss <- function(preds){
+  preds %>% group_by(model, fold) %>% do({
+    data.frame(logloss=logloss(.$y.true, .$y.pred))
+  })
+}
+
+compute.fold.auc <- function(preds){
+  preds %>% group_by(model, fold) %>% do({
+    p <- prediction(.$y.pred, .$y.true)
+    auc <- p %>% performance('auc') %>% .@y.values
+    data.frame(auc=auc[[1]])
+  })
+}

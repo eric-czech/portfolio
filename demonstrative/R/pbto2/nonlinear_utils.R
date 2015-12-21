@@ -22,7 +22,7 @@ get.stan.data <- function(d.stan, static.features, ts.feature, n.outcome=3){
   )
 }
 
-get.stan.data.cv <- function(d.tr, d.ho, static.features, ts.feature, n.outcome=3){
+get.stan.data.cv <- function(d.tr, d.ho, static.features, ts.feature, n.outcome=3, zmin=NULL, zmax=NULL){
   d.tr <- data.frame(d.tr)
   d.ho <- data.frame(d.ho)
   d.uid.tr <- get.first.row(d.tr)
@@ -42,8 +42,8 @@ get.stan.data.cv <- function(d.tr, d.ho, static.features, ts.feature, n.outcome=
     z_ho = d.ho[,ts.feature],
     uid = d.tr$uid,
     uid_ho = d.ho$uid,
-    min_z = min(d.tr[,ts.feature]),
-    max_z = max(d.tr[,ts.feature])
+    min_z = ifelse(is.null(zmin), min(d.tr[,ts.feature]), zmin),
+    max_z = ifelse(is.null(zmax), max(d.tr[,ts.feature]), zmax)
   )
 }
 

@@ -18,7 +18,7 @@ rstan_options(auto_write=T)
 options(mc.cores = parallel::detectCores())
 
 # Set timeseries feature to be used in modeling
-ts.feature <- c('pao2')
+ts.feature <- c('pbto2')
 
 static.features <- c('age', 'marshall', 'gcs', 'sex')
 features <- c(static.features, ts.feature)
@@ -90,12 +90,27 @@ run.fold <- function(fold, ...){
   else
     ml.fl <- NULL
   
-  # Run nonlinear, single logistic, unaggregated timeseries model
-  ms.cv <- stan(slogit.model, data = dl.stan.cv, ...)
+  # Run nonlinear, single logistic, unaggregated timeseries model (w/ lower center)
+  dsl.cv <- dl.stan.cv
+  dsl.cv[['max_z']] <- 0
+  dsl.fl <- dl.stan.fl
+  dsl.fl[['max_z']] <- 0
+  msl.cv <- stan(slogit.model, data = dsl.cv, ...)
   if (fold == 1)
-    ms.fl <- stan(slogit.model, data = dl.stan.fl, ...)
+    msl.fl <- stan(slogit.model, data = dsl.fl, ...)
   else
-    ms.fl <- NULL
+    msl.fl <- NULL
+  
+  # Run nonlinear, single logistic, unaggregated timeseries model (w/ upper center)
+  dsh.cv <- dl.stan.cv
+  dsh.cv[['min_z']] <- 0
+  dsh.fl <- dl.stan.fl
+  dsh.fl[['min_z']] <- 0
+  msh.cv <- stan(slogit.model, data = dsh.cv, ...)
+  if (fold == 1)
+    msh.fl <- stan(slogit.model, data = dsh.fl, ...)
+  else
+    msh.fl <- NULL
   
   # Run linear, aggregated timeseries model
   mw.cv <- stan(linear.model, data = dw.stan.cv, ...)
@@ -114,21 +129,26 @@ run.fold <- function(fold, ...){
   list(
     fold=fold,
     dl=dl.stan.cv, ml.cv=ml.cv, ml.fl=ml.fl, # Double logistic results
-    ds=dl.stan.cv, ms.cv=ms.cv, ms.fl=ms.fl, # Single logistic results
+    dsl=dsl.cv, msl.cv=msl.cv, msl.fl=msl.fl, # Single logistic results (lower)
+    dsh=dsh.cv, msh.cv=msh.cv, msh.fl=msh.fl, # Single logistic results (upper)
     dw=dw.stan.cv, mw.cv=mw.cv, mw.fl=mw.fl, # Aggregated linear results
     dn=dn.stan.cv, mn.cv=mn.cv, mn.fl=mn.fl  # Null results
   )
 }
 
 
-# res <- foreach(i=1:k) %do% run.fold(i, warmup = 100, iter = 1000, thin = 3, chains = 1, verbose = FALSE)
+res <- foreach(i=1:2) %do% run.fold(i, warmup = 100, iter = 1000, thin = 3, chains = 1, verbose = FALSE)
 
 registerDoMC(6) # Only run this once to avoid crashes
-res <- foreach(i=1:k) %dopar% run.fold(i, warmup = 100, iter = 1000, thin = 3, 
+res <- foreach(i=1:k) %dopar% run.fold(i, warmup = 250, iter = 2000, thin = 3, 
                                               chains = 1, verbose = FALSE)
 
 res.file <- sprintf('/Users/eczech/data/pbto2/cache/res_%s.Rdata', ts.feature)
 save(res, file=res.file)
+
+res.env <- new.env()
+load(res.file, envir=res.env)
+res <- res.env$res
 
 #posteriors <- foreach(i=1:k) %do% run.fold(i)
 
@@ -142,26 +162,16 @@ rhat <- extract.rhat(res)
 plot.rhat(rhat)
 
 waic <- extract.waic(res)
-waic
+waic 
+waic %>% ggplot(aes(x=model, y=waic, ymin=waic-waic_se, ymax=waic+waic_se)) + geom_pointrange()
 
 preds <- extract.predictions(res)
 
-# compute.fold.logloss <- function(preds){
-#   preds %>% group_by(model, fold) %>% do({
-#     
-#     p <- prediction(.$y.pred, .$y.true)
-#     auc <- p %>% performance('auc') %>% .@y.values
-#     data.frame(auc=auc[[1]])
-#   })
-# }
-compute.fold.auc <- function(preds){
-  preds %>% group_by(model, fold) %>% do({
-    p <- prediction(.$y.pred, .$y.true)
-    auc <- p %>% performance('auc') %>% .@y.values
-    data.frame(auc=auc[[1]])
-  })
-}
+lloss <- compute.fold.logloss(preds)
+lloss %>% ggplot(aes(x=model, y=logloss)) + geom_boxplot()
+
 auc <- compute.fold.auc(preds)
+auc %>% ggplot(aes(x=model, y=auc)) + geom_boxplot()
 auc %>% ggplot(aes(x=model, y=auc, color=model)) + geom_jitter(position = position_jitter(width = .1))
 auc %>% group_by(model) %>% summarise(mean(auc), sd(auc))
 
