@@ -1,4 +1,3 @@
-
 data {
   int<lower=2> N_OBS;              // Total # of observations in time 
   int<lower=2> N_OBS_HO;           // Total # of observations in time (hold-out)
