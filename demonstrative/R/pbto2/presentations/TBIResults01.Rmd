@@ -1,0 +1,428 @@
+---
+title: "TBI Study Results"
+author: "Eric Czech"
+date: "December 11, 2015"
+output: ioslides_presentation
+output: html_document
+widescreen: yes
+---
+
+<br><br>
+
+# Data Description
+
+## Raw Data Spreadsheet
+
+Raw data given as excel file with ~300 tabs, one for each patient, like this:
+
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/raw_spreadsheet.png" height="338px" width="800px"/>
+
+## Patient Data {.smaller}
+
+Along with timeseries measurements, the following static covariates were given for each patient:
+
+- Age and Sex
+- [GCS](https://en.wikipedia.org/wiki/Glasgow_Coma_Scale) (Glasgow Coma Scale) - Integer score from 3 (deep unconsciousness) to 15 (normal)
+- [Marshall Clasasification](http://neurodss.com/details.php?id=70) - Similar to GCS; Integer from 1 to 6 (lower is better)
+- Estimated Initial Time of Injury
+
+
+As well as an outcome score called "GOS" measured at 3, 6, 12, and 24 months:
+
+- GOS - 1=Dead, 2-3=Severely Disabled, 4-5=Good Outcome
+
+## Data Preparation {.smaller}
+
+For the sake of modeling, the following assumptions were made:
+
+- Only measurments within 48 hours of initial injury were considered
+- Patients with no GCS or Marshall score were excluded
+- Patients with less than 8 hours of PbtO2 measurements were also excluded 
+- Only the 3 month GOS outcome was used, using the 6 month GOS where 3 month not available
+
+__There were 339 patients in raw data but only 268 in filtered dataset.__
+
+*Note: Of 268 patients in filtered set, 18 had missing 3 month GOS*
+
+# Descriptive Stats
+
+## Static Variable Distributions
+
+```{r, echo=FALSE, include=FALSE}
+# Initialize libraries and datasets
+
+library(reshape2)
+library(ggplot2)
+library(dplyr)
+library(plotly)
+library(xtable)
+library(stringr)
+
+source('/Users/eczech/repos/portfolio/demonstrative/R/pbto2/common.R')
+
+d <- get.wide.data(scale.vars=F, outcome.func=gos.to.ord)
+p <- d %>% select(-gos) %>% names
+p.main <- c('age', 'marshall', 'gcs', 'sex')
+p.sec <- p[!p %in% p.main]
+```
+
+Frequency of non-time-dependent values:
+
+<center>
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+p <- d[,p.main] %>% melt(id.vars=NULL) %>%
+  ggplot(aes(x=value)) + geom_histogram(binwidth=NULL) + 
+  facet_wrap(~variable, scales='free') + theme_bw()
+ggplotly(p)
+```
+</center>
+
+## Comparing Variables to Outcome
+
+Relationships between static variables and outcomes are pretty clear:
+
+<center>
+```{r, echo=FALSE}
+age.labels <- quantile(d$age)
+d.stat <- d[,c(p.main, c('gos', 'uid'))] %>% 
+  mutate(age=cut(d$age, breaks=c(0, age.labels), labels=age.labels, include.lowest = T)) %>% 
+  mutate_each(funs(as.character)) %>%
+  mutate(age = paste('<=', age, sep='')) %>%
+  melt(id.vars=c('uid', 'gos')) %>% 
+  group_by(variable, value, gos) %>% tally %>%
+  group_by(variable, value) %>% do({mutate(., pct=n/sum(n))}) %>% ungroup
+
+d.stat %>% mutate(Outcome=factor(gos, levels=1:3, labels=c('Dead', 'Bad', 'Good'))) %>% 
+  ggplot(aes(x=value, y=pct, fill=Outcome)) + 
+  geom_bar(stat='identity') + theme_bw() + 
+  facet_wrap(~variable, scales='free') + 
+  scale_fill_manual(values=c('Dead'='red3', 'Bad'='yellow3', 'Good'='green4')) + 
+  xlab('Variable Value') + ylab('Fraction of Patients')
+```
+</center>
+
+## Blood Gas Measurements {.smaller}
+
+Timeseries measurements for 4 random patients:
+
+<center>
+```{r, echo=FALSE}
+static.features <- c('gcs', 'marshall', 'sex', 'age')
+ts.features <- c('pbto2', 'pao2', 'icp1', 'paco2', 'pha', 'map')
+
+d.ts <- get.long.data(c(static.features, ts.features, 'tsi_min'), scale.vars=F, reset.uid=F, rm.na=F)
+
+set.seed(567)
+uids <- sample(unique(d$uid), replace=F, size=4)
+p <- d.ts %>% select(-one_of(static.features)) %>% 
+  filter(uid %in% uids) %>%
+  mutate(hsi=tsi_min/60) %>% select(-tsi_min, -outcome) %>%
+  melt(id.vars=c('uid', 'hsi')) %>% 
+  ggplot(aes(x=hsi, y=value, color=factor(uid))) + geom_line() + 
+  facet_grid(variable~uid, scales='free') + theme_bw() + 
+  theme(panel.grid.minor=element_blank()) + xlab('Hours Since Injury')
+ggplotly(p)
+```
+</center>
+
+## Blood Gas Measurements {.smaller}
+
+Some observations on timeseries values:
+
+- Some quantities are sparse (measured more often for sicker people)
+- There are weak correlations between several pairs of variables
+- The amount of time between injury and first measurement can vary a lot:
+
+<center>
+```{r, echo=FALSE, fig.height=3}
+p <- d.ts %>% group_by(uid) %>% summarise(time=min(tsi_min)) %>% 
+  mutate(time=floor(time/60)) %>% ggplot(aes(x=time)) + geom_histogram(binwidth=1) +
+  theme_bw() + xlab('Hours Between Injury and First Measurement') + ylab('Patient Count') +
+  ggtitle('Time Between Injury and Treatment')
+ggplotly(p)
+```
+</center>
+
+## Global Trends {.smaller}
+Overall trends in measurements across all patients:
+<center>
+```{r, echo=FALSE, fig.height=4}
+d.ts[,c(ts.features, 'uid', 'tsi_min')] %>% 
+  mutate(time=3*floor(tsi_min/(60*3))) %>% dplyr::select(-tsi_min) %>%
+  group_by(uid, time) %>% summarise_each(funs(mean(., na.rm=T))) %>% 
+  melt(id.vars=c('uid', 'time')) %>% na.omit() %>% 
+  ggplot(aes(x=time, y=value, color=factor(uid))) + geom_jitter(alpha=.75) + 
+  guides(color=F)  + theme_bw() + xlab('Hours Since Injury') + ylab('Value') +
+  facet_wrap(~variable, scales='free') + 
+  geom_smooth(aes(color=NULL), se=F, method='loess', color='black', size=1.5)
+```
+</center>
+
+Things should level off by hour 48, validating the assumption that earlier measurements are more relevant.
+
+# Modeling
+
+## Data Input {.smaller}
+A big challenge involves working around the fact that this model for the data below is not valid:
+
+<center>```glm(outcome ~ age + pbto2, family='binomial')```</center>
+
+```{r, echo=FALSE}
+p <- d.ts %>% na.omit() %>% dplyr::select(age, pbto2, uid, tsi_min, outcome)
+rbind(
+  p %>% filter(outcome==0) %>% head(3),
+  p %>% filter(outcome==1) %>% head(2)
+) %>%
+  knitr::kable()
+```
+
+## Data Input {.smaller}
+
+Repeating the non-time-dependent variables like this leads to confidence intervals on coefficients that are unrealistically small (and not valid).
+
+Possible Workarounds:
+
+1. Take the mean of each timeseries and use that as a single variable
+  <br>*This doesn't work -- all timeseries variables become insignificant*
+2. Take multiple distribution statistics (e.g. percentiles) and use those all as variables
+  <br>*This works better, but has a relatively useless interpretation*
+3. Try to find "threshold" values where time spent above or below those values become variables
+  <br>*This is best, though it introduces thresholds as a variable*
+
+All of the models that follow take approach 3, though the way they deal with the thresholds will differ.
+
+## Finding Good Thresholds {.smaller}
+
+As a first attempt at modeling, all timeseries variables were separated into ranges based on known guidelines for safe values (Primarily from this [Lab Value Guide](http://www.globalrph.com/abg_analysis.htm)).
+
+For example, the ```PaCO2``` variable was split into three new variables:
+
+- **paco2_0_35** - % of time spent by patient w/ ```PaCO2``` value in [0, 35)
+- **paco2_35_45** - % of time spent by patient w/ ```PaCO2``` value in [35, 45)
+- **paco2_45_inf** - % of time spent by patient w/ ```PaCO2``` value in [45, +Inf)
+
+For all variables, the known "safe range" was then dropped from the model to avoid linear dependence (percentages across all variables would add up to 1).  This leaves only variables indicating time spent at dangerous levels.
+
+## Binary Outcome Dataset 
+
+Modeling input dataset; includes static covariates and timeseries summaries:
+<center>
+```{r, echo=FALSE}
+
+d.stat <- d  %>% melt(id.vars=c('uid', 'gos')) %>% 
+  group_by(variable) %>% summarise(
+    mean=mean(value, na.rm=T), 
+    sd=sd(value, na.rm=T),
+    min=min(value, na.rm=T),
+    max=max(value, na.rm=T)
+  ) %>% mutate_each(funs(round(., 2)), -variable) %>% 
+  mutate(type = ifelse(variable %in% static.features, 'Static', 'GasRange')) %>%
+  arrange(type)
+
+
+d.stat %>% data.frame
+```
+</center>
+
+## Binary GLM Results 
+
+Best model selected through exhaustive AIC search:
+
+<center>```glmulti('gos ~ .', family='binomial', level=1)```</center>
+<center>
+```{r, echo=FALSE, results='asis'}
+
+glmulti.env <- new.env()
+glmulti.res <- load(file='/Users/eczech/data/pbto2/export/glmulti_res_no_interp.Rdata', envir=glmulti.env)
+glmulti.res <- glmulti.env$glm.res
+
+glm.res <- glmulti.res@objects[[1]]
+coef(summary(glm.res, digits=2)) %>% .[order(.[,4]),] %>% xtable(digits=3) %>% print(type='html')
+```
+</center>
+
+## Parameter Averages 
+Parameter estimates averaged over all models (main effects only):
+<center>
+```{r, echo=FALSE, results='asis'}
+coef(glmulti.res)[,-2] %>% .[order(.[,3]),] %>% xtable(digits=3) %>% print(type='html')
+```
+</center>
+
+## Parameter Average Plot {.smaller}
+Plot of 95% Confidence Intervals over all models, sized by importance:
+<center>
+```{r, echo=FALSE}
+cf <- coef(glmulti.res) %>% data.frame %>% setNames(c('est', 'var', 'num_models', 'imp', 'se'))
+#cf <- coef(glm.res) %>% data.frame %>% setNames(c('est', 'var', 'num_models', 'imp', 'se'))
+variable.order <- order(cf$est)
+cf %>% add_rownames('variable') %>% 
+  mutate(quantity=str_extract(variable, '^.*?(?=_)')) %>%
+  mutate(variable=factor(variable, levels=.$variable[variable.order])) %>%
+  ggplot(aes(x=variable, y=est, ymin=est - se, ymax=est + se, size=imp, alpha=imp, color=quantity)) +
+  geom_hline(yintercept=0, linetype='dashed', alpha=.3) +
+  geom_pointrange() +
+  theme_bw() + coord_flip() + theme(panel.grid.major=element_blank()) +
+  scale_size(range=c(.5, 1)) + scale_alpha(range = c(.7, 1)) +
+  guides(size=guide_legend(title="Importance"), color=guide_legend(title='Quantity'), alpha=F) +
+  ylab('Coefficient Value') + xlab('Variable') 
+```
+</center>
+
+# Nonlinear Modeling 
+
+## An Improved Model {.smaller}
+
+A potential improvement on the linear models would involve not needing to set "threshold" ranges for blood gas measurements manually.  The most basic version of this kind of model would involve a single threshold and a step function where having blood gas values on one side of that function has a different effect that the other side.
+
+A generalization of this could allow more than one threshold as well as the possibility for gradual shifts between regions of values where effects differ.
+
+<center>
+```{r, echo=FALSE, fig.height=3}
+double.logistic <- function(x, a1, a2, b1, b2, c1, c2, c=0){
+  r1 <- a1 / (1 + exp(b1 * (x - c1)))
+  r2 <- a2 / (1 + exp(b2 * (x - c2)))
+  r1 + r2
+}
+x <- seq(-10, 10, length.out = 100)
+data.frame(
+  x,
+  Double_Logistic = double.logistic(x, 5, 5, -1, 1, -5, 5),
+  Step_Function = double.logistic(x, 0, 5, -100, 100, 0, 0)
+) %>% melt(id.vars='x') %>% ggplot(aes(x=x, y=value, color=variable)) + geom_line() + 
+  facet_wrap(~variable, scales='free', nrow=2) + theme_bw() +
+  guides(color=guide_legend(title='Function Type')) + 
+  ylab('Effect on Outcome') + xlab('Blood Gas Level')
+
+```
+</center>
+
+## Nonlinear Model {.smaller}
+
+A modified logistic model:
+
+$$ logit(Pr(y_i = 1)) = \alpha + \beta \cdot X_i + f(G_{ij}) $$
+
+where
+
+$$ X_i = [{Gender}_i, {Age}_i, {CommaScore}_i, {MarshallScore}_i], $$
+$$ y_i = \{ 0 \text{ if }{GOS}_i \in [1, 2, 3], 1 \text{ if }{GOS}_i \in [4, 5] \} $$
+
+and
+
+$$ f(G_i) = \frac{1}{n_i} \sum_j^{n_i}{ \frac{c_1}{1 + e^{-c_2(G_{ij} - c_3)}} + \frac{c_4}{1 + e^{-c_5(G_{ij} - c_6)}}  } $$
+$$ n_i = \text{ length of timeseries for patient }i $$
+
+The "double logistic" function definition for $f$ allows for flexiblity in thresholds and graduated changes.
+
+## What Does Nonlinear Effect Mean? {.smaller}
+This is the format that all nonlinear effects will be shown in:
+<center>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/NonlinearEffect.png", width="45%" height="45%"/>
+</center>
+
+## Double Logistic Function Examples
+
+<center>
+```{r, echo=FALSE, warnings=FALSE}
+library(ggplot2)
+library(dplyr)
+library(reshape2)
+
+x <- seq(-10, 10, length.out = 100)
+data.frame(
+  x,
+  y1 = double.logistic(x, 5, 5, -10, 10, -3, 3),
+  y2 = double.logistic(x, 5, 5, 10, -10, -3, 3),
+  y3 = double.logistic(x, 5, 5, -1, 1, -5, 5),
+  y4 = double.logistic(x, 0, 5, -1, .5, -5, 5),
+  y5 = double.logistic(x, 5, 5, 2, 2, -5, 5),
+  y6 = double.logistic(x, 5, 5, .5, .5, -5, 5)
+) %>% melt(id.vars='x') %>% 
+  ggplot(aes(x=x, y=value)) + geom_line() + facet_wrap(~variable) + theme_bw() + ylab('y')
+```
+</center>
+
+## Implementation {.smaller}
+
+MCMC sampling model used: [Model on Github](https://github.com/eric-czech/portfolio/blob/master/demonstrative/R/pbto2/models/stan/nonlinear_binom.stan)
+
+These are effect functions drawn from the priors in the model to show possibilities and biases the model begins with:
+
+<center><img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_prior.png" height="45%" width="45%"/></center>
+
+
+## Sample Size Effects (Fully Simulated Data)
+
+<center>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_800.png" width="250px" height="250px/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_600.png" width="250px" height="250px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_400.png" width="250px" height="250px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_250.png" width="250px" height="250px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_100.png" width="250px" height="250px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_50.png" width="250px" height="250px"/>
+</center>
+
+## Function Forms on Semi-Simulated Data
+
+Parameter recovery after hard coding coefficient / function values for the **actual** (rather than simulated) data:
+
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/act_upward.png" width="300px" height="300px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/act_slope.png" width="300px" height="300px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/act_downward.png" width="300px" height="300px"/>
+
+
+## Results - Intracranial Pressure levels
+<center> 
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_icp1.png" width="500px" height="500px"/>
+</center>
+
+## Results (PaCO2 levels)
+<center> 
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_paco2.png" width="500px" height="500px"/>
+</center>
+
+##Results (pH levels)
+<center>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_pha.png" width="500px" height="500px"/>
+</center>
+
+##Results - PaO2 levels
+<center>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_pao2.png" width="500px" height="500px"/>
+</center>
+
+##Results - PbtO2 levels
+<center>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_pbto2.png" width="500px" height="500px"/>
+</center>
+
+# Ordered Logistic Modeling 
+
+## Nonlinear, Ordered Logit Model {.smaller}
+
+Going one step further to model more than 2 outcomes:
+
+$$ logit(Pr(y_i \leq k)) = \alpha_k + \beta \cdot X_i + f(G_{ij}) $$
+$$ => Pr(y_i = k) = Pr(y_i \leq k) - Pr(y_i \leq k - 1), $$
+$$ k \in [1, 2, 3] $$
+
+where
+
+$$ X_i = [{Gender}_i, {Age}_i, {CommaScore}_i, {MarshallScore}_i], $$
+$$ y_i = \{ 1 \text{ if }{GOS}_i = 1, 2 \text{ if }{GOS}_i \in [2,3], 3 \text{ if }{GOS}_i \in [4,5] \} $$
+
+and
+
+$$ f(G_i) = \frac{1}{n_i} \sum_j^{n_i}{ \frac{c_1}{1 + e^{-c_2(G_{ij} - c_3)}} + \frac{c_4}{1 + e^{-c_5(G_{ij} - c_6)}}  } $$
+$$ n_i = \text{ length of timeseries for patient }i $$
+
+This is essentially equivalent to the binary model except it introduces one extra parameter for another intercept (2 intercepts are required to separate 3 outcome classes).
+
+## Ordered Logistic Results
+
+Generally speaking the results from 3-class, ordered logistic models were little different from 2-class models for the same thing.  Regardless, here are some of the fitted functions for the different blood gases under this model:
+
+<center>[Ordered Logistic Results](https://github.com/eric-czech/portfolio/tree/master/demonstrative/R/pbto2/presentations/images/no_interp_ord)</center>
+
+# Done

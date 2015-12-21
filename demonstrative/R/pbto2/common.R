@@ -71,17 +71,62 @@ plot.pbto2.coef <- function(beta.post){
 }
 
 
-get.cleaned.data <- function(d, p, scale=T, sample.frac=NULL, outcome.func=gos.to.binom){
+DATA_CONFIG <- 'config2'
+#DATA_CONFIG <- 'config1'
+
+get.wide.data <- function(scale.vars=T, outcome.func=gos.to.binom, reset.uid=F){
+  d <- read.csv(sprintf('/Users/eczech/data/pbto2/final/%s/data_wide.csv', DATA_CONFIG)) %>% 
+    mutate_each(funs(as.numeric)) %>%
+    # Remove pct values in "normal" ranges for blood gases
+    dplyr::select(-paco2_35_45, -icp1_0_20, -pha_7.35_7.45, -pao2_30_100, -pbto2_20_100, -starts_with('n_')) %>%
+    mutate(gos = sapply(gos, outcome.func))
+  
+  if (scale.vars)
+    d <- d %>% mutate_each(funs(scale), -gos)
+  
+  if (reset.uid)
+    d <- d %>% mutate(uid=as.integer(factor(uid)))
+  
+  d
+}
+
+get.long.data <- function(p, scale.vars=T, outcome.func=gos.to.binom, sample.frac=NULL, reset.uid=T, rm.na=T){
+  d <- read.csv(sprintf('~/data/pbto2/final/%s/data_long.csv', DATA_CONFIG), stringsAsFactors=F) %>%
+    mutate(gos = sapply(gos, outcome.func))
+  
   if (!is.null(sample.frac))
     d <- d %>% sample.uids(frac=sample.frac)
+  
   d <- d %>% 
     dplyr::rename(outcome=gos) %>%
-    dplyr::select_(.dots=c(p, 'outcome', 'uid')) %>%
-    na.omit()
+    dplyr::select_(.dots=c(p, 'outcome', 'uid')) 
   
-  if (scale)
+  if (rm.na)
+    d <- d %>% na.omit()
+  
+  if (scale.vars)
     d <- d %>% mutate_each_(funs(scale), p)
   
-  d %>% mutate(outcome=sapply(outcome, outcome.func)) %>%
-    mutate(uid=as.integer(factor(uid))) 
+  if (reset.uid)
+    d <- d %>% mutate(uid=as.integer(factor(uid)))
+  
+  d
 }
+
+
+get.wide.model.data <- function(d, features, d.ho=NULL, outcome.var='gos'){
+  d <- data.frame(d)
+  r <- list(
+    N_OBS = nrow(d),
+    N_VARS = length(features),
+    y = as.integer(d[,outcome.var]),
+    x = d[,features]
+  )
+  if (!is.null(d.ho)){
+    r[['N_OBS_HO']] <- nrow(d.ho)
+    r[['x_ho']] <- d.ho[,features]
+    r[['y_ho']] <- as.integer(d.ho[,outcome.var])
+  }
+  r
+}
+

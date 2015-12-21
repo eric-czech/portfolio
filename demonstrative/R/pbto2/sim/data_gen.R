@@ -2,43 +2,23 @@
 library(foreach)
 library(dplyr)
 
-get.sim.data.from.actual <- function(ds){
+get.sim.data.from.actual <- function(ds, a1, a2, b1, b2, c1, c2, ts.feature='pbto2'){
   alpha <- 1
   b.age <- 2
   b.mar <- -.5
   b.gcs <- 1
   b.sex <- .01
   
-  # Rise on both sides
-  br <- -6; p <- .3; bc <- 0;
-  a1 <- br * p; a2 <- (1 - p) * br;
-  b1 <- 25; b2 <- -20;
-  c1 <- -.6; c2 <- .55; # set based on quantiles (25/75%)
-  
-  
-  # Rise on right
-  # br <- -5; p <- 1; bc <- 0;
-  # a1 <- br * p; a2 <- (1 - p) * br;
-  # b1 <- 25; b2 <- -20;
-  # c1 <- -.6; c2 <- .55; # set based on quantiles (25/75%)
-  
-  # Plot ts weight function
-  # x <- seq(min(ds[,ts.feature]), max(ds[,ts.feature]), length.out = 100)
-  # dev.off();
-  # plot(x, double.logistic(x, a1, a2, b1, b2, c1, c2, bc), type='l')
-  # sapply(quantile(ds$pbto2, probs=c(.1, .25, .5, .75, .99)), function(x) abline(v=x))
-  # unscaled.value(.2, 'pbto2')
-  
   get.w <- function(x) 
     sum(sapply(x, function(v) double.logistic(v, a1, a2, b1, b2, c1, c2, bc))) / length(x)
-  dpw <- du %>% group_by(uid) %>% 
-    summarise(w=get.w(pbto2)) %>% ungroup 
-  #mutate(w=scale(w))
+  ds$value = ds[,ts.feature]
+  ds <- ds %>% select(-matches(ts.feature))
+  dpw <- ds %>% group_by(uid) %>% 
+    summarise(w=get.w(value)) %>% ungroup
   
-  du %>% inner_join(dpw, by = 'uid') %>% group_by(uid) %>% do({
+  ds %>% inner_join(dpw, by = 'uid') %>% group_by(uid) %>% do({
     d <- .
     r1 <- alpha + d$age[1] * b.age + d$sex[1] * b.sex + d$gcs[1] * b.gcs + d$marshall[1] * b.mar
-    #r1 <- alpha + d$age[1] * b.age
     r2 <- d$w[1]
     p <- 1 / (1 + exp(-(r1 + r2)))
     d$outcome <- sample(0:1, prob = c(1-p, p), size=1)
@@ -47,12 +27,6 @@ get.sim.data.from.actual <- function(ds){
     d$p <- p
     d
   }) %>% ungroup
-  
-  
-  # hist(dp$p)
-  # hist(dp$r2)
-  # hist(dp$r1)
-  # hist(dp$w)
 }
 
 
@@ -76,14 +50,14 @@ get.emp.dist <- function(d, var){
   dist
 }
 
-get.sim.data <- function(d, a1, a2, b1, b2, c1, c2, seed=123, n=100){
+get.sim.data <- function(d, a1, a2, b1, b2, c1, c2, seed=123, n=100, ts.feature='pbto2'){
   set.seed(seed)
   
-  ts.dist <- d %>% dplyr::select(uid, pbto2) %>% na.omit()
-  ts.value.unscaled <- ts.dist$pbto2
+  ts.dist <- d %>% dplyr::select_(.dots=c('uid', ts.feature)) %>% na.omit() %>% setNames(c('uid', 'value'))
+  ts.value.unscaled <- ts.dist$value
   ts.value.scaled <- scale(ts.value.unscaled)
-  ts.dist <- ts.dist %>% mutate(pbto2=scale(pbto2)) %>%
-    group_by(uid) %>% summarise(m=mean(pbto2), s=sd(pbto2), n=length(pbto2))
+  ts.dist <- ts.dist %>% mutate(value=scale(value)) %>%
+    group_by(uid) %>% summarise(m=mean(value), s=sd(value), n=length(value))
 
   alpha <- 1
   b.age <- 2
@@ -122,7 +96,7 @@ get.sim.data <- function(d, a1, a2, b1, b2, c1, c2, seed=123, n=100){
       browser()
     outcome <- sample(0:1, prob = c(1-p, p), size=1)
     
-    data.frame(age, gcs, marshall, sex, outcome, uid=i, r1, r2, p, pbto2=v.ts)
+    data.frame(age, gcs, marshall, sex, outcome, uid=i, r1, r2, p, value=v.ts)
   }
   list(res=res, ts.value.unscaled=ts.value.unscaled)
 }
