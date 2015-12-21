@@ -14,7 +14,9 @@ extract.waic <- function(res){
     }
     rbind(
       extract(r$ml.fl, 'Double Logistic'),
-      extract(r$ms.fl, 'Single Logistic'),
+      extract(r$msc.fl, 'Centered Single Logistic'),
+      extract(r$msl.fl, 'Lower Single Logistic'),
+      extract(r$msh.fl, 'Upper Single Logistic'),
       extract(r$mw.fl, 'Wide'),
       extract(r$mn.fl, 'Null')
     )
@@ -33,8 +35,12 @@ extract.rhat <- function(res){
     rbind(
       extract(r$ml.fl, 'Double Logistic', 'Full'),
       extract(r$ml.cv, 'Double Logistic', 'CV'),
-      extract(r$ms.fl, 'Single Logistic', 'Full'),
-      extract(r$ms.cv, 'Single Logistic', 'CV'),
+      extract(r$msc.fl, 'Centered Single Logistic', 'Full'),
+      extract(r$msc.cv, 'Centered Single Logistic', 'CV'),
+      extract(r$msl.fl, 'Lower Single Logistic', 'Full'),
+      extract(r$msl.cv, 'Lower Single Logistic', 'CV'),
+      extract(r$msh.fl, 'Upper Single Logistic', 'Full'),
+      extract(r$msh.cv, 'Upper Single Logistic', 'CV'),
       extract(r$mw.fl, 'Wide', 'Full'),
       extract(r$mw.cv, 'Wide', 'CV'),
       extract(r$mn.fl, 'Null', 'Full'),
@@ -45,7 +51,8 @@ extract.rhat <- function(res){
 
 plot.rhat <- function(rhat){
   plot.group.rhat <- function(r)
-    ggplot(r, aes(x=rhat)) + geom_histogram(binwidth=.01) + facet_grid(fold~model.name, scales='free_y')
+    ggplot(r, aes(x=rhat)) + geom_histogram(binwidth=.005) + 
+    facet_grid(fold~model.name, scales='free_y')
   p1 <- rhat %>% filter(model.type == 'Full') %>% plot.group.rhat
   p2 <- rhat %>% filter(model.type == 'CV') %>% plot.group.rhat
   grid.arrange(p1, p2, ncol=1)
@@ -59,7 +66,9 @@ extract.predictions <- function(res){
   foreach(r=res, .combine=rbind)%do%{
     rbind(
       extract(r$dl, r$ml.cv, 'Double Logistic'),
-      extract(r$ds, r$ms.cv, 'Single Logistic'),
+      extract(r$dsc, r$msc.cv, 'Centered Single Logistic'),
+      extract(r$dsl, r$msl.cv, 'Lower Single Logistic'),
+      extract(r$dsh, r$msh.cv, 'Upper Single Logistic'),
       extract(r$dw, r$mw.cv, 'Wide'),
       extract(r$dn, r$mn.cv, 'Null')
     ) %>% mutate(fold=r$fold)

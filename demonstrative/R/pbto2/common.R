@@ -75,7 +75,7 @@ DATA_CONFIG <- 'config2'
 #DATA_CONFIG <- 'config1'
 
 get.wide.data <- function(scale.vars=T, outcome.func=gos.to.binom, reset.uid=F){
-  d <- read.csv(sprintf('/Users/eczech/data/pbto2/final/%s/data_wide.csv', DATA_CONFIG)) %>% 
+  d <- read.csv(sprintf('~/data/pbto2/final/%s/data_wide.csv', DATA_CONFIG)) %>% 
     mutate_each(funs(as.numeric)) %>%
     # Remove pct values in "normal" ranges for blood gases
     dplyr::select(-paco2_35_45, -icp1_0_20, -pha_7.35_7.45, -pao2_30_100, -pbto2_20_100, -starts_with('n_')) %>%
