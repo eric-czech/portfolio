@@ -3,6 +3,31 @@ library(loo)
 library(stringr)
 library(gridExtra)
 
+CV_RES_DIR <- '~/data/pbto2/cache' 
+
+get.cv.res.file <- function(ts.feature){
+  sprintf('%s/cv_res_%s.Rdata', CV_RES_DIR, ts.feature)
+}
+
+get.cv.res.data <- function(ts.feature){
+  res.env <- new.env()
+  res.file <- get.cv.res.file(ts.feature)
+  load(res.file, envir=res.env)
+  res.env$res
+}
+
+get.cv.res.features <- function(){
+  foreach(f=list.files(CV_RES_DIR, pattern="^cv_res_.*\\.Rdata$"), .combine=c)%do%{
+    p <- str_split(f, '_')
+    if (length(p) != 1 || length(p[[1]]) != 3)
+      return(NULL)
+    p <- str_split(p[[1]][3], '\\.')
+    if (length(p) != 1 || length(p[[1]]) != 2)
+      return(NULL)
+    p[[1]][1]
+  }
+}
+  
 extract.waic <- function(res){
   foreach(r=res, .combine=rbind) %do% {
     if (r$fold != 1)
