@@ -14,7 +14,7 @@ rstan_options(auto_write=T)
 options(mc.cores = parallel::detectCores())
 
 static.features <- c('age', 'marshall', 'gcs', 'sex')
-ts.features <- c('icp1', 'paco2')
+ts.features <- c('pbto2', 'paco2')
 features <- c(static.features, ts.features)
 
 
