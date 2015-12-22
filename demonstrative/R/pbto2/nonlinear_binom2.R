@@ -86,7 +86,7 @@ p3 <- post.summary %>%
 
 # Save above plots to file
 filename <- paste(ts.features, collapse='_')
-file <- sprintf("~/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_%s.png", filename) 
+file <- sprintf("~/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/double_var/actual_%s.png", filename) 
 png(file = file, width=1200, height=800)
 main.title <- sprintf('Model: %s + %s\n(waic = %s +/- %s, pe = %s +/- %s)', 
                       ts.features[1], ts.features[2], round(waic$waic, 3), round(waic$se_waic, 3),
