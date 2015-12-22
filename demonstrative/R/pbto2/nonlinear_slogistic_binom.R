@@ -109,7 +109,7 @@ p2 <- post.summary %>%
 
 
 # Save above plots to file
-file <- sprintf("~/repos/portfolio/demonstrative/R/pbto2/presentations/images/slogit_no_interp/actual_%s.png", ts.feature)
+file <- sprintf("~/repos/portfolio/demonstrative/R/pbto2/presentations/images/slogit_no_interp/single_var/actual_%s.png", ts.feature)
 png(file = file, width=800, height=800)
 grid.arrange(p2, p1, nrow=2, ncol=1, heights=c(0.3, 0.7))
 dev.off()

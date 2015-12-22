@@ -114,29 +114,9 @@ p2 <- post.summary %>%
 
 
 # Save above plots to file
-file <- sprintf("~/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp_ord/actual_%s.png", ts.feature)
+file <- sprintf("~/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp_ord/single_var/actual_%s.png", ts.feature)
 png(file = file, width=800, height=800)
 grid.arrange(p2, p1, nrow=2, ncol=1, heights=c(0.3, 0.7))
 dev.off()
 
 
-
-#exp(post$lp)
-
-beta.post <- compute.var.posteriors(d, post)
-
-plot.pbto2.cutoff(beta.post)
-
-plot.beta.post(beta.post)
-
-d.lp <- post$lp %>% melt(id.vars='rowname')
-d.lp.iter <- d.lp %>% group_by(iterations) %>% summarise(min=min(value)) %>% 
-  #filter(min > -800) %>% 
-  .$iterations %>% unique
-d.lp %>% 
-  filter(iterations %in% d.lp.iter) %>%
-  #ggplot(aes(x=factor(Var2), y=value)) + geom_boxplot()
-  ggplot(aes(x=Var2, y=value, color=factor(iterations))) + geom_line()
-
-beta.post %>% select(pbto2_cp, pbto2_lo) %>% 
-  ggplot(aes(x=pbto2_cp, y=pbto2_lo)) + geom_point()
