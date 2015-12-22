@@ -70,7 +70,7 @@ run.cv <- function(ts.feature, static.features, k=10, dopar=F, ...){
     
     dw.stan.cv <- get.wide.model.data(dw.tr, dwf, d.ho=dw.ho)
     dw.stan.fl <- get.wide.model.data(dw.all, dwf, d.ho=head(dw.ho, 2))
-    
+
     null.feat <- c('gos', static.features)
     dn.stan.cv <- get.wide.model.data(dw.tr[,null.feat], static.features, d.ho=dw.ho[,null.feat])
     dn.stan.fl <- get.wide.model.data(dw.all[,null.feat], static.features, d.ho=head(dw.ho[,null.feat], 2))

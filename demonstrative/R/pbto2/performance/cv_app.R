@@ -16,7 +16,7 @@ rstan_options(auto_write=T)
 options(mc.cores = parallel::detectCores())
 
 # Set timeseries feature to be used in modeling
-ts.feature <- c('pao2')
+ts.feature <- c('pha')
 
 static.features <- c('age', 'marshall', 'gcs', 'sex')
 
@@ -34,7 +34,7 @@ res <- run.cv(ts.feature, static.features, k=15, dopar=T,
 # res <- run.cv(ts.feature, static.features, k=10, dopar=T, warmup = 25, iter = 50, thin = 2, chains = 1, verbose = FALSE)
 
 
-res.file <- sprintf('~/data/pbto2/cache/res_%s.Rdata', ts.feature)
+res.file <- sprintf('~/data/pbto2/cache/cv_res_%s.Rdata', ts.feature)
 save(res, file=res.file)
 
 res.env <- new.env()
