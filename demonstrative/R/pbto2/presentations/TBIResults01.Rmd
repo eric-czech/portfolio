@@ -1,9 +1,9 @@
 ---
-title: "TBI Study Results"
+title: "Traumatic Brain Injury Study Results"
 author: "Eric Czech"
 date: "December 11, 2015"
 output: ioslides_presentation
-output: html_document
+#output: html_document
 widescreen: yes
 ---
 
@@ -13,7 +13,7 @@ widescreen: yes
 
 ## Raw Data Spreadsheet
 
-Raw data given as excel file with ~300 tabs, one for each patient, like this:
+Raw patient data provided as excel file with ~300 tabs, one for each patient, like this:
 
 <img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/raw_spreadsheet.png" height="338px" width="800px"/>
 
@@ -64,6 +64,11 @@ d <- get.wide.data(scale.vars=F, outcome.func=gos.to.ord)
 p <- d %>% select(-gos) %>% names
 p.main <- c('age', 'marshall', 'gcs', 'sex')
 p.sec <- p[!p %in% p.main]
+
+# Plotly function with options set to disable controls/links
+plot.ly <- function(p) {
+  ggplotly(p) %>% plotly::config(showLink = F, displayModeBar = F)
+}
 ```
 
 Frequency of non-time-dependent values:
@@ -73,7 +78,7 @@ Frequency of non-time-dependent values:
 p <- d[,p.main] %>% melt(id.vars=NULL) %>%
   ggplot(aes(x=value)) + geom_histogram(binwidth=NULL) + 
   facet_wrap(~variable, scales='free') + theme_bw()
-ggplotly(p)
+plot.ly(p)
 ```
 </center>
 
@@ -121,7 +126,7 @@ p <- d.ts %>% select(-one_of(static.features)) %>%
   ggplot(aes(x=hsi, y=value, color=factor(uid))) + geom_line() + 
   facet_grid(variable~uid, scales='free') + theme_bw() + 
   theme(panel.grid.minor=element_blank()) + xlab('Hours Since Injury')
-ggplotly(p)
+plot.ly(p)
 ```
 </center>
 
@@ -139,7 +144,7 @@ p <- d.ts %>% group_by(uid) %>% summarise(time=min(tsi_min)) %>%
   mutate(time=floor(time/60)) %>% ggplot(aes(x=time)) + geom_histogram(binwidth=1) +
   theme_bw() + xlab('Hours Between Injury and First Measurement') + ylab('Patient Count') +
   ggtitle('Time Between Injury and Treatment')
-ggplotly(p)
+plot.ly(p)
 ```
 </center>
 
@@ -363,7 +368,7 @@ These are effect functions drawn from the priors in the model to show possibilit
 <img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/sim_1_50.png" width="250px" height="250px"/>
 </center>
 
-## Function Forms on Semi-Simulated Data
+## Function Fits on Semi-Simulated Data
 
 Parameter recovery after hard coding coefficient / function values for the **actual** (rather than simulated) data:
 
@@ -372,30 +377,113 @@ Parameter recovery after hard coding coefficient / function values for the **act
 <img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/sim/images/act_downward.png" width="300px" height="300px"/>
 
 
-## Results - Intracranial Pressure levels
+## Results - Intracranial Pressure
 <center> 
-<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_icp1.png" width="500px" height="500px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/single_var/actual_icp1.png" width="500px" height="500px"/>
 </center>
 
-## Results (PaCO2 levels)
+## Results - PaCO2 
 <center> 
-<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_paco2.png" width="500px" height="500px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/single_var/actual_paco2.png" width="500px" height="500px"/>
 </center>
 
-##Results (pH levels)
+##Results - PaO2
 <center>
-<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_pha.png" width="500px" height="500px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/single_var/actual_pao2.png" width="500px" height="500px"/>
 </center>
 
-##Results - PaO2 levels
+##Results - PbtO2
 <center>
-<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_pao2.png" width="500px" height="500px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/single_var/actual_pbto2.png" width="500px" height="500px"/>
 </center>
 
-##Results - PbtO2 levels
+##Results - pH
 <center>
-<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/actual_pbto2.png" width="500px" height="500px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/single_var/actual_pha.png" width="500px" height="500px"/>
 </center>
+
+
+# Bi-variate Models
+
+## Using Multiple Timeseries Variables
+
+Previous results were from models fit using one timeseries predictor at a time.  
+
+Using two such variables in the same model gives similar results, though these bi-variate models sometimes have better IC scores.
+
+## Results - PbtO2 + PaO2
+<center>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/double_var/actual_pbto2_pao2.png" width="800px" height="500px"/>
+</center>
+
+## Results - ICP + PaCO2
+<center>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/double_var/actual_icp1_paco2.png" width="800px" height="500px"/>
+</center>
+
+# Cross Validation and Scoring
+
+```{r, echo=FALSE}
+model.levels <- c(
+  'Wide', 'Double Logistic', 'Centered Single Logistic',
+  'Lower Single Logistic', 'Upper Single Logistic', 'Null'
+)
+cv <- read.csv('~/data/pbto2/cv/cv_results.csv', sep='\t', stringsAsFactors=F) %>%
+  mutate(model = factor(model, levels=model.levels))
+```
+
+## WAIC and CV Scores
+
+<center>WAIC Scores</center>
+```{r, echo=FALSE}
+cv %>% 
+  arrange(variable, waic) %>%
+  #mutate(waic=sprintf('%s +/- %s', round(waic, 2), round(waic_se, 2))) %>%
+  dcast(variable ~ model, value.var='waic') %>% knitr::kable(digits = 2)
+```
+
+## WAIC (continued)
+
+```{r, echo=FALSE}
+cv %>% ggplot(aes(x=model, y=waic, ymin=waic - waic_se, ymax=waic + waic_se)) + 
+  geom_pointrange() + facet_wrap(~variable, nrow=2, scales='free')  + theme_bw() +
+  theme(axis.text.x = element_text(angle = 25, hjust = 1))
+```
+
+## LogLoss
+
+<center>LogLoss Scores</center>
+```{r, echo=FALSE}
+cv %>% 
+  arrange(variable, lloss) %>%
+  dcast(variable ~ model, value.var='lloss') %>% knitr::kable(digits=4)
+```
+
+## LogLoss (continued)
+
+```{r, echo=FALSE}
+cv %>% ggplot(aes(x=model, y=lloss, ymin=lloss - lloss_se, ymax=lloss + lloss_se)) + 
+  geom_pointrange() + facet_wrap(~variable, nrow=2, scales='free')  + theme_bw() +
+  theme(axis.text.x = element_text(angle = 25, hjust = 1))
+```
+
+## AUC
+
+<center>AUC Scores</center>
+```{r, echo=FALSE}
+cv %>% 
+  arrange(variable, auc) %>%
+  dcast(variable ~ model, value.var='auc') %>% knitr::kable(digits=4)
+```
+
+## AUC (continued)
+
+```{r, echo=FALSE}
+cv %>% ggplot(aes(x=model, y=auc, ymin=auc - auc_se, ymax=auc + auc_se)) + 
+  geom_pointrange() + facet_wrap(~variable, nrow=2, scales='free')  + theme_bw() +
+  theme(axis.text.x = element_text(angle = 25, hjust = 1))
+```
+
 
 # Ordered Logistic Modeling 
 

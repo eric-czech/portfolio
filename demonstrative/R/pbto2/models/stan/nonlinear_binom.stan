@@ -13,8 +13,8 @@ data {
 }
 
 parameters {
-  real alpha;          // Intercept for logit model
-  vector[N_VARS] beta; // Coefficients of static covariates
+  real alpha;                      // Intercept for logit model
+  vector[N_VARS] beta;             // Coefficients of static covariates
   real<lower=0, upper=1> p;
   real<lower=-25, upper=0> betaz;
   real<lower=-25, upper=25> b2;
@@ -32,15 +32,20 @@ transformed parameters {
   c[1] <- c1;
   c[2] <- c2;
 
+  // 'p' parameter determines split between left and right double-logistic term
   a1 <- p * betaz;
   a2 <- (1 - p) * betaz;
 
   ct <- rep_vector(0, N_UID);
   w <- rep_vector(0, N_UID);
+
+  // Compute double-logistic weights for current parameter values
   for (i in 1:N_OBS){
     w[uid[i]] <- w[uid[i]] + a1 / (1 + exp(b1 * (z[i] - c[1]))) + a2 / (1 + exp(b2 * (z[i] - c[2])));
     ct[uid[i]] <- ct[uid[i]] + 1;
   }
+
+  // Compute averages for weights
   for (i in 1:N_UID){
     w[i] <- w[i] / ct[i];
   }
@@ -49,17 +54,19 @@ model {
   real d;
   d <- 10;
 
+  // Linear coefficient priors
   alpha ~ normal(0, 5);
   beta ~ normal(0, 5);
+  betaz ~ normal(0, 5);
+
+  // Priors for double-logistic center locations
+  c1 ~ normal(-1, 3);
+  c2 ~ normal(1, 3); 
+
+  // Multi-model prior below on 'b' parameters 
+  // avoids identifiability issues for b near 0
   sinh(b1/d) ~ normal(0, 2);
   sinh(b2/d) ~ normal(0, 2);
-  //b1 ~ normal(0, 10);
-  //b2 ~ normal(0, 10);
-  c1 ~ normal(-1, 3);
-  c2 ~ normal(1, 3);
-
-  //betaz ~ double_exponential(0, 3); // Regularized
-  betaz ~ normal(0, 5); // Less regularized
   
   y ~ bernoulli_logit(alpha + x * beta + w);
 

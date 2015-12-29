@@ -84,7 +84,7 @@ get.wide.data <- function(scale.vars=T, outcome.func=gos.to.binom, reset.uid=F){
     mutate(gos = sapply(gos, outcome.func))
   
   if (scale.vars)
-    d <- d %>% mutate_each(funs(scale), -gos)
+    d <- d %>% mutate_each(funs(scale), -gos, -uid)
   
   if (reset.uid)
     d <- d %>% mutate(uid=as.integer(factor(uid)))
