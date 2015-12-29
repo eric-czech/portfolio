@@ -33,25 +33,14 @@ res <- run.cv(ts.feature, static.features, k=15, dopar=T,
 # registerDoMC(6) # Only run this once to avoid crashes
 # res <- run.cv(ts.feature, static.features, k=10, dopar=T, warmup = 25, iter = 50, thin = 2, chains = 1, verbose = FALSE)
 
-
-res.file <- sprintf('~/data/pbto2/cache/cv_res_%s.Rdata', ts.feature)
+res.file <- get.cv.res.file(ts.feature)
 save(res, file=res.file)
+res <- get.cv.res.data(ts.feature)
 
-res.env <- new.env()
-load(res.file, envir=res.env)
-res <- res.env$res
-
-#posteriors <- foreach(i=1:k) %do% run.fold(i)
-
-# pars <- c('beta', 'betaz', 'a1', 'a2', 'b1', 'b2', 'c', 'alpha', 'p')
-# m <- res[[1]]$mn.cv
-# rstan::extract(m)
-# summary(m)$summary[,'Rhat']
-
+# Examining current results
 
 rhat <- extract.rhat(res)
 plot.rhat(rhat)
-
 
 waic <- extract.waic(res)
 waic 
@@ -67,6 +56,29 @@ auc %>% ggplot(aes(x=model, y=auc)) + geom_boxplot()
 auc %>% ggplot(aes(x=model, y=auc, color=model)) + geom_jitter(position = position_jitter(width = .1))
 auc %>% group_by(model) %>% summarise(mean(auc), sd(auc))
 
+
+# Create results for all variables
+
+feats <- get.cv.res.features()
+perf <- foreach(feat=feats)%do%{
+  r <- get.cv.res.data(feat)
+  waic <- extract.waic(r)
+  preds <- extract.predictions(r)
+  lloss <- compute.fold.logloss(preds)
+  auc <- compute.fold.auc(preds)
+  list(feat=feat, waic=waic, lloss=lloss, auc=auc)
+}
+
+perf.table <- foreach(p=perf, .combine=rbind) %do% {
+  rw <- p$waic %>% select(model, waic, waic_se)
+  rl <- p$lloss %>% group_by(model) %>% summarize(lloss=mean(logloss), lloss_se=sd(logloss))
+  ra <- p$auc %>% group_by(model) %>% summarize(auc_est=mean(auc), auc_se=sd(auc)) %>%
+    rename(auc=auc_est)
+  r <- rw %>% full_join(rl, by='model') %>% full_join(ra, by='model')
+  r$variable <- p$feat
+  r
+}
+write.table(perf.table, '~/data/pbto2/cv/cv_results.csv', row.names = F, sep='\t')
 
 # Future possibilities
 ## Comparing WAIC differences
