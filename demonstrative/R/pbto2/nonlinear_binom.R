@@ -12,12 +12,17 @@ source('~/repos/portfolio/demonstrative/R/pbto2/nonlinear_binom_utils.R')
 rstan_options(auto_write=T)
 options(mc.cores = parallel::detectCores())
 
+set.seed(1)
 static.features <- c('age', 'marshall', 'gcs', 'sex')
+rand.static.features <- T
 ts.feature <- c('pbto2')
 features <- c(static.features, ts.feature)
 
 dsu <- get.long.data(features, scale.vars=F, outcome.func=gos.to.binom, reset.uid=T)
 dsu$rand <- rnorm(n = nrow(dsu))
+if (rand.static.features){
+  for (p in static.features) dsu[,p] <- rnorm(n = nrow(dsu))
+}
 unscaled.value <- function(x, var) x * sd(dsu[,var]) + mean(dsu[,var])
 d.stan <- dsu %>% mutate_each_(funs(scale), features)
 
@@ -93,7 +98,7 @@ p1 <- ggplot(NULL) +
   scale_alpha(range = c(.05, .05), guide = 'none') + theme_bw() +
   scale_color_discrete(guide = guide_legend(title = "Summary")) + 
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
-  xlab(ts.feature) + ylab(paste0('w(', ts.feature, ')')) + ggtitle('Timeseries Weight Function') + 
+  xlab(ts.feature) + ylab(paste0('w(', ts.feature, ')')) + ggtitle(paste0('Estimated ', ts.feature, ' Weight Function')) + 
   geom_rect(aes(xmax=x+v.width, xmin=x-v.width, ymin=min.v, ymax=y), data=v.hist, alpha=.5) +
   geom_vline(xintercept=c.lo, linetype='dashed', alpha=.25) +
   annotate("text", x = c.lo, y = 1, label = round(c.lo, 2)) + 
@@ -115,5 +120,10 @@ p2 <- post.summary %>%
 file <- sprintf("~/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/single_var/actual_%s.png", ts.feature)
 png(file = file, width=800, height=800)
 grid.arrange(p2, p1, nrow=2, ncol=1, heights=c(0.3, 0.7))
+dev.off()
+
+file <- sprintf("~/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/single_var/actual_tsonly_%s.png", ts.feature)
+png(file = file, width=600, height=400)
+p1
 dev.off()
 

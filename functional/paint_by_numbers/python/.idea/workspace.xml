@@ -15,19 +15,16 @@
   <component name="CreatePatchCommitExecutor">
     <option name="PATCH_PATH" value="" />
   </component>
-  <component name="DaemonCodeAnalyzer">
-    <disable_hints />
-  </component>
   <component name="ExecutionTargetManager" SELECTED_TARGET="default_target" />
   <component name="FavoritesManager">
     <favorites_list name="python" />
   </component>
   <component name="FileEditorManager">
-    <leaf>
+    <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
       <file leaf-file-name="operations.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/pbn/operations.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.46985447" vertical-offset="5714" max-vertical-offset="6195">
+            <state vertical-scroll-proportion="0.46985447">
               <caret line="396" column="16" selection-start-line="396" selection-start-column="16" selection-end-line="396" selection-end-column="16" />
               <folding>
                 <element signature="e#23#55#0" expanded="true" />
@@ -39,7 +36,7 @@
       <file leaf-file-name="dots.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/pbn/dots.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.0" vertical-offset="299" max-vertical-offset="1665">
+            <state vertical-scroll-proportion="0.0">
               <caret line="34" column="21" selection-start-line="34" selection-start-column="21" selection-end-line="34" selection-end-column="21" />
               <folding />
             </state>
@@ -49,7 +46,7 @@
       <file leaf-file-name="conversions.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/pbn/conversions.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.0" vertical-offset="285" max-vertical-offset="495">
+            <state vertical-scroll-proportion="0.0">
               <caret line="19" column="17" selection-start-line="19" selection-start-column="17" selection-end-line="19" selection-end-column="17" />
               <folding>
                 <element signature="e#23#78#0" expanded="true" />
@@ -61,7 +58,7 @@
       <file leaf-file-name="color_objects.py" pinned="false" current-in-tab="false">
         <entry file="file://$USER_HOME$/anaconda/envs/research3.3/lib/python3.3/site-packages/colormath/color_objects.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.0" vertical-offset="4264" max-vertical-offset="12360">
+            <state vertical-scroll-proportion="0.0">
               <caret line="292" column="8" selection-start-line="292" selection-start-column="8" selection-end-line="292" selection-end-column="8" />
               <folding />
             </state>
@@ -71,7 +68,7 @@
       <file leaf-file-name="functions.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/pbn/functions.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.0" vertical-offset="251" max-vertical-offset="960">
+            <state vertical-scroll-proportion="0.0">
               <caret line="56" column="45" selection-start-line="56" selection-start-column="45" selection-end-line="56" selection-end-column="45" />
               <folding>
                 <element signature="e#23#42#0" expanded="true" />
@@ -83,7 +80,7 @@
       <file leaf-file-name="palettes.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/pbn/palettes.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.0" vertical-offset="974" max-vertical-offset="1455">
+            <state vertical-scroll-proportion="0.0">
               <caret line="84" column="33" selection-start-line="84" selection-start-column="33" selection-end-line="84" selection-end-column="33" />
               <folding />
             </state>
@@ -93,7 +90,7 @@
       <file leaf-file-name="suite.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/pbn/suite.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.0" vertical-offset="915" max-vertical-offset="3435">
+            <state vertical-scroll-proportion="0.0">
               <caret line="72" column="10" selection-start-line="72" selection-start-column="10" selection-end-line="72" selection-end-column="88" />
               <folding>
                 <element signature="e#23#42#0" expanded="true" />
@@ -151,9 +148,12 @@
       <autoscrollToSource />
       <autoscrollFromSource />
       <sortByType />
+      <manualOrder />
+      <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
       <pane id="Scope" />
+      <pane id="Scratches" />
       <pane id="ProjectPane">
         <subPane>
           <PATH>
@@ -178,7 +178,6 @@
           </PATH>
         </subPane>
       </pane>
-      <pane id="Scratches" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -187,7 +186,6 @@
     <property name="options.lastSelected" value="configurable.group.appearance" />
     <property name="options.splitter.main.proportions" value="0.3" />
     <property name="options.splitter.details.proportions" value="0.2" />
-    <property name="FullScreen" value="false" />
   </component>
   <component name="PyConsoleOptionsProvider">
     <option name="myPythonConsoleState">
@@ -195,7 +193,24 @@
     </option>
   </component>
   <component name="RunManager">
-    <configuration default="true" type="tests" factoryName="py.test">
+    <configuration default="true" type="PythonConfigurationType" factoryName="Python">
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <module name="python" />
+      <option name="SCRIPT_NAME" value="" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <method />
+    </configuration>
+    <configuration default="true" type="tests" factoryName="Attests">
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
       <envs />
@@ -212,11 +227,25 @@
       <option name="TEST_TYPE" value="TEST_SCRIPT" />
       <option name="PATTERN" value="" />
       <option name="USE_PATTERN" value="false" />
-      <option name="testToRun" value="" />
-      <option name="keywords" value="" />
-      <option name="params" value="" />
-      <option name="USE_PARAM" value="false" />
-      <option name="USE_KEYWORD" value="false" />
+      <method />
+    </configuration>
+    <configuration default="true" type="tests" factoryName="Doctests">
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs />
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <module name="python" />
+      <option name="SCRIPT_NAME" value="" />
+      <option name="CLASS_NAME" value="" />
+      <option name="METHOD_NAME" value="" />
+      <option name="FOLDER_NAME" value="" />
+      <option name="TEST_TYPE" value="TEST_SCRIPT" />
+      <option name="PATTERN" value="" />
+      <option name="USE_PATTERN" value="false" />
       <method />
     </configuration>
     <configuration default="true" type="tests" factoryName="Nosetests">
@@ -238,23 +267,6 @@
       <option name="USE_PATTERN" value="false" />
       <option name="PARAMS" value="" />
       <option name="USE_PARAM" value="false" />
-      <method />
-    </configuration>
-    <configuration default="true" type="PythonConfigurationType" factoryName="Python">
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="" />
-      <option name="IS_MODULE_SDK" value="false" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <module name="python" />
-      <option name="SCRIPT_NAME" value="" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
       <method />
     </configuration>
     <configuration default="true" type="tests" factoryName="Unittests">
@@ -279,7 +291,7 @@
       <option name="USE_PARAM" value="false" />
       <method />
     </configuration>
-    <configuration default="true" type="tests" factoryName="Doctests">
+    <configuration default="true" type="tests" factoryName="py.test">
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
       <envs />
@@ -296,28 +308,13 @@
       <option name="TEST_TYPE" value="TEST_SCRIPT" />
       <option name="PATTERN" value="" />
       <option name="USE_PATTERN" value="false" />
+      <option name="testToRun" value="" />
+      <option name="keywords" value="" />
+      <option name="params" value="" />
+      <option name="USE_PARAM" value="false" />
+      <option name="USE_KEYWORD" value="false" />
       <method />
     </configuration>
-    <configuration default="true" type="tests" factoryName="Attests">
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs />
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="" />
-      <option name="IS_MODULE_SDK" value="false" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <module name="python" />
-      <option name="SCRIPT_NAME" value="" />
-      <option name="CLASS_NAME" value="" />
-      <option name="METHOD_NAME" value="" />
-      <option name="FOLDER_NAME" value="" />
-      <option name="TEST_TYPE" value="TEST_SCRIPT" />
-      <option name="PATTERN" value="" />
-      <option name="USE_PATTERN" value="false" />
-      <method />
-    </configuration>
-    <list size="0" />
   </component>
   <component name="ShelveChangesManager" show_recycled="false" />
   <component name="SvnConfiguration">
@@ -334,27 +331,27 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="0" y="22" width="1400" height="578" extended-state="0" />
-    <editor active="false" />
+    <editor active="true" />
     <layout>
-      <window_info id="Changes" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
-      <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
-      <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
-      <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
-      <window_info id="Application Servers" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
-      <window_info id="Project" active="true" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" weight="0.25" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
-      <window_info id="Python Console" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
-      <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
-      <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
-      <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
-      <window_info id="Cvs" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.25" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
-      <window_info id="Message" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
-      <window_info id="Ant Build" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
-      <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
-      <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.4" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
-      <window_info id="Commander" active="false" anchor="right" auto_hide="false" internal_type="SLIDING" type="SLIDING" visible="false" weight="0.4" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
-      <window_info id="Hierarchy" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.25" sideWeight="0.5" order="2" side_tool="false" content_ui="combo" />
-      <window_info id="Inspection" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.4" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
-      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
+      <window_info id="Project" active="true" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
+      <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
+      <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
+      <window_info id="Python Console" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
+      <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
+      <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
+      <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
+      <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
+      <window_info id="Changes" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
+      <window_info id="Cvs" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
+      <window_info id="Message" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
+      <window_info id="Commander" active="false" anchor="right" auto_hide="false" internal_type="SLIDING" type="SLIDING" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
+      <window_info id="Application Servers" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
+      <window_info id="Inspection" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
+      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
+      <window_info id="Hierarchy" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="2" side_tool="false" content_ui="combo" />
+      <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
+      <window_info id="Ant Build" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
+      <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
     </layout>
   </component>
   <component name="Vcs.Log.UiProperties">
@@ -368,11 +365,6 @@
   <component name="VcsContentAnnotationSettings">
     <option name="myLimit" value="2678400000" />
   </component>
-  <component name="VcsManagerConfiguration">
-    <option name="myTodoPanelSettings">
-      <TodoPanelSettings />
-    </option>
-  </component>
   <component name="XDebuggerManager">
     <breakpoint-manager />
     <watches-manager />
@@ -380,7 +372,7 @@
   <component name="editorHistoryManager">
     <entry file="file://$PROJECT_DIR$/pbn/suite.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="3435">
+        <state vertical-scroll-proportion="0.0">
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
             <element signature="e#23#42#0" expanded="true" />
@@ -390,7 +382,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/operations.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="4766" max-vertical-offset="6150">
+        <state vertical-scroll-proportion="0.0">
           <caret line="334" column="48" selection-start-line="334" selection-start-column="48" selection-end-line="334" selection-end-column="48" />
           <folding>
             <element signature="e#23#55#0" expanded="true" />
@@ -400,7 +392,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/dots.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="299" max-vertical-offset="1665">
+        <state vertical-scroll-proportion="0.0">
           <caret line="34" column="21" selection-start-line="34" selection-start-column="21" selection-end-line="34" selection-end-column="21" />
           <folding />
         </state>
@@ -408,7 +400,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/conversions.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="285" max-vertical-offset="495">
+        <state vertical-scroll-proportion="0.0">
           <caret line="19" column="17" selection-start-line="19" selection-start-column="17" selection-end-line="19" selection-end-column="17" />
           <folding>
             <element signature="e#23#78#0" expanded="true" />
@@ -418,7 +410,7 @@
     </entry>
     <entry file="file://$USER_HOME$/anaconda/envs/research3.3/lib/python3.3/site-packages/colormath/color_objects.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="4264" max-vertical-offset="12360">
+        <state vertical-scroll-proportion="0.0">
           <caret line="292" column="8" selection-start-line="292" selection-start-column="8" selection-end-line="292" selection-end-column="8" />
           <folding />
         </state>
@@ -426,7 +418,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/functions.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="251" max-vertical-offset="960">
+        <state vertical-scroll-proportion="0.0">
           <caret line="56" column="45" selection-start-line="56" selection-start-column="45" selection-end-line="56" selection-end-column="45" />
           <folding>
             <element signature="e#23#42#0" expanded="true" />
@@ -436,7 +428,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/palettes.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="974" max-vertical-offset="1455">
+        <state vertical-scroll-proportion="0.0">
           <caret line="84" column="33" selection-start-line="84" selection-start-column="33" selection-end-line="84" selection-end-column="33" />
           <folding />
         </state>
@@ -444,7 +436,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/suite.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="3270">
+        <state vertical-scroll-proportion="0.0">
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
             <element signature="e#23#42#0" expanded="true" />
@@ -454,7 +446,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/operations.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="4766" max-vertical-offset="6150">
+        <state vertical-scroll-proportion="0.0">
           <caret line="334" column="48" selection-start-line="334" selection-start-column="48" selection-end-line="334" selection-end-column="48" />
           <folding>
             <element signature="e#23#55#0" expanded="true" />
@@ -464,7 +456,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/dots.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="299" max-vertical-offset="1665">
+        <state vertical-scroll-proportion="0.0">
           <caret line="34" column="21" selection-start-line="34" selection-start-column="21" selection-end-line="34" selection-end-column="21" />
           <folding />
         </state>
@@ -472,7 +464,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/conversions.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="285" max-vertical-offset="495">
+        <state vertical-scroll-proportion="0.0">
           <caret line="19" column="17" selection-start-line="19" selection-start-column="17" selection-end-line="19" selection-end-column="17" />
           <folding>
             <element signature="e#23#78#0" expanded="true" />
@@ -482,7 +474,7 @@
     </entry>
     <entry file="file://$USER_HOME$/anaconda/envs/research3.3/lib/python3.3/site-packages/colormath/color_objects.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="4264" max-vertical-offset="12360">
+        <state vertical-scroll-proportion="0.0">
           <caret line="292" column="8" selection-start-line="292" selection-start-column="8" selection-end-line="292" selection-end-column="8" />
           <folding />
         </state>
@@ -490,7 +482,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/functions.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="251" max-vertical-offset="960">
+        <state vertical-scroll-proportion="0.0">
           <caret line="56" column="45" selection-start-line="56" selection-start-column="45" selection-end-line="56" selection-end-column="45" />
           <folding>
             <element signature="e#23#42#0" expanded="true" />
@@ -500,7 +492,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/palettes.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="974" max-vertical-offset="1455">
+        <state vertical-scroll-proportion="0.0">
           <caret line="84" column="33" selection-start-line="84" selection-start-column="33" selection-end-line="84" selection-end-column="33" />
           <folding />
         </state>
@@ -508,7 +500,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/suite.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="3435">
+        <state vertical-scroll-proportion="0.0">
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
             <element signature="e#23#42#0" expanded="true" />
@@ -518,7 +510,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/operations.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="5456" max-vertical-offset="6120">
+        <state vertical-scroll-proportion="0.0">
           <caret line="384" column="12" selection-start-line="384" selection-start-column="12" selection-end-line="384" selection-end-column="12" />
           <folding>
             <element signature="e#23#55#0" expanded="true" />
@@ -528,7 +520,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/dots.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="974" max-vertical-offset="1455">
+        <state vertical-scroll-proportion="0.0">
           <caret line="10" column="26" selection-start-line="10" selection-start-column="26" selection-end-line="10" selection-end-column="26" />
           <folding />
         </state>
@@ -536,7 +528,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/conversions.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="285" max-vertical-offset="495">
+        <state vertical-scroll-proportion="0.0">
           <caret line="19" column="17" selection-start-line="19" selection-start-column="17" selection-end-line="19" selection-end-column="17" />
           <folding>
             <element signature="e#23#78#0" expanded="true" />
@@ -546,7 +538,7 @@
     </entry>
     <entry file="file://$USER_HOME$/anaconda/envs/research3.3/lib/python3.3/site-packages/colormath/color_objects.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="4264" max-vertical-offset="12360">
+        <state vertical-scroll-proportion="0.0">
           <caret line="292" column="8" selection-start-line="292" selection-start-column="8" selection-end-line="292" selection-end-column="8" />
           <folding />
         </state>
@@ -554,7 +546,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/functions.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="251" max-vertical-offset="960">
+        <state vertical-scroll-proportion="0.0">
           <caret line="56" column="45" selection-start-line="56" selection-start-column="45" selection-end-line="56" selection-end-column="45" />
           <folding>
             <element signature="e#23#42#0" expanded="true" />
@@ -564,7 +556,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/palettes.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="1455">
+        <state vertical-scroll-proportion="0.0">
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding />
         </state>
@@ -572,7 +564,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/suite.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="209" max-vertical-offset="690">
+        <state vertical-scroll-proportion="0.0">
           <caret line="7" column="21" selection-start-line="7" selection-start-column="17" selection-end-line="7" selection-end-column="21" />
           <folding>
             <element signature="e#23#42#0" expanded="true" />
@@ -582,7 +574,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/operations.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="5456" max-vertical-offset="6120">
+        <state vertical-scroll-proportion="0.0">
           <caret line="384" column="12" selection-start-line="384" selection-start-column="12" selection-end-line="384" selection-end-column="12" />
           <folding>
             <element signature="e#23#55#0" expanded="true" />
@@ -592,7 +584,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/dots.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="974" max-vertical-offset="1455">
+        <state vertical-scroll-proportion="0.0">
           <caret line="10" column="26" selection-start-line="10" selection-start-column="26" selection-end-line="10" selection-end-column="26" />
           <folding />
         </state>
@@ -600,7 +592,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/conversions.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="285" max-vertical-offset="495">
+        <state vertical-scroll-proportion="0.0">
           <caret line="19" column="17" selection-start-line="19" selection-start-column="17" selection-end-line="19" selection-end-column="17" />
           <folding>
             <element signature="e#23#78#0" expanded="true" />
@@ -610,7 +602,7 @@
     </entry>
     <entry file="file://$USER_HOME$/anaconda/envs/research3.3/lib/python3.3/site-packages/colormath/color_objects.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="4264" max-vertical-offset="12360">
+        <state vertical-scroll-proportion="0.0">
           <caret line="292" column="8" selection-start-line="292" selection-start-column="8" selection-end-line="292" selection-end-column="8" />
           <folding />
         </state>
@@ -618,7 +610,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/functions.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="251" max-vertical-offset="960">
+        <state vertical-scroll-proportion="0.0">
           <caret line="56" column="45" selection-start-line="56" selection-start-column="45" selection-end-line="56" selection-end-column="45" />
           <folding>
             <element signature="e#23#42#0" expanded="true" />
@@ -628,7 +620,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/palettes.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="1455">
+        <state vertical-scroll-proportion="0.0">
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding />
         </state>
@@ -636,7 +628,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/suite.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="209" max-vertical-offset="690">
+        <state vertical-scroll-proportion="0.0">
           <caret line="7" column="21" selection-start-line="7" selection-start-column="17" selection-end-line="7" selection-end-column="21" />
           <folding>
             <element signature="e#23#42#0" expanded="true" />
@@ -646,7 +638,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/operations.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="6360">
+        <state vertical-scroll-proportion="0.0">
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
             <element signature="e#23#55#0" expanded="true" />
@@ -656,7 +648,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/dots.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="959" max-vertical-offset="1440">
+        <state vertical-scroll-proportion="0.0">
           <caret line="70" column="112" selection-start-line="70" selection-start-column="112" selection-end-line="70" selection-end-column="112" />
           <folding />
         </state>
@@ -664,7 +656,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/conversions.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="285" max-vertical-offset="495">
+        <state vertical-scroll-proportion="0.0">
           <caret line="19" column="17" selection-start-line="19" selection-start-column="17" selection-end-line="19" selection-end-column="17" />
           <folding>
             <element signature="e#23#78#0" expanded="true" />
@@ -674,7 +666,7 @@
     </entry>
     <entry file="file://$USER_HOME$/anaconda/envs/research3.3/lib/python3.3/site-packages/colormath/color_objects.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="4264" max-vertical-offset="12360">
+        <state vertical-scroll-proportion="0.0">
           <caret line="292" column="8" selection-start-line="292" selection-start-column="8" selection-end-line="292" selection-end-column="8" />
           <folding />
         </state>
@@ -682,7 +674,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/functions.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="251" max-vertical-offset="960">
+        <state vertical-scroll-proportion="0.0">
           <caret line="56" column="45" selection-start-line="56" selection-start-column="45" selection-end-line="56" selection-end-column="45" />
           <folding>
             <element signature="e#23#42#0" expanded="true" />
@@ -692,7 +684,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/palettes.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="974" max-vertical-offset="1455">
+        <state vertical-scroll-proportion="0.0">
           <caret line="84" column="33" selection-start-line="84" selection-start-column="33" selection-end-line="84" selection-end-column="33" />
           <folding />
         </state>
@@ -700,7 +692,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/suite.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="209" max-vertical-offset="690">
+        <state vertical-scroll-proportion="0.0">
           <caret line="7" column="21" selection-start-line="7" selection-start-column="17" selection-end-line="7" selection-end-column="21" />
           <folding>
             <element signature="e#23#42#0" expanded="true" />
@@ -710,7 +702,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/operations.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="4410">
+        <state vertical-scroll-proportion="0.0">
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
             <element signature="e#23#55#0" expanded="true" />
@@ -720,7 +712,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/conversions.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="135" max-vertical-offset="390">
+        <state vertical-scroll-proportion="0.0">
           <caret line="9" column="18" selection-start-line="9" selection-start-column="18" selection-end-line="9" selection-end-column="18" />
           <folding>
             <element signature="e#23#78#0" expanded="true" />
@@ -730,7 +722,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/functions.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="60" max-vertical-offset="450">
+        <state vertical-scroll-proportion="0.0">
           <caret line="4" column="25" selection-start-line="4" selection-start-column="25" selection-end-line="4" selection-end-column="25" />
           <folding>
             <element signature="e#23#42#0" expanded="true" />
@@ -740,7 +732,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/suite.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="390" max-vertical-offset="690">
+        <state vertical-scroll-proportion="0.0">
           <caret line="26" column="4" selection-start-line="26" selection-start-column="4" selection-end-line="26" selection-end-column="4" />
           <folding>
             <element signature="e#23#42#0" expanded="true" />
@@ -750,7 +742,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/operations.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="2985">
+        <state vertical-scroll-proportion="0.0">
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
             <element signature="e#23#55#0" expanded="true" />
@@ -760,7 +752,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/suite.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="390" max-vertical-offset="690">
+        <state vertical-scroll-proportion="0.0">
           <caret line="26" column="29" selection-start-line="26" selection-start-column="29" selection-end-line="26" selection-end-column="29" />
           <folding>
             <element signature="e#23#42#0" expanded="true" />
@@ -770,39 +762,39 @@
     </entry>
     <entry file="file://$USER_HOME$/anaconda/envs/research3.3/lib/python3.3/site-packages/scipy/ndimage/filters.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.021037867" vertical-offset="3645" max-vertical-offset="17790">
+        <state vertical-scroll-proportion="0.021037867">
           <caret line="251" column="4" selection-start-line="251" selection-start-column="4" selection-end-line="251" selection-end-column="4" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/pbn/functions.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="251" max-vertical-offset="960">
-          <caret line="56" column="45" selection-start-line="56" selection-start-column="45" selection-end-line="56" selection-end-column="45" />
-          <folding>
-            <element signature="e#23#42#0" expanded="true" />
-          </folding>
         </state>
       </provider>
     </entry>
     <entry file="file://$USER_HOME$/Library/Caches/PyCharm40/python_stubs/-624759079/itertools.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.33286318" vertical-offset="7459" max-vertical-offset="12285">
+        <state vertical-scroll-proportion="0.33286318">
           <caret line="513" column="8" selection-start-line="513" selection-start-column="8" selection-end-line="513" selection-end-column="8" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$USER_HOME$/anaconda/envs/research3.3/lib/python3.3/site-packages/colormath/color_objects.py">
+    <entry file="file://$PROJECT_DIR$/pbn/operations.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="4264" max-vertical-offset="12360">
-          <caret line="292" column="8" selection-start-line="292" selection-start-column="8" selection-end-line="292" selection-end-column="8" />
+        <state vertical-scroll-proportion="0.46985447">
+          <caret line="396" column="16" selection-start-line="396" selection-start-column="16" selection-end-line="396" selection-end-column="16" />
+          <folding>
+            <element signature="e#23#55#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/pbn/dots.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state vertical-scroll-proportion="0.0">
+          <caret line="34" column="21" selection-start-line="34" selection-start-column="21" selection-end-line="34" selection-end-column="21" />
           <folding />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/pbn/conversions.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="495">
+        <state vertical-scroll-proportion="0.0">
           <caret line="19" column="17" selection-start-line="19" selection-start-column="17" selection-end-line="19" selection-end-column="17" />
           <folding>
             <element signature="e#23#78#0" expanded="true" />
@@ -810,38 +802,38 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/pbn/palettes.py">
+    <entry file="file://$USER_HOME$/anaconda/envs/research3.3/lib/python3.3/site-packages/colormath/color_objects.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="974" max-vertical-offset="1455">
-          <caret line="84" column="33" selection-start-line="84" selection-start-column="33" selection-end-line="84" selection-end-column="33" />
+        <state vertical-scroll-proportion="0.0">
+          <caret line="292" column="8" selection-start-line="292" selection-start-column="8" selection-end-line="292" selection-end-column="8" />
           <folding />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/pbn/dots.py">
+    <entry file="file://$PROJECT_DIR$/pbn/functions.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="299" max-vertical-offset="1665">
-          <caret line="34" column="21" selection-start-line="34" selection-start-column="21" selection-end-line="34" selection-end-column="21" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/pbn/suite.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0" vertical-offset="915" max-vertical-offset="3435">
-          <caret line="72" column="10" selection-start-line="72" selection-start-column="10" selection-end-line="72" selection-end-column="88" />
+        <state vertical-scroll-proportion="0.0">
+          <caret line="56" column="45" selection-start-line="56" selection-start-column="45" selection-end-line="56" selection-end-column="45" />
           <folding>
             <element signature="e#23#42#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/pbn/operations.py">
+    <entry file="file://$PROJECT_DIR$/pbn/palettes.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.46985447" vertical-offset="5714" max-vertical-offset="6195">
-          <caret line="396" column="16" selection-start-line="396" selection-start-column="16" selection-end-line="396" selection-end-column="16" />
+        <state vertical-scroll-proportion="0.0">
+          <caret line="84" column="33" selection-start-line="84" selection-start-column="33" selection-end-line="84" selection-end-column="33" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/pbn/suite.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state vertical-scroll-proportion="0.0">
+          <caret line="72" column="10" selection-start-line="72" selection-start-column="10" selection-end-line="72" selection-end-column="88" />
           <folding>
-            <element signature="e#23#55#0" expanded="true" />
+            <element signature="e#23#42#0" expanded="true" />
           </folding>
         </state>
       </provider>

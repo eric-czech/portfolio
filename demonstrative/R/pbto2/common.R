@@ -72,16 +72,22 @@ plot.pbto2.coef <- function(beta.post){
     ggtitle('Coefficient 95% Intevals for Pbto2 Above and Below Cutpoint') 
 }
 
-
-DATA_CONFIG <- 'config2'
+#DATA_CONFIG <- 'config5'
+#DATA_CONFIG <- 'config4'
+DATA_CONFIG <- 'config3'
+#DATA_CONFIG <- 'config2'
 #DATA_CONFIG <- 'config1'
 
-get.wide.data <- function(scale.vars=T, outcome.func=gos.to.binom, reset.uid=F){
+get.wide.data <- function(scale.vars=T, outcome.func=gos.to.binom, reset.uid=F, remove.na.flags=T){
   d <- read.csv(sprintf('~/data/pbto2/final/%s/data_wide.csv', DATA_CONFIG)) %>% 
     mutate_each(funs(as.numeric)) %>%
     # Remove pct values in "normal" ranges for blood gases
-    dplyr::select(-paco2_35_45, -icp1_0_20, -pha_7.35_7.45, -pao2_30_100, -pbto2_20_100, -starts_with('n_')) %>%
+    #dplyr::select(-paco2_35_45, -icp1_0_20, -pha_7.35_7.45, -pao2_30_100, -pbto2_20_100, -starts_with('n_')) %>%
+    dplyr::select(-paco2_28_42, -icp1_0_20, -pha_7.35_7.45, -pao2_300_875, -pbto2_20_70, -starts_with('n_')) %>%
     mutate(gos = sapply(gos, outcome.func))
+  
+  if (remove.na.flags)
+    d <- d %>% select(-ends_with('_is_na'))
   
   if (scale.vars)
     d <- d %>% mutate_each(funs(scale), -gos, -uid)
