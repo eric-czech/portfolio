@@ -6,8 +6,8 @@ library(reshape2)
 d <- read.csv('~/data/pbto2/export/data_stan_input.csv', stringsAsFactors=F)
 
 p <- 'pbto2'
-c1 <- 10
-c2 <- 50
+c1 <- 14.5
+c2 <- 75.1
 
 breaks <- c(-Inf, c1, c2, Inf)
 
@@ -25,7 +25,10 @@ q <- d %>% group_by(uid) %>% do({
     mutate(n=n/sum(.$n)) %>% 
     dcast(. ~ l, value.var='n') %>% select(-matches('\\.')) %>%
     mutate(gos=x$gos[1]) 
-}) %>% mutate_each(funs(replace.na), starts_with('v')) %>% mutate(v4=v1 + v3)
+}) %>% 
+  mutate_each(funs(replace.na), starts_with('v')) %>% 
+  mutate(v4=v1 + v3) %>%
+  mutate(gos=ifelse(gos <= 3, 0, 1))
 
 plot_ly(q, y = v4, color = factor(gos), type = "box")
 
