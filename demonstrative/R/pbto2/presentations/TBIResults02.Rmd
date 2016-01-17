@@ -1,0 +1,227 @@
+---
+title: "Traumatic Brain Injury Study Results (pt. 2)"
+author: "Eric Czech"
+date: "January 14, 2015"
+widescreen: true
+#output: ioslides_presentation
+output: html_document
+#widescreen: yes
+---
+
+```{r init, echo=FALSE, message=FALSE, warning=FALSE}
+library(dplyr)
+library(knitr)
+library(glmulti)
+library(cvTools)
+library(MASS)
+library(dummies)
+library(foreach)
+library(plotly)
+library(reshape2)
+library(tsne)
+library(pander)
+
+select <- dplyr::select
+source('~/repos/portfolio/demonstrative/R/pbto2/common.R')
+source('~/repos/portfolio/demonstrative/R/pbto2/performance/cv_utils.R')
+source('~/repos/portfolio/demonstrative/R/pbto2/selection/model_comparisons_lib.R')
+
+##### Rendering Functions #####
+
+get.model.coefs <- function(m){
+  mc <- round(m$coefficients, 4)
+  mc[,4] <- sapply(mc[,4], function(x) {
+    x <- round(x, 2)
+    if (x <= .001) paste(x, '***')
+    else if (x <= .01) paste(x, '**')
+    else if (x <= .05) paste(x, '*')
+    else if (x <= .1) paste(x, '.')
+    else x
+  })
+  mc
+}
+
+get.model.results <- function(d, m){
+  cat(paste('**Formula** = ', deparse(m, width.cutoff = 500), '<br>'))
+  cat(paste('**N** =', nrow(d)))
+  d %>% glm(m, data=., family='binomial') %>% summary %>% get.model.coefs
+}
+```
+
+```{r loading, echo=FALSE, cache=TRUE}
+
+dbu <- get.wide.data(outcome.func=gos.to.binom, scale.vars=F, remove.na.flags=F)
+dou <- get.wide.data(outcome.func=gos.to.ord, scale.vars=F, remove.na.flags=F) %>% mutate(gos=factor(gos))
+p <- c('age', 'sex', 'marshall', 'gcs')
+
+models <- get.models()
+all.vars <- models[['all.vars']]
+models <- models[['models']]
+```
+
+```{r exhaustive_modeling, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+d.glmulti <- dbu %>% prep.df(c('icp1', 'pbto2', 'pao2', 'paco2'))
+f.glmulti <- get.form(models[['wcov_icp_pao2_pbto2_paco2']])
+m.glmulti <- glmulti(f.glmulti, data=d.glmulti, family='binomial', level=1, crit = AICc, plotty = F, report=F)
+```
+
+```{r predictive_modeling, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+results.glm <- run.models(pred.binary.glm, T, ic.score=ic.binary.glm)
+#results.gbm <- run.models(pred.binary.gbm, T)
+#results.rf <- run.models(pred.binary.rf, T)
+```
+
+<br><br>
+<hr>
+# Blood Gas and Pressure Thresholds
+
+- "Using recursive partitioning analyses and/or other analyses determine a threshold of hypoxic PbtO2 burden"
+
+## Basis for Thresholding
+
+Reducing the timeseries measurements for patients' blood gas and pressure levels into scalar-valued indicators or quantities that best correlate with outcomes using thresholds in their values will be helpful for several reasons.  Firstly, having single values for the gas and pressure levels makes them more amenable to modeling alongside the existing covariates like age, gender, and marshall/GCS scores.  Secondly, models using these scalar values are necessary to establish confidence intervals for effects (bayesian credible intervals are possible without reduction to scalar values but that may be difficult to share).  Lastly, using the thresholds makes everything easier to explain and visualize.
+
+Example for how thresholds could be used to reduce timeseries measurements to single values:
+
+Given timeseries measurements $x_1, x_2, x_3, ..., x_n$, compute the percentage of time spent above and below threshold value $x_t$ as $\frac{N_1}{N_1 + N_2}$ where $N_1 = |{x_i;x \lt x_t}|$ and $N_2 = |{x_i;x \geq x_t}|$
+
+## Threshold Finding Model (Same as before) {.smaller}
+
+Logistic regression with special function for taking in timeseries measurements and then estimating parameters for that function that map to gas/pressure thresholds:
+
+$$ logit(Pr(y_i = 1)) = \alpha + \beta \cdot X_i + f(G_{ij}) $$
+
+where
+
+$$ X_i = [{Gender}_i, {Age}_i, {CommaScore}_i, {MarshallScore}_i], $$
+$$ y_i = \{ 0 \text{ if }{GOS}_i \in [1, 2, 3], 1 \text{ if }{GOS}_i \in [4, 5] \} $$
+
+and
+
+$$ f(G_i) = \frac{1}{n_i} \sum_j^{n_i}{ \frac{c_1}{1 + e^{-c_2(G_{ij} - c_3)}} + \frac{c_4}{1 + e^{-c_5(G_{ij} - c_6)}}  } $$
+$$ n_i = \text{ length of timeseries for patient }i $$
+
+## Thresholds w/ No Covariates {.smaller}
+
+The following models were fit using only one gas/pressure measurment:
+
+<center>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/single_var/actual_tsonly_paco2.png" width="375px" height="250px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/single_var/actual_tsonly_pbto2.png" width="375px" height="250px"/><br>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/single_var/actual_tsonly_pao2.png" width="375px" height="250px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/single_var/actual_tsonly_icp1.png" width="375px" height="250px"/>
+</center>
+
+## Thresholds w/ Covariates (ICP & PbtO2) {.smaller} 
+
+The following models were fit using one gas/pressure measurment and all covariates (age, sex, gcs, marshall):
+
+<center>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/single_var/actual_icp1.png" width="400px" height="400px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/single_var/actual_pbto2.png" width="400px" height="400px"/>
+</center>
+
+## Thresholds w/ Covariates (PaO2 & PaCO2) {.smaller} 
+
+The following models were fit using one gas/pressure measurment and all covariates (age, sex, gcs, marshall):
+
+<center>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/single_var/actual_pao2.png" width="400px" height="400px"/>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/presentations/images/no_interp/single_var/actual_paco2.png" width="400px" height="400px"/>
+</center>
+
+## Threshold Summary {.smaller}
+
+Based on the inferred thresholds and their proximity to some known limits, the following values were used for each quantity as the low, high, and safe ranges:
+
+```{r, echo=FALSE}
+data.frame(
+  'Quantity'=c('PaCO2', 'PaO2', 'PbtO2', 'ICP'),
+  'Low Range'=c('[0, 28)', '[0, 300)', '[0, 20)', NA),
+  'Safe Range'=c('[28, 42]', '[300, 875)', '[20, 70)', '(-Inf, 20)'),
+  'High Range'=c('42+', '875+', '70+', '20+')
+) %>% kable
+```
+
+<br><br><br>
+<hr>
+# Gas and Pressure Model Statistical Performance {.smaller}
+
+- "Evaluate the impact of hypoxic PbtO2 burden while controlling for known predictors of outcome: age, GCS, Marshall score, ICP burden (ICP > 20), lung injury (PaO2/.4 < 300)"
+- "Determine if PbtO2 burden improves, degrades, or does nothing to the prediction accuracy of outcome in a model including age, GCS, Marshall, and ICP burden"
+- "Is PbtO2 better than PaO2?"
+
+## Model Selection via Information Criteria 
+
+Exhaustive model selection via AICc with model space given by:
+
+```{r, echo=FALSE, results='asis'}
+deparse(f.glmulti, width.cutoff = 50) %>% cat
+```
+
+Note that only main effects in a linear model were considered because models with nonlinearities and interactions showed no major improvements.  Also, the ```gos``` outcome was binarized into two classes, one for bad outcomes (original gos in [1,2,3]) and one for good outcomes (original gos in [4,5]).
+
+Modeling call:
+
+<center>```glmulti(f.glmulti, data=d.glmulti, family='binomial', level=1, crit = AICc)```</center>
+
+## IC-Based Model Selection Results {.smaller}
+
+Best model found after exhaustive search (note that PaO2 is absent):
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results='asis'}
+m <- m.glmulti@objects[[1]]
+print(paste('Number of observations =', m$residuals %>% length))
+m %>% summary %>% get.model.coefs %>% pandoc.table
+```
+
+## Impact of PbtO2 {.smaller}
+
+While a model that includes all predictors (ICP, PaO2, PaCO2, and PbtO2) shows weak significances for each, simpler models including smaller groups of predictors show stronger relationships (though still fairly weak overall).
+
+For example, this model more directly answers the question *"What is the impact of hypoxic PbtO2 burden while controlling for known predictors of outcome?"*:
+
+```{r, echo=FALSE, results='asis'}
+d <- dbu %>% prep.df(c('pbto2', 'icp1'))
+m <- get.form(models[['wcov_icp_pbto2']])
+r <- get.model.results(d, m)
+```
+```{r, results='asis', echo=FALSE}
+r %>% pandoc.table
+```
+
+Now even in the presence of ICP, PbtO2 is still significant at a 95% level (vs a p-value of .07 in the best model)
+
+## Impact of PbtO2 w/ PaO2 {.smaller}
+
+To answer the question *"Is PbtO2 better than PaO2?"*, a model like that above that also includes PaO2 could be considered:
+
+```{r, echo=FALSE, results='asis'}
+d <- dbu %>% prep.df(c('pbto2', 'icp1', 'pao2'))
+m <- get.form(models[['wcov_icp_pao2_pbto2']])
+r <- get.model.results(d, m)
+```
+```{r, results='asis', echo=FALSE}
+r %>% pandoc.table
+```
+
+At least on the scale of statistical significance, an argument could be made that PbtO2 is better than PaO2.
+
+## Statistical Performance Conclusions {.smaller}
+
+Conclusion #1: Information criteria scores and statistical signifiances of different predictors show fairly weak evidence that PbtO2 is both important and a better predictor than PaO2, even after controlling for known predictors of outcome like ICP burden, Age, Gender, GCS, and Marshall scores.
+
+Despite the above, I would argue that using information criteria and statistical significances is probably not the best way to draw these conclusions (especially given that the evidence is not overwhelming) and that a better approach may be assessing model performance in leave-one-out cross validation.  A predictive accuracy measure like that would likely give a better sense of the quality of the different predictors on a more practical scale.  To that end, everything that follows will examine predictive performance instead.
+
+<br><br><br>
+<hr>
+# Gas and Pressure Model Predictive Performance {.smaller}
+
+- "Compare the predictive accuracy of hypoxic PbtO2 burden against known predictors of outcome""
+- "Determine if PbtO2 burden improves, degrades, or does nothing to the prediction accuracy of outcome in a model including age, GCS, Marshall, and ICP burden"
+- "Is PbtO2 better than PaO2?""
+
+## Statistical Performance Conclusions {.smaller}
+
+
+

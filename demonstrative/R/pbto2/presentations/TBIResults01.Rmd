@@ -208,7 +208,7 @@ For example, the ```PaCO2``` variable was split into three new variables:
 
 For all variables, the known "safe range" was then dropped from the model to avoid linear dependence (percentages across all variables would add up to 1).  This leaves only variables indicating time spent at dangerous levels.
 
-## Binary Outcome Dataset 
+## Binary Outcome Dataset
 
 Modeling input dataset; includes static covariates and timeseries summaries:
 <center>

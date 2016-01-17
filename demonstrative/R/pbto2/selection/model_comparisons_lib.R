@@ -5,6 +5,82 @@ library(gbm)
 library(randomForest)
 library(ggplot2)
 
+get.form <- function(e) as.formula(paste0('gos ~ ', paste(e, collapse=' + ')))
+
+scale.df <- function(d) d %>% mutate_each(funs(scale), -gos, -uid)
+
+prep.df <- function(d, ts.features){
+  if (length(ts.features) > 0){
+    ts.na <- d %>% select_(.dots=paste0(ts.features, '_is_na')) %>% apply(1, sum)
+    d <- d %>% filter(ts.na == 0)
+  }
+  d %>% select(-ends_with('_is_na')) %>% scale.df
+}
+
+run.model <- function(m, d, modelfun, cv.score=score.predictions, ic.score=NULL, prep.with.all.vars=F){
+  set.seed(1)
+  
+  # Determine unique predictor prefixes in this model
+  if (prep.with.all.vars) m.prefix <- all.vars
+  else m.prefix <- m[!m %in% p]
+  m.prefix <- str_split(m.prefix, '_') %>% sapply(function(x)x[1]) %>% unique
+  d <- prep.df(d, m.prefix)
+  
+  #browser()
+  # Create model formula
+  form <- get.form(m)
+  #print(form)
+  # Run LOO CV loop and compute scores
+  preds <- foreach(i=1:nrow(d), .combine=rbind) %do% {
+    d.tr <- d[-i,]
+    d.ho <- d[i,]
+    modelfun(form, d.tr, d.ho) %>% 
+      mutate(y.true=d.ho$gos, i=i)
+  } 
+  cv.scores <- cv.score(preds) %>% mutate(n=nrow(d))
+  
+  # Compute IC scores, if possible
+  if (!is.null(ic.score)) cv.scores <- cbind(cv.scores, ic.score(form, d))
+  
+  list(cv.scores=cv.scores, preds=preds, data=d)
+}
+
+run.models <- function(modelfun, prep.with.all.vars, ic.score=NULL){
+  foreach(m=names(models))%do%{
+    #score <- cv.run(models[[m]], d, predictor=bin.predict.class, score=accuracy.score)
+    #score <- cv.run(models[[m]], d, predictor=bin.predict.probs, score=logloss)
+    #score <- cv.run(models[[m]], do, predictor=ord.predict.probs, score=mlogloss)
+    #score <- cv.run(models[[m]], dbu, predictor=ord.predict.class, score=accuracy.score)
+    r <- run.model(models[[m]], dbu, modelfun=modelfun, ic.score=ic.score, prep.with.all.vars=prep.with.all.vars) 
+    r[['cv.scores']] <- r[['cv.scores']] %>% mutate(model=m, formula=paste(models[[m]], collapse=' + '))
+    r
+  } 
+}
+
+
+get.models <- function(){
+  gas.models <- list(
+    icp=c('icp1_20_inf'),
+    paco2=c('paco2_0_28', 'paco2_42_inf'),
+    pao2=c('pao2_0_300', 'pao2_875_inf'),
+    pbto2=c('pbto2_0_20', 'pbto2_70_inf'),
+    pao2_pbto2=c('pao2_0_300', 'pao2_875_inf', 'pbto2_0_20', 'pbto2_70_inf'),
+    icp_paco2=c('icp1_20_inf', 'paco2_0_28', 'paco2_42_inf'),
+    icp_pao2=c('icp1_20_inf', 'pao2_0_300', 'pao2_875_inf'),
+    icp_pbto2=c('icp1_20_inf', 'pbto2_0_20', 'pbto2_70_inf'),
+    icp_pao2_pbto2=c('icp1_20_inf', 'pao2_0_300', 'pao2_875_inf', 'pbto2_0_20', 'pbto2_70_inf'),
+    icp_pao2_pbto2_paco2=c('icp1_20_inf', 'pao2_0_300', 'pao2_875_inf', 'pbto2_0_20', 'pbto2_70_inf', 'paco2_0_28', 'paco2_42_inf')
+  )
+  all.vars <- unlist(gas.models) %>% unique 
+  models1 <- gas.models
+  models1[['demo']] <- c('age', 'sex')
+  models2 <- lapply(gas.models, function(x) c(p, x))
+  names(models2) <- sapply(names(models2), function(x)paste0('wcov_', x))
+  models2[['wcov_none']] <- p
+  models <- c(models1, models2)
+  list(models=models, all.vars=all.vars)
+}
+
 ic.binary.glm <- function(form, d){
   r <- glm(form, data=d, family='binomial')
   data.frame(aic=AIC(r), bic=BIC(r), aicc=AICc(r))
@@ -108,7 +184,7 @@ mlogloss <- function(y_true, y_pred){
   return(mll)
 }
 
-plot.roc.curve <- function(res, model.filter){
+plot.roc.curve <- function(res, model.filter, title='ROC Curves'){
   roc <- foreach(r=res, .combine=rbind) %do% {
     model <- r$cv.scores$model[1]
     if (!model %in% model.filter)
@@ -119,6 +195,6 @@ plot.roc.curve <- function(res, model.filter){
   }
   roc %>% ggplot(aes(x=x, y=y, color=model)) + geom_line() + 
     geom_abline(intercept = 0, slope = 1) + 
-    theme_bw()
+    theme_bw() + ggtitle(title)
 }
 
