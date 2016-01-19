@@ -20,7 +20,9 @@ library(plotly)
 library(reshape2)
 library(tsne)
 library(pander)
-
+library(doMC)
+registerDoMC(8)
+set.seed(123)
 select <- dplyr::select
 source('~/repos/portfolio/demonstrative/R/pbto2/common.R')
 source('~/repos/portfolio/demonstrative/R/pbto2/performance/cv_utils.R')
@@ -67,9 +69,51 @@ m.glmulti <- glmulti(f.glmulti, data=d.glmulti, family='binomial', level=1, crit
 
 ```{r predictive_modeling, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
 results.glm <- run.models(pred.binary.glm, T, ic.score=ic.binary.glm)
-#results.gbm <- run.models(pred.binary.gbm, T)
-#results.rf <- run.models(pred.binary.rf, T)
+model.filter <- c('wcov_icp_pao2_pbto2_paco2', 'wcov_icp_pao2_pbto2', 'wcov_icp_pbto2', 'wcov_icp', 'wcov_none')
+results.gbm <- run.models(pred.binary.gbm, T, model.filter=model.filter)
+results.rft <- run.models(pred.binary.rf, T, model.filter=model.filter)
+results.knn <- run.models(pred.binary.knn, T, model.filter=model.filter)
+#results.svm <- run.models(pred.binary.svm, T, model.filter='wcov_icp_pao2_pbto2_paco2')
+
 ```
+
+```{r interaction_modeling, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+d.int <- dbu %>% prep.df(c('icp1', 'pbto2', 'pao2'), scale.vars=F) %>%
+  select(gos, age, marshall, gcs, sex, pao2_0_300, pbto2_0_20, icp1_20_inf)
+
+d.int.1 <- d.int %>% mutate_each(funs(scale), -gos) 
+d.int.2 <- d.int %>% mutate_each(funs(scale), -gos) %>%
+  model.matrix(gos ~ (.)*pbto2_0_20 - 1, data=.) %>% data.frame %>% 
+  cbind(., data.frame(gos=d.int$gos))
+
+# d.int.bins <- d.int %>% mutate(pao2=cut(
+#     d.int$pao2_0_300, breaks = c(0, .25, .75, 1), 
+#     labels = c('_0_25', '_25_75', '_75_1'), include.lowest = T, right=T)) %>%
+#   select(-pao2_0_300, -sex) %>% mutate_each(funs(scale), -gos, -pao2)
+
+m.int.1 <- glm(gos ~ . + pao2_0_300:pbto2_0_20, data=d.int.1, family='binomial')
+#m.int.2 <- glmulti(gos ~ . + pbto2_0_20:pao2_0_300, data=d.int.1, family='binomial', level=1, crit = AICc)
+m.int.3 <- glmulti(gos ~ ., data=d.int.2, family='binomial', level=1, crit = AICc, plotty = F, report=F)
+```
+
+```{r cluster_modeling, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+r <- results.glm
+cv.data <- r[[1]]$data
+cv.diffs <- get.model.diffs(r, 'wcov_icp_pao2_pbto2', 'wcov_icp_pao2')
+stopifnot(nrow(cv.data) == nrow(cv.diffs))
+
+cv.llr <- cv.data %>% select(
+    one_of(c(p, 'uid', 'gos')), starts_with('icp'), starts_with('pbto2'),
+    starts_with('pao2'), starts_with('paco2')
+  ) %>% mutate(i=1:nrow(.)) %>% 
+  inner_join(cv.diffs %>% select(i, llr), by='i') %>% 
+  arrange(desc(llr))
+
+d.tsne <- cv.llr %>% select(age, marshall, gcs, pao2_0_300, llr)
+X.tsne <- tsne(d.tsne) %>% apply(2, scale) %>% as.data.frame %>% setNames(c('x', 'y')) 
+```
+
+
 
 <br><br>
 <hr>
@@ -209,9 +253,9 @@ At least on the scale of statistical significance, an argument could be made tha
 
 ## Statistical Performance Conclusions {.smaller}
 
-Conclusion #1: Information criteria scores and statistical signifiances of different predictors show fairly weak evidence that PbtO2 is both important and a better predictor than PaO2, even after controlling for known predictors of outcome like ICP burden, Age, Gender, GCS, and Marshall scores.
+Information criteria scores and statistical signifiances of different predictors show fairly weak evidence that PbtO2 is both important and a better predictor than PaO2, even after controlling for known predictors of outcome like ICP burden, Age, Gender, GCS, and Marshall scores.
 
-Despite the above, I would argue that using information criteria and statistical significances is probably not the best way to draw these conclusions (especially given that the evidence is not overwhelming) and that a better approach may be assessing model performance in leave-one-out cross validation.  A predictive accuracy measure like that would likely give a better sense of the quality of the different predictors on a more practical scale.  To that end, everything that follows will examine predictive performance instead.
+Despite the above, I would argue that using information criteria and statistical significances is probably not the best way to draw these conclusions (especially given that the evidence is not overwhelming) and that a better approach may be assessing model performance in leave-one-out cross validation.  A predictive accuracy measure like that would likely give a better sense of the quality of the different predictors on a more practical scale.  To that end, most of what that follows will examine predictive performance instead.
 
 <br><br><br>
 <hr>
@@ -221,7 +265,171 @@ Despite the above, I would argue that using information criteria and statistical
 - "Determine if PbtO2 burden improves, degrades, or does nothing to the prediction accuracy of outcome in a model including age, GCS, Marshall, and ICP burden"
 - "Is PbtO2 better than PaO2?""
 
-## Statistical Performance Conclusions {.smaller}
+
+## Predictive Performance {.smaller}
+
+All models below were tested in leave-one-out cross validation for the sake of comparing predictive performance measuremes between them like ROC-AUC:
+
+```{r, echo=FALSE}
+foreach(m=names(models), .combine=rbind)%do%{
+  data.frame(model.name=m, variables=paste(models[[m]], collapse=','))
+} %>% kable
+```
+
+## GLM AUC Results
+
+```{r, echo=FALSE}
+cv.res <- get.cv.results(results.glm, 'auc', desc=T)
+cv.res %>% select(model, auc, tp, fp, tn, fn, n) %>% kable
+```
+
+## AUC Comparisons
+
+Going beyond GLM models to more sophisticated black-box models, AUC numbers don't change drastically indicating that little is being lost by ignoring interactions and nonlinearities:
+
+```{r, echo=FALSE}
+d1 <- get.cv.results(results.glm, 'auc', desc=F) %>% select(model, GLM=auc) 
+d2 <- get.cv.results(results.knn, 'auc', desc=F) %>% select(model, KNN=auc)
+d3 <- get.cv.results(results.rft, 'auc', desc=F) %>% select(model, RFT=auc)
+d4 <- get.cv.results(results.gbm, 'auc', desc=F) %>% select(model, GBM=auc)
+d1 %>% 
+  inner_join(d2, by='model') %>%
+  inner_join(d3, by='model') %>%
+  inner_join(d4, by='model') %>% kable(caption = 'AUC by Model Type')
+```
+
+## GLM ROC Plots
+
+ROC Curves from logistic regression models [Demo turning models on and off in order]:
+
+```{r, echo=FALSE, fig.align='center'}
+model.filter <- c(
+  'demo', 'wcov_none', 'wcov_pbto2', 'wcov_icp', 'wcov_icp_pao2', 'wcov_icp_paco2',
+  'wcov_icp_pbto2', 'wcov_icp_pao2_pbto2', 'wcov_icp_pao2_pbto2_paco2'
+)
+plot.roc.curve(results.glm, model.filter, title='GLM ROC')  %>% 
+  ggplotly %>% layout(showlegend = T)
+```
+
+## GBM ROC Plots
+
+ROC Curves from gbm models:
+
+```{r, echo=FALSE, fig.align='center'}
+plot.roc.curve(results.gbm, model.filter, title='GBM ROC')  %>% 
+  ggplotly %>% layout(showlegend = T)
+```
+
+## KNN ROC Plots
+
+ROC Curves from nearest neighbor models:
+
+```{r, echo=FALSE, fig.align='center'}
+plot.roc.curve(results.knn, model.filter, title='Nearest Neighbor ROC')  %>% 
+  ggplotly %>% layout(showlegend = T)
+```
 
 
+## Predictive Performance Conclusions {.smaller}
+
+Changes in ROC curves and AUC values further indicate that PaO2 is a weaker predictor than PbtO2.  However, the effect of all gases on a practical scale is still relatively weak, and even the highest performing classifiers offer a fairly minor lift over those built using only known predictors of outcome like GCS + Marshall scores and Age.
+
+
+# Sub Group Predictability
+
+- Is there a particular sub-group (as defined by age, GCS, Marshall score, ICP burden, and/or PaO2) that benefit from measuring PbtO2?
+- Do patients with lower PaO2 show a greater association between PbtO2 and outcome?
+
+## Looking for Interactions {.smaller}
+
+One way to answer the question "Do patients with lower PaO2 show a greater association between PbtO2 and outcome?" would be to look for potential interactions between PaO2 and PbtO2.
+
+One such model like this would be:
+
+```{r, results='asis', echo=FALSE}
+form <- model.matrix(m.int.1$formula, data=m.int.1$data) %>% colnames %>% .[-1] %>% paste(collapse=' + ')
+form <- paste0('gos ~ ', form)
+cat(form)
+```
+
+
+```{r, results='asis', echo=FALSE}
+get.model.coefs(summary(m.int.1)) %>% pandoc.table
+```
+
+## Interaction Effects
+
+How the effect of PbtO2 on predicted outcome probabilities changes with PaO2 levels:
+
+```{r, echo=FALSE, fig.align='center'}
+d.pred <- data.frame(
+  age=0, marshall=0, gcs=0, icp1_20_inf=0, sex=0, 
+  pbto2_0_20=seq(min(m.int.1$data$pbto2_0_20), max(m.int.1$data$pbto2_0_20), .1)
+)
+d.pred <- list(
+  d.pred %>% mutate(pao2_0_300=min(m.int.1$data$pao2_0_300)), 
+  d.pred %>% mutate(pao2_0_300=0),
+  d.pred %>% mutate(pao2_0_300=max(m.int.1$data$pao2_0_300))
+) %>% do.call('rbind', .) 
+d.pred$prediction <- predict(m.int.1, newdata=d.pred, type='response')
+d.pred %>% 
+  mutate(pbto2_0_20=unscale.var(pbto2_0_20, d.int, 'pbto2_0_20')) %>%
+  mutate(pao2_0_300=unscale.var(pao2_0_300, d.int, 'pao2_0_300')) %>%
+  ggplot(aes(x=pbto2_0_20, y=prediction, color=factor(pao2_0_300))) + geom_line() + 
+  theme_bw()
+```
+
+## More PbtO2 Interactions
+
+Looking for similar interactions between PbtO2 and other predictors shows nothing new.  For example, computing an exhaustive AIC search based on models that include the following predictors interacted with PbtO2 shows that only the PaO2 interaction is even remotely important:
+
+Variables considered in search:
+```{r, echo=FALSE}
+m.int.3@objects[[1]]$data %>% names
+```
+
+Best Model:
+```{r, results='asis', echo=FALSE}
+m.int.3@objects[[1]] %>% summary %>% get.model.coefs %>% pandoc.table
+```
+
+
+## Comparative Modeling
+
+Another way to look for interactions is to attempt to explain differences in predictive accuracy of a model including PbtO2 vs a model that does not include PbtO2.
+
+For example, this is a linear model that attempts to explain the point-wise log likelihood ratio (in LOO CV) calculated between a model that includes all predictors except PbtO2 and one that is identical but also includes PbtO2:
+
+```{r, echo=FALSE}
+cv.llr %>% 
+  select(one_of(p), starts_with('icp'), starts_with('pao2'), llr) %>% 
+  lm(llr ~ ., data=.) %>% summary
+```
+
+Only PaO2 is intimated as being connected to the differences, and here is a plot of those differences:
+
+```{r, echo=FALSE, fig.align='center'}
+cv.llr %>% ggplot(aes(x=pao2_0_300, y=llr)) + geom_point() + 
+  stat_smooth(method='lm') + theme_bw()
+```
+
+
+## Comparative Clusters
+
+As one more way to verify that no other definitions of sub-groups benefiting from PbtO2 exist, a dimensional scaling algorithm like TSNE could be used to see if inferred clusters have a relationship with predictive differences:
+
+```{r, echo=FALSE, fig.align='center'}
+X.tsne %>%  
+  mutate(llr=cv.llr$llr, i=as.numeric(cv.llr$i), pao2_0_300=d.tsne$pao2_0_300) %>% 
+  mutate(Prediction.Better=ifelse(llr < 0, 'w/o PbtO2', 'w PbtO2')) %>%
+  ggplot(aes(x=x, y=y, color=factor(Prediction.Better), size=pao2_0_300)) + 
+  geom_point() + theme_bw() + 
+  ggtitle('2-D Projection of Predictors Overlayed w/ Predictive Type')
+```
+
+## Sub Group Predictability Conclusions
+
+There is some really weak evidence that an interaction exists between PaO2 and PbtO2, implying that PbtO2 is a greater predictor of outcome when a patient experiences lower PaO2 levels.
+
+There is also a good bit of evidence indicating that no other covariates of interest (ICP, Age, GCS, or Marshall) have such an interaction or any kind of relationship indicating clusters of behavior with respect to PbtO2.
 

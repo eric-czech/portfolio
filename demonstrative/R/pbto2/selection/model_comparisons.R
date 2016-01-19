@@ -31,13 +31,6 @@ results.glm <- run.models(pred.binary.glm, T, ic.score=ic.binary.glm)
 results.gbm <- run.models(pred.binary.gbm, T)
 results.rf <- run.models(pred.binary.rf, T)
 
-get.cv.scores <- function(res) foreach(r=res, .combine=rbind) %do% r$cv.scores
-
-get.cv.results <- function(r, s, desc=T){
-  r <- get.cv.scores(r)
-  r[order(r[,s], decreasing = desc),] %>% select(-formula)
-}
-
 r <- results.glm
 cv.res <- get.cv.results(r, 'auc', desc=F)
 cv.res <- get.cv.results(r, 'aucpr', desc=F)
@@ -80,19 +73,6 @@ summary(m@objects[[1]])
 
 ##### Predictive Clusters #####
 
-get.model.diffs <- function(res, model1, model2){
-  #browser()
-  probs <- foreach(r=res, .combine=rbind) %do% {
-    model <- r$cv.scores$model[1]
-    if (!model %in% c(model1, model2))
-      return(NULL)
-    data.frame(y.proba=r$preds$y.proba, y.true=r$preds$y.true, i=r$preds$i, model=model)
-  } 
-  probs %>% dcast(y.true + i ~ model, value.var = 'y.proba') %>%
-    mutate(lik1=y.true * eval(as.name(model1)) + (1-y.true) * (1-eval(as.name(model1)))) %>%
-    mutate(lik2=y.true * eval(as.name(model2)) + (1-y.true) * (1-eval(as.name(model2)))) %>%
-    mutate(llr=log(lik1 / lik2))
-}
 r <- results.glm
 cv.data <- r[[1]]$data
 cv.diffs <- get.model.diffs(r, 'wcov_icp_pao2_pbto2', 'wcov_icp_pao2')
@@ -117,13 +97,23 @@ cv.llr %>% select(one_of(p), starts_with('icp'), starts_with('pao2'), llr) %>%
 cv.llr %>% ggplot(aes(x=pao2_0_300, y=llr)) + geom_point() + stat_smooth(method='lm')
 #cv.llr %>% ggplot(aes(x=pao2_0_300, y=age, color=sign(llr))) + geom_point()
 
-# X <- cv.llr %>% select(age, marshall, gcs)
-# #X.mds <- tsne(X) %>% apply(2, scale) # dist(X) %>% cmdscale
-# X.mds <- cv.llr %>% select(age, gcs)
-# X.mds %>% as.data.frame %>% setNames(c('x', 'y')) %>% 
-#   mutate(llr=cv.llr$llr, i=cv.llr$i) %>%
-#   ggplot(aes(x=x, y=y, color=sign(llr))) + 
-#   geom_jitter(position = position_jitter(width = .1, height = .1))
+
+library(pls)
+X <- cv.llr %>% select(age, marshall, gcs, pao2_0_300, llr)
+r <- plsr(llr ~ ., ncomp=4, data=X, validation = "LOO")
+#plot(r, plottype = "scores", comps = 1:4)
+data.frame(x=r$scores[,1], y=r$scores[,2], llr=X$llr) %>% 
+  mutate(llr=cut(llr, breaks=c(-Inf, 0, Inf))) %>% 
+  ggplot(aes(x=x, y=y, color=llr)) + geom_point()
+
+#X.mds <- cv.llr %>% select(age, gcs)
+X.mds <- tsne(X) %>% apply(2, scale) # dist(X) %>% cmdscale
+X.mds %>% as.data.frame %>% setNames(c('x', 'y')) %>%  
+  mutate(llr=cv.llr$llr, i=as.numeric(cv.llr$i), pao2_0_300=X$pao2_0_300) %>% 
+  mutate(Prediction.Better=ifelse(llr < 0, 'w/o PbtO2', 'w PbtO2')) %>%
+  ggplot(aes(x=x, y=y, color=factor(Prediction.Better), size=pao2_0_300)) + 
+  geom_jitter(position = position_jitter(width = .1, height = .1)) + 
+  theme_bw()
 
 
 

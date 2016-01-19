@@ -25,3 +25,7 @@ caTools
 survival
 gbm
 randomForest
+pander
+iterators
+doMC
+caret

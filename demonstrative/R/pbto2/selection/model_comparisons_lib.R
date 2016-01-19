@@ -4,17 +4,22 @@ library(caTools)
 library(gbm)
 library(randomForest)
 library(ggplot2)
+library(caret)
 
 get.form <- function(e) as.formula(paste0('gos ~ ', paste(e, collapse=' + ')))
 
 scale.df <- function(d) d %>% mutate_each(funs(scale), -gos, -uid)
 
-prep.df <- function(d, ts.features){
+prep.df <- function(d, ts.features, scale.vars=T){
   if (length(ts.features) > 0){
     ts.na <- d %>% select_(.dots=paste0(ts.features, '_is_na')) %>% apply(1, sum)
     d <- d %>% filter(ts.na == 0)
   }
-  d %>% select(-ends_with('_is_na')) %>% scale.df
+  if (scale.vars) {
+    d %>% select(-ends_with('_is_na')) %>% scale.df
+  } else {
+    d %>% select(-ends_with('_is_na'))
+  }
 }
 
 run.model <- function(m, d, modelfun, cv.score=score.predictions, ic.score=NULL, prep.with.all.vars=F){
@@ -29,9 +34,9 @@ run.model <- function(m, d, modelfun, cv.score=score.predictions, ic.score=NULL,
   #browser()
   # Create model formula
   form <- get.form(m)
-  #print(form)
+  
   # Run LOO CV loop and compute scores
-  preds <- foreach(i=1:nrow(d), .combine=rbind) %do% {
+  preds <- foreach(i=1:nrow(d), .combine=rbind) %dopar% {
     d.tr <- d[-i,]
     d.ho <- d[i,]
     modelfun(form, d.tr, d.ho) %>% 
@@ -45,8 +50,10 @@ run.model <- function(m, d, modelfun, cv.score=score.predictions, ic.score=NULL,
   list(cv.scores=cv.scores, preds=preds, data=d)
 }
 
-run.models <- function(modelfun, prep.with.all.vars, ic.score=NULL){
-  foreach(m=names(models))%do%{
+run.models <- function(modelfun, prep.with.all.vars, ic.score=NULL, model.filter=c()){
+  res <- foreach(m=names(models))%do%{
+    if (length(model.filter) > 0 && !m %in% model.filter)
+      return(NULL)
     #score <- cv.run(models[[m]], d, predictor=bin.predict.class, score=accuracy.score)
     #score <- cv.run(models[[m]], d, predictor=bin.predict.probs, score=logloss)
     #score <- cv.run(models[[m]], do, predictor=ord.predict.probs, score=mlogloss)
@@ -55,8 +62,15 @@ run.models <- function(modelfun, prep.with.all.vars, ic.score=NULL){
     r[['cv.scores']] <- r[['cv.scores']] %>% mutate(model=m, formula=paste(models[[m]], collapse=' + '))
     r
   } 
+  res[!sapply(res, is.null)] 
 }
 
+get.cv.scores <- function(res) foreach(r=res, .combine=rbind) %do% r$cv.scores
+
+get.cv.results <- function(r, s, desc=T){
+  r <- get.cv.scores(r)
+  r[order(r[,s], decreasing = desc),] %>% select(-formula)
+}
 
 get.models <- function(){
   gas.models <- list(
@@ -93,7 +107,6 @@ pred.binary.glm <- function(form, d.tr, d.ho){
   data.frame(y.pred=y, y.proba=p)
 }
 
-
 pred.binary.gbm <- function(form, d.tr, d.ho){
   r <- gbm(form, data = d.tr, n.trees = 1000, distribution='bernoulli',
            interaction.depth = 5, shrinkage=.1, n.minobsinnode = 20)
@@ -109,12 +122,23 @@ pred.binary.rf <- function(form, d.tr, d.ho){
   data.frame(y.pred=y, y.proba=p)
 }
 
-pred.binary.gbm <- function(form, d.tr, d.ho){
-  r <- gbm(form, data = d.tr, n.trees = 1000, distribution='bernoulli',
-           interaction.depth = 5, shrinkage=.1, n.minobsinnode = 20)
-  p <- predict(r, newdata=d.ho, type='response',  n.trees = 100)
-  y <- ifelse(p > .5, 1, 0)
+pred.binary.svm <- function(form, d.tr, d.ho){
+  ctrl <- trainControl(method = "cv", number=5, classProbs=TRUE)
+  d.svm <- d.tr %>% mutate(gos=factor(gos, levels=c(0, 1), labels=c('bad', 'good')))
+  r <- train(form, data=d.svm, method = "svmRadial", trControl = ctrl)
+  
+  p <- predict(r, newdata=d.ho, type='prob')[1,2]
+  y <- predict(r, newdata=d.ho, type='raw') %>% as.integer - 1
   data.frame(y.pred=y, y.proba=p)
+}
+
+pred.binary.knn <- function(form, d.tr, d.ho){
+  ctrl <- trainControl(method="cv", number=5)
+  d.knn <- d.tr %>% mutate(gos=factor(gos, levels=c(0, 1), labels=c('bad', 'good')))
+  r <- train(form, data = d.knn, method = "knn", trControl = ctrl, tuneLength = 20)
+  p <- predict(r, newdata=d.ho, type='prob')[1,2]
+  y <- predict(r, newdata=d.ho, type='raw') %>% as.integer - 1
+  data.frame(y.pred=y, y.proba=p)  
 }
 
 bin.predict.probs <- function(f, d.tr, d.ho){
@@ -198,3 +222,15 @@ plot.roc.curve <- function(res, model.filter, title='ROC Curves'){
     theme_bw() + ggtitle(title)
 }
 
+get.model.diffs <- function(res, model1, model2){
+  probs <- foreach(r=res, .combine=rbind) %do% {
+    model <- r$cv.scores$model[1]
+    if (!model %in% c(model1, model2))
+      return(NULL)
+    data.frame(y.proba=r$preds$y.proba, y.true=r$preds$y.true, i=r$preds$i, model=model, stringsAsFactors=F)
+  } 
+  probs %>% dcast(y.true + i ~ model, value.var = 'y.proba') %>% 
+    mutate(lik1=y.true * .[,model1] + (1-y.true) * (1-.[,model1])) %>% 
+    mutate(lik2=y.true * .[,model2] + (1-y.true) * (1-.[,model2])) %>% 
+    mutate(llr=log(lik1 / lik2))
+}
