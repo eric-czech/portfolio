@@ -213,11 +213,14 @@ plot.roc.curve <- function(res, model.filter, title='ROC Curves'){
     model <- r$cv.scores$model[1]
     if (!model %in% model.filter)
       return(NULL)
-    roc <- prediction(r$preds$y.proba, r$preds$y.true) %>%
-      performance('tpr', 'fpr') 
-    data.frame(model=model, x=roc@x.values[[1]], y=roc@y.values[[1]])
+    pred.obj <- prediction(r$preds$y.proba, r$preds$y.true)
+    roc <- pred.obj %>% performance('tpr', 'fpr') 
+    auc <- pred.obj %>% performance('auc') %>% .@y.values %>% .[[1]]
+    data.frame(model=model, auc=auc, x=roc@x.values[[1]], y=roc@y.values[[1]])
   }
-  roc %>% ggplot(aes(x=x, y=y, color=model)) + geom_line() + 
+  roc %>% 
+    mutate(model=paste0(model, ' (AUC=', round(auc, 2), ')')) %>%
+    ggplot(aes(x=x, y=y, color=model)) + geom_line() + 
     geom_abline(intercept = 0, slope = 1) + 
     theme_bw() + ggtitle(title)
 }

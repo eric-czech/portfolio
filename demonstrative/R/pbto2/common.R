@@ -78,6 +78,10 @@ DATA_CONFIG <- 'config3'
 #DATA_CONFIG <- 'config2'
 #DATA_CONFIG <- 'config1'
 
+set.data.config <- function(config){
+  DATA_CONFIG <<- config
+}
+
 get.wide.data <- function(scale.vars=T, outcome.func=gos.to.binom, reset.uid=F, remove.na.flags=T){
   d <- read.csv(sprintf('~/data/pbto2/final/%s/data_wide.csv', DATA_CONFIG)) %>% 
     mutate_each(funs(as.numeric)) %>%

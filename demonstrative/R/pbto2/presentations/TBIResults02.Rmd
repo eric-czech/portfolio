@@ -2,9 +2,9 @@
 title: "Traumatic Brain Injury Study Results (pt. 2)"
 author: "Eric Czech"
 date: "January 14, 2015"
-widescreen: true
 #output: ioslides_presentation
 output: html_document
+widescreen: yes
 #widescreen: yes
 ---
 
@@ -28,6 +28,11 @@ source('~/repos/portfolio/demonstrative/R/pbto2/common.R')
 source('~/repos/portfolio/demonstrative/R/pbto2/performance/cv_utils.R')
 source('~/repos/portfolio/demonstrative/R/pbto2/selection/model_comparisons_lib.R')
 
+#set.data.config('config3') # 48 hour source data
+#set.data.config('config2') # 24 hour source data
+set.data.config('config6') # 72 hour source data
+#set.data.config('config4') # 96 hour source data
+
 ##### Rendering Functions #####
 
 get.model.coefs <- function(m){
@@ -48,6 +53,8 @@ get.model.results <- function(d, m){
   cat(paste('**N** =', nrow(d)))
   d %>% glm(m, data=., family='binomial') %>% summary %>% get.model.coefs
 }
+
+plot.ly <- function(p) { p %>% plotly::config(showLink = F, displayModeBar = F) }
 ```
 
 ```{r loading, echo=FALSE, cache=TRUE}
@@ -131,7 +138,7 @@ Given timeseries measurements $x_1, x_2, x_3, ..., x_n$, compute the percentage 
 
 ## Threshold Finding Model (Same as before) {.smaller}
 
-Logistic regression with special function for taking in timeseries measurements and then estimating parameters for that function that map to gas/pressure thresholds:
+Logistic regression with special function for taking in timeseries measurements and then estimating parameters for that function that map to gas/pressure thresholds ([Stan Sampling Model](https://github.com/eric-czech/portfolio/blob/master/demonstrative/R/pbto2/models/stan/nonlinear_binom.stan)):
 
 $$ logit(Pr(y_i = 1)) = \alpha + \beta \cdot X_i + f(G_{ij}) $$
 
@@ -272,7 +279,7 @@ All models below were tested in leave-one-out cross validation for the sake of c
 
 ```{r, echo=FALSE}
 foreach(m=names(models), .combine=rbind)%do%{
-  data.frame(model.name=m, variables=paste(models[[m]], collapse=','))
+  data.frame(model.name=m, variables=paste(models[[m]], collapse=', '))
 } %>% kable
 ```
 
@@ -302,20 +309,20 @@ d1 %>%
 
 ROC Curves from logistic regression models [Demo turning models on and off in order]:
 
-```{r, echo=FALSE, fig.align='center'}
+```{r, echo=FALSE, fig.align='center', fig.width=12, fig.height=8}
 model.filter <- c(
   'demo', 'wcov_none', 'wcov_pbto2', 'wcov_icp', 'wcov_icp_pao2', 'wcov_icp_paco2',
   'wcov_icp_pbto2', 'wcov_icp_pao2_pbto2', 'wcov_icp_pao2_pbto2_paco2'
 )
-plot.roc.curve(results.glm, model.filter, title='GLM ROC')  %>% 
-  ggplotly %>% layout(showlegend = T)
+plot.roc.curve(results.glm, model.filter, title='GLM ROC (Click on legend items to remove them)')  %>% 
+  ggplotly %>% layout(showlegend = T) %>% plot.ly
 ```
 
 ## GBM ROC Plots
 
 ROC Curves from gbm models:
 
-```{r, echo=FALSE, fig.align='center'}
+```{r, echo=FALSE, fig.align='center', fig.width=12, fig.height=8}
 plot.roc.curve(results.gbm, model.filter, title='GBM ROC')  %>% 
   ggplotly %>% layout(showlegend = T)
 ```
@@ -324,7 +331,7 @@ plot.roc.curve(results.gbm, model.filter, title='GBM ROC')  %>%
 
 ROC Curves from nearest neighbor models:
 
-```{r, echo=FALSE, fig.align='center'}
+```{r, echo=FALSE, fig.align='center', fig.width=12, fig.height=8}
 plot.roc.curve(results.knn, model.filter, title='Nearest Neighbor ROC')  %>% 
   ggplotly %>% layout(showlegend = T)
 ```
@@ -334,6 +341,9 @@ plot.roc.curve(results.knn, model.filter, title='Nearest Neighbor ROC')  %>%
 
 Changes in ROC curves and AUC values further indicate that PaO2 is a weaker predictor than PbtO2.  However, the effect of all gases on a practical scale is still relatively weak, and even the highest performing classifiers offer a fairly minor lift over those built using only known predictors of outcome like GCS + Marshall scores and Age.
 
+
+<br><br><br>
+<hr>
 
 # Sub Group Predictability
 

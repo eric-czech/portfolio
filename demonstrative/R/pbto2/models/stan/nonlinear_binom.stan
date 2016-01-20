@@ -63,8 +63,8 @@ model {
   c1 ~ normal(-1, 3);
   c2 ~ normal(1, 3); 
 
-  // Multi-model prior below on 'b' parameters 
-  // avoids identifiability issues for b near 0
+  // Multi-modal prior below on 'b' parameters 
+  // avoid identifiability issues for b near 0
   sinh(b1/d) ~ normal(0, 2);
   sinh(b2/d) ~ normal(0, 2);
   
