@@ -30,8 +30,8 @@ source('~/repos/portfolio/demonstrative/R/pbto2/selection/model_comparisons_lib.
 
 #set.data.config('config3') # 48 hour source data
 #set.data.config('config2') # 24 hour source data
-set.data.config('config6') # 72 hour source data
-#set.data.config('config4') # 96 hour source data
+#set.data.config('config6') # 72 hour source data
+set.data.config('config4') # 96 hour source data
 
 ##### Rendering Functions #####
 

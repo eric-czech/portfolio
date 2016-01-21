@@ -108,11 +108,11 @@ data.frame(x=r$scores[,1], y=r$scores[,2], llr=X$llr) %>%
 
 #X.mds <- cv.llr %>% select(age, gcs)
 X.mds <- tsne(X) %>% apply(2, scale) # dist(X) %>% cmdscale
-X.mds %>% as.data.frame %>% setNames(c('x', 'y')) %>%  
-  mutate(llr=cv.llr$llr, i=as.numeric(cv.llr$i), pao2_0_300=X$pao2_0_300) %>% 
+X.mds %>% as.data.frame %>% setNames(c('x', 'y')) %>%
+  mutate(llr=cv.llr$llr, i=as.numeric(cv.llr$i), pao2_0_300=X$pao2_0_300) %>%
   mutate(Prediction.Better=ifelse(llr < 0, 'w/o PbtO2', 'w PbtO2')) %>%
-  ggplot(aes(x=x, y=y, color=factor(Prediction.Better), size=pao2_0_300)) + 
-  geom_jitter(position = position_jitter(width = .1, height = .1)) + 
+  ggplot(aes(x=x, y=y, color=factor(Prediction.Better), size=pao2_0_300)) +
+  geom_jitter(position = position_jitter(width = .1, height = .1)) +
   theme_bw()
 
 

@@ -73,3 +73,4 @@ model {
   increment_log_prob(log(fabs((1/d)*cosh(b1/d))));
   increment_log_prob(log(fabs((1/d)*cosh(b2/d))));
 }
+
