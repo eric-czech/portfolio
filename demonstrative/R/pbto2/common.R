@@ -72,12 +72,8 @@ plot.pbto2.coef <- function(beta.post){
     ggtitle('Coefficient 95% Intevals for Pbto2 Above and Below Cutpoint') 
 }
 
-#DATA_CONFIG <- 'config5'
-#DATA_CONFIG <- 'config4'
-DATA_CONFIG <- 'config3'
-#DATA_CONFIG <- 'config2'
-#DATA_CONFIG <- 'config1'
 
+DATA_CONFIG <- 'config3'
 set.data.config <- function(config){
   DATA_CONFIG <<- config
 }
