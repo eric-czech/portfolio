@@ -2,6 +2,18 @@ library(dplyr)
 library(ROCR)
 EPSILON <- .000000000000001
 
+
+.score.reg.mse <- function (y.true, y.pred) mean((y.true-y.pred)^2)
+.score.reg.rmse <- function (y.true, y.pred) sqrt(.score.reg.mse(y.true, y.pred))
+.score.reg.rsquared <- function(y.true, y.pred) cor(y.true, y.pred) ^ 2
+.score.reg.mae <- function (y.true, y.pred) mean(abs(y.true-y.pred))
+
+GetRegressorScore <- function(y.true, y.pred, score){
+  if (!score %in% c('rsquared', 'rmse', 'mae', 'mse'))
+    stop(sprintf('Score calculations for type "%s" not valid.', score))
+  eval(parse(text = sprintf('.score.reg.%s(y.true, y.pred)', score)))
+}
+
 GetBinaryClassifierScore <- function(y.true, y.pred, score, is.proba=T){
   if (is.proba){
     if (!score %in% c('logloss', 'roc.auc', 'pr.auc'))
