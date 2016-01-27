@@ -4,9 +4,9 @@ EPSILON <- .000000000000001
 
 
 .score.reg.mse <- function (y.true, y.pred) mean((y.true-y.pred)^2)
-.score.reg.rmse <- function (y.true, y.pred) sqrt(mse(y.true, y.pred))
+.score.reg.rmse <- function (y.true, y.pred) sqrt(.score.reg.mse(y.true, y.pred))
 .score.reg.rsquared <- function(y.true, y.pred) cor(y.true, y.pred) ^ 2
-.score.reg.mae <- function (y.true, y.pred) mean(ae(y.true, y.pred))
+.score.reg.mae <- function (y.true, y.pred) mean(abs(y.true-y.pred))
 
 GetRegressorScore <- function(y.true, y.pred, score){
   if (!score %in% c('rsquared', 'rmse', 'mae', 'mse'))
