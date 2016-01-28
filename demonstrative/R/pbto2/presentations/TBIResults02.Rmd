@@ -28,10 +28,10 @@ source('~/repos/portfolio/demonstrative/R/pbto2/common.R')
 source('~/repos/portfolio/demonstrative/R/pbto2/performance/cv_utils.R')
 source('~/repos/portfolio/demonstrative/R/pbto2/selection/model_comparisons_lib.R')
 
-#set.data.config('config3') # 48 hour source data
+set.data.config('config3') # 48 hour source data
 #set.data.config('config2') # 24 hour source data
 #set.data.config('config6') # 72 hour source data
-set.data.config('config4') # 96 hour source data
+#set.data.config('config4') # 96 hour source data
 
 ##### Rendering Functions #####
 
@@ -71,7 +71,7 @@ models <- models[['models']]
 ```{r exhaustive_modeling, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
 d.glmulti <- dbu %>% prep.df(c('icp1', 'pbto2', 'pao2', 'paco2'))
 f.glmulti <- get.form(models[['wcov_icp_pao2_pbto2_paco2']])
-m.glmulti <- glmulti(f.glmulti, data=d.glmulti, family='binomial', level=1, crit = AICc, plotty = F, report=F)
+m.glmulti <- glmulti(f.glmulti, data=d.glmulti, family='binomial', level=1, crit=AICc, plotty=F, report=F)
 ```
 
 ```{r predictive_modeling, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
@@ -87,11 +87,17 @@ results.knn <- run.models(pred.binary.knn, T, model.filter=model.filter)
 ```{r interaction_modeling, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
 d.int <- dbu %>% prep.df(c('icp1', 'pbto2', 'pao2'), scale.vars=F) %>%
   select(gos, age, marshall, gcs, sex, pao2_0_300, pbto2_0_20, icp1_20_inf)
+d.int.noicp <- dbu %>% prep.df(c('pbto2', 'pao2'), scale.vars=F) %>%
+  select(gos, age, marshall, gcs, sex, pao2_0_300, pbto2_0_20)
 
 d.int.1 <- d.int %>% mutate_each(funs(scale), -gos) 
 d.int.2 <- d.int %>% mutate_each(funs(scale), -gos) %>%
   model.matrix(gos ~ (.)*pbto2_0_20 - 1, data=.) %>% data.frame %>% 
   cbind(., data.frame(gos=d.int$gos))
+d.int.3 <- d.int.noicp %>% mutate_each(funs(scale), -gos) 
+d.int.4 <- d.int.noicp %>% mutate_each(funs(scale), -gos) %>%
+  model.matrix(gos ~ (.)*pbto2_0_20 - 1, data=.) %>% data.frame %>% 
+  cbind(., data.frame(gos=d.int.noicp$gos))
 
 # d.int.bins <- d.int %>% mutate(pao2=cut(
 #     d.int$pao2_0_300, breaks = c(0, .25, .75, 1), 
@@ -101,6 +107,11 @@ d.int.2 <- d.int %>% mutate_each(funs(scale), -gos) %>%
 m.int.1 <- glm(gos ~ . + pao2_0_300:pbto2_0_20, data=d.int.1, family='binomial')
 #m.int.2 <- glmulti(gos ~ . + pbto2_0_20:pao2_0_300, data=d.int.1, family='binomial', level=1, crit = AICc)
 m.int.3 <- glmulti(gos ~ ., data=d.int.2, family='binomial', level=1, crit = AICc, plotty = F, report=F)
+m.int.4 <- glm(gos ~ . + pao2_0_300:pbto2_0_20, data=d.int.3, family='binomial')
+#m.int.2 <- glmulti(gos ~ . + pbto2_0_20:pao2_0_300, data=d.int.1, family='binomial', level=1, crit = AICc)
+m.int.6 <- glmulti(gos ~ ., data=d.int.4, family='binomial', level=1, crit = AICc, plotty = F, report=F)
+
+
 ```
 
 ```{r cluster_modeling, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
@@ -243,6 +254,19 @@ r %>% pandoc.table
 
 Now even in the presence of ICP, PbtO2 is still significant at a 95% level (vs a p-value of .07 in the best model)
 
+## Impact of PbtO2 (no ICP) {.smaller}
+
+Same as previous without ICP:
+
+```{r, echo=FALSE, results='asis'}
+d <- dbu %>% prep.df(c('pbto2'))
+m <- get.form(models[['wcov_pbto2']])
+r <- get.model.results(d, m)
+```
+```{r, results='asis', echo=FALSE}
+r %>% pandoc.table
+```
+
 ## Impact of PbtO2 w/ PaO2 {.smaller}
 
 To answer the question *"Is PbtO2 better than PaO2?"*, a model like that above that also includes PaO2 could be considered:
@@ -257,6 +281,20 @@ r %>% pandoc.table
 ```
 
 At least on the scale of statistical significance, an argument could be made that PbtO2 is better than PaO2.
+
+## Impact of PbtO2 w/ PaO2 (no ICP)
+
+Same as previous with no ICP:
+
+```{r, echo=FALSE, results='asis'}
+d <- dbu %>% prep.df(c('pbto2', 'pao2'))
+m <- get.form(models[['wcov_pao2_pbto2']])
+r <- get.model.results(d, m)
+```
+```{r, results='asis', echo=FALSE}
+r %>% pandoc.table
+```
+
 
 ## Statistical Performance Conclusions {.smaller}
 
@@ -312,7 +350,8 @@ ROC Curves from logistic regression models [Demo turning models on and off in or
 ```{r, echo=FALSE, fig.align='center', fig.width=12, fig.height=8}
 model.filter <- c(
   'demo', 'wcov_none', 'wcov_pbto2', 'wcov_icp', 'wcov_icp_pao2', 'wcov_icp_paco2',
-  'wcov_icp_pbto2', 'wcov_icp_pao2_pbto2', 'wcov_icp_pao2_pbto2_paco2'
+  'wcov_icp_pbto2', 'wcov_icp_pao2_pbto2', 'wcov_icp_pao2_pbto2_paco2',
+  'wcov_pao2_pbto2', 'wcov_pao2'
 )
 plot.roc.curve(results.glm, model.filter, title='GLM ROC (Click on legend items to remove them)')  %>% 
   ggplotly %>% layout(showlegend = T) %>% plot.ly
@@ -389,6 +428,40 @@ d.pred %>%
   theme_bw()
 ```
 
+## Interaction Effects (no ICP)
+
+```{r, results='asis', echo=FALSE}
+form <- model.matrix(m.int.4$formula, data=m.int.4$data) %>% colnames %>% .[-1] %>% paste(collapse=' + ')
+form <- paste0('gos ~ ', form)
+cat(form)
+```
+
+
+```{r, results='asis', echo=FALSE}
+get.model.coefs(summary(m.int.4)) %>% pandoc.table
+```
+
+
+## Interaction Effect Counterfactuals (no ICP)
+
+```{r, echo=FALSE, fig.align='center'}
+d.pred <- data.frame(
+  age=0, marshall=0, gcs=0, sex=0, 
+  pbto2_0_20=seq(min(m.int.4$data$pbto2_0_20), max(m.int.4$data$pbto2_0_20), .1)
+)
+d.pred <- list(
+  d.pred %>% mutate(pao2_0_300=min(m.int.4$data$pao2_0_300)), 
+  d.pred %>% mutate(pao2_0_300=0),
+  d.pred %>% mutate(pao2_0_300=max(m.int.4$data$pao2_0_300))
+) %>% do.call('rbind', .) 
+d.pred$prediction <- predict(m.int.4, newdata=d.pred, type='response')
+d.pred %>% 
+  mutate(pbto2_0_20=unscale.var(pbto2_0_20, d.int.noicp, 'pbto2_0_20')) %>%
+  mutate(pao2_0_300=unscale.var(pao2_0_300, d.int.noicp, 'pao2_0_300')) %>%
+  ggplot(aes(x=pbto2_0_20, y=prediction, color=factor(pao2_0_300))) + geom_line() + 
+  theme_bw()
+```
+
 ## More PbtO2 Interactions
 
 Looking for similar interactions between PbtO2 and other predictors shows nothing new.  For example, computing an exhaustive AIC search based on models that include the following predictors interacted with PbtO2 shows that only the PaO2 interaction is even remotely important:
@@ -403,6 +476,20 @@ Best Model:
 m.int.3@objects[[1]] %>% summary %>% get.model.coefs %>% pandoc.table
 ```
 
+
+## More PbtO2 Interactions (no ICP)
+
+Same as above with no ICP:
+
+Variables considered in search:
+```{r, echo=FALSE}
+m.int.6@objects[[1]]$data %>% names
+```
+
+Best Model:
+```{r, results='asis', echo=FALSE}
+m.int.6@objects[[1]] %>% summary %>% get.model.coefs %>% pandoc.table
+```
 
 ## Comparative Modeling
 
