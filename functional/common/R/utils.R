@@ -25,3 +25,6 @@ lib <- function(p) {
     install.packages(p, dep = TRUE)
   require(p, character.only = TRUE)
 }
+
+#' Binary operator used to remove items from a vector
+`%wo%` <- function(sequence, removals) sequence[!sequence %in% removals]
