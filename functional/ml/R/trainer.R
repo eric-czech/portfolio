@@ -4,6 +4,7 @@ source('~/repos/portfolio/functional/common/R/cache.R')
 library(foreach)
 library(iterators)
 library(logging)
+library(stringr)
 
 Trainer <- setRefClass("Trainer",
   fields = list(cache='Cache', seed='numeric', fold.data='list', fold.index='list'),
@@ -13,51 +14,115 @@ Trainer <- setRefClass("Trainer",
       callSuper(..., cache=cache, seed=seed, fold.data=list(), fold.index=list())
     },
     getCache = function(){ cache },
-    generateFolds = function(fold.generator){
+    generateFoldIndex = function(y, fold.generator){
       set.seed(seed)
-      fold.index <<- fold.generator()
+      fold.index <<- list()
+      fold.index[['outer']] <<- fold.generator(y, index=NULL, level=1)
+      fold.index[['inner']] <<- lapply(fold.index[['outer']], function(x) fold.generator(y, index=x, level=2))
       loginfo('Fold index generation complete')
     },
-    getFolds = function(){ fold.index },
-    generateFoldData = function(X, y, data.generator, data.summarizer=NULL){
-      if (length(fold.index) == 0)
-        stop('Training cannot be done until folds have been generated (must call generateFolds first)')
-      fold.data <<- foreach(fold=fold.index, i=icount()) %do%{
-        loginfo('Generating data for fold %s of %s', i, length(fold.index))
+    getFoldIndex = function(){ fold.index },
+    generateFoldData = function(X, y, data.generator, data.summarizer=NULL, enable.cache=T){
+      if (length(fold.index[['outer']]) == 0)
+        stop('Training cannot be done until fold index has been generated (must call generateFoldIndex first)')
+      fold.data <<- foreach(fold=fold.index[['outer']], i=icount(), .errorhandling='stop') %do%{
+        loginfo('Generating data for fold %s of %s', i, length(fold.index[['outer']]))
         
-        X.train <- X[-fold,]; y.train <- y[-fold]
-        X.test <- X[fold,]; y.test <- y[fold]
+        # Folds should be for training set, not test set
+        X.train <- X[fold,]; y.train <- y[fold]
+        X.test <- X[-fold,]; y.test <- y[-fold]
         
         set.seed(seed)
         fold.key <- sprintf('fold_%s', i)
-        d <- cache$load(fold.key, function(){ data.generator(X.train, y.train, X.test, y.test) })
+        tryCatch({
+          if (!enable.cache) cache$invalidate(fold.key)
+          d <- cache$load(fold.key, function(){ data.generator(X.train, y.train, X.test, y.test) })
+        }, error=function(e) {
+            logerror('An error occurred while generating/fetching training data.')
+            logerror(e)
+            browser()
+        })
         
         if (!is.null(data.summarizer)) data.summarizer(d)
         
-        list(key=fold.key, id=i, data=d, y.test=y.test)
+        inner.fold.index <- tryCatch(fold.index[['inner']][[i]], error=function(e) NULL)
+        list(key=fold.key, id=i, data=d, y.test=y.test, index=inner.fold.index)
       }
       loginfo('Fold data generation complete')
     },
     getFoldData = function(){
       fold.data
     },
-    train = function(model, data.summarizer=NULL){
+    cleanModelName = function(model.name){
+      str_replace_all(str_replace_all(model.name, '\\.', '_'), '\\W+', '')
+    },
+    fit = function(model, X, y, data.generator, data.summarizer=NULL, enable.cache=T){
+      
+      set.seed(seed)
+      data.key <- 'fit_data'
+      tryCatch({
+        if (!enable.cache) cache$invalidate(data.key)
+        d <- cache$load(data.key, function(){ data.generator(X, y, X, y) })
+      }, error=function(e) {
+        logerror('An error occurred while creating data for non-resampled fit.')
+        logerror(e)
+        browser()
+      })
+      
+      if (!is.null(data.summarizer)) data.summarizer(d)
+      
+      set.seed(seed)
+      tryCatch({ 
+        f <- model$train(d, NULL, 0) 
+      }, error=function(e){
+        logerror('An error occurred during training.')
+        logerror(e)
+        browser()
+      })
+      
+      res <- list(data=d, fit=f)
+      loginfo('Model fit complete')
+      res
+    },
+    train = function(model, data.summarizer=NULL, enable.cache=T){
       if (length(fold.data) == 0)
         stop('Training cannot be done until fold data has been generated (must call generateFoldData first)')
-      res <- foreach(fold=fold.data, i=icount()) %do% {
-        loginfo('Running model trainer for fold %s of %s', i, length(fold.data))
-        
-        if (!is.null(data.summarizer)) data.summarizer(fold$data)
-        
-        set.seed(seed)
-        f <- model$train(fold$data)
-        
-        set.seed(seed)
-        p <- model$predict(f, fold$data)
-        
-        list(fit=f, y.pred=p, y.test=fold$y.test, fold=fold$id)
-      }
-      loginfo('Training complete')
+      
+      model.key <- sprintf('model_%s', cleanModelName(model$name))
+      loginfo('Beginning training for model "%s" (cache name = "%s")', model$name, model.key)
+      
+      if (!enable.cache) cache$invalidate(model.key)
+      res <- cache$load(model.key, function(){ 
+        foreach(fold=fold.data, i=icount(), .errorhandling='stop') %do% {
+          loginfo('Running model trainer for fold %s of %s', i, length(fold.data))
+          
+          if (!is.null(data.summarizer)) data.summarizer(fold$data)
+          
+          # Run model training routine
+          set.seed(seed)
+          tryCatch({ 
+            f <- model$train(fold$data, fold$index, fold$id) 
+          }, error=function(e){
+            logerror('An error occurred during training.')
+            logerror(e)
+            browser()
+          })
+          
+          # Reset seed and produce predictions from model
+          set.seed(seed)
+          tryCatch({ 
+            p <- model$predict(f, fold$data, fold$id)
+          }, error=function(e){
+            logerror('An error occurred during model prediction')
+            logerror(e)
+            browser()
+          })
+          
+
+          list(fit=f, y.pred=p, y.test=fold$y.test, fold=fold$id, model=model$name)
+        }
+      })
+      loginfo('Training complete for model "%s"', model$name)
       res
     }
   )
