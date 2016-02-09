@@ -56,32 +56,51 @@ Trainer <- setRefClass("Trainer",
     cleanModelName = function(model.name){
       str_replace_all(str_replace_all(model.name, '\\.', '_'), '\\W+', '')
     },
-    fit = function(model, X, y, data.generator, data.summarizer=NULL, enable.cache=T){
+    predict = function(model, data, fold.index, fold.id){
       
-      set.seed(seed)
-      data.key <- 'fit_data'
-      tryCatch({
-        if (!enable.cache) cache$invalidate(data.key)
-        d <- cache$load(data.key, function(){ data.generator(X, y, X, y) })
-      }, error=function(e) {
-        logerror('An error occurred while creating data for non-resampled fit.')
-        logerror(e)
-        browser()
-      })
-      
-      if (!is.null(data.summarizer)) data.summarizer(d)
-      
+      # Run model training routine
       set.seed(seed)
       tryCatch({ 
-        f <- model$train(d, NULL, 0) 
+        f <- model$train(data, fold.index, fold.id) 
       }, error=function(e){
         logerror('An error occurred during training.')
         logerror(e)
         browser()
       })
       
-      res <- list(data=d, fit=f)
-      loginfo('Model fit complete')
+      # Reset seed and produce predictions from model
+      set.seed(seed)
+      tryCatch({ 
+        p <- model$predict(f, data, fold.id)
+      }, error=function(e){
+        logerror('An error occurred during model prediction')
+        logerror(e)
+        browser()
+      })
+      
+      list(fit=f, y.pred=p, y.test=model$test(data), fold=fold.id, model=model$name)
+    }, 
+    holdout = function(models, X, y, X.ho, y.ho, data.generator, data.summarizer=NULL, enable.cache=T){
+      
+      # Create and cache preprocessed predictor data frame
+      set.seed(seed)
+      data.key <- 'holdout_data'
+      tryCatch({
+        if (!enable.cache) cache$invalidate(data.key)
+        d <- cache$load(data.key, function(){ data.generator(X, y, X.ho, y.ho) })
+      }, error=function(e) {
+        logerror('An error occurred while creating/fetching hold out data.')
+        logerror(e)
+        browser()
+      })
+      
+      if (!is.null(data.summarizer)) data.summarizer(d)
+      
+      res <- foreach(model=models) %do% {
+        loginfo('Creating holdout predictions for model "%s"', model$name)
+        .self$predict(model, d, NULL, 0)
+      } %>% setNames(sapply(models), function(m) m$name)
+      loginfo('Holdout predictions complete')
       res
     },
     train = function(model, data.summarizer=NULL, enable.cache=T){
@@ -98,28 +117,10 @@ Trainer <- setRefClass("Trainer",
           
           if (!is.null(data.summarizer)) data.summarizer(fold$data)
           
-          # Run model training routine
-          set.seed(seed)
-          tryCatch({ 
-            f <- model$train(fold$data, fold$index, fold$id) 
-          }, error=function(e){
-            logerror('An error occurred during training.')
-            logerror(e)
-            browser()
-          })
-          
-          # Reset seed and produce predictions from model
-          set.seed(seed)
-          tryCatch({ 
-            p <- model$predict(f, fold$data, fold$id)
-          }, error=function(e){
-            logerror('An error occurred during model prediction')
-            logerror(e)
-            browser()
-          })
-          
+          # Fit model and get predictions for this fold
+          res <- .self$predict(model, fold$data, fold$index, fold$id)
 
-          list(fit=f, y.pred=p, y.test=fold$y.test, fold=fold$id, model=model$name)
+          res
         }
       })
       loginfo('Training complete for model "%s"', model$name)
