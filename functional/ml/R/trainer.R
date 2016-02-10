@@ -99,7 +99,7 @@ Trainer <- setRefClass("Trainer",
       res <- foreach(model=models) %do% {
         loginfo('Creating holdout predictions for model "%s"', model$name)
         .self$predict(model, d, NULL, 0)
-      } %>% setNames(sapply(models), function(m) m$name)
+      } %>% setNames(sapply(models, function(m) m$name))
       loginfo('Holdout predictions complete')
       res
     },
