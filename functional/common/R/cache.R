@@ -97,8 +97,14 @@ Cache <- setRefClass("Cache",
       # Load and return the cached object
       e <- new.env()
       base::load(cpath, envir=e)
-      if (!'object' %in% ls(e))
-        stop(sprintf('Failed to find result with name "object" in restored cache file "%s"', cpath))
+      if ('res' %in% ls(e)){
+        object <- e$res
+        base::save(object, file=cpath, compress=compress)
+      } else {
+        if (!'object' %in% ls(e))
+          stop(sprintf('Failed to find result with name "object" in restored cache file "%s"', cpath))
+        object <- e$object
+      }
       e$object
     },
     invalidate = function(key, ext='.Rdata'){
