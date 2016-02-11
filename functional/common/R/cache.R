@@ -97,15 +97,9 @@ Cache <- setRefClass("Cache",
       # Load and return the cached object
       e <- new.env()
       base::load(cpath, envir=e)
-      if ('res' %in% ls(e)){
-        object <- e$res
-        base::save(object, file=cpath, compress=compress)
-      } else {
-        if (!'object' %in% ls(e))
-          stop(sprintf('Failed to find result with name "object" in restored cache file "%s"', cpath))
-        object <- e$object
-      }
-      object
+      if (!'object' %in% ls(e))
+        stop(sprintf('Failed to find result with name "object" in restored cache file "%s"', cpath))
+      e$object
     },
     invalidate = function(key, ext='.Rdata'){
       #' Deletes a file for the given key, if it exists in cache
@@ -124,9 +118,21 @@ Cache <- setRefClass("Cache",
     store = function(key, object, compress=T, ext='.Rdata'){
       #' Stores the given object using the given name (key)
       #' * Note that this should be used only to force a write of a 
-      #'   new cached object, which should be a rare use case
+      #'   new cached object, which should be a somewhat rare use case
       cpath <- getPath(key, ext)
       base::save(object, file=cpath, compress=compress)
+    },
+    get = function(key, ext='.Rdata'){
+      #' Fetches a previously cached object using the given name (key)
+      cpath <- getPath(key, ext)
+      if (!file.exists(cpath))
+        stop(sprintf('Cached object "%s" does not exist (expected at path "%s")', key, cpath))
+      
+      e <- new.env()
+      base::load(cpath, envir=e)
+      if (!'object' %in% ls(e))
+        stop(sprintf('Failed to find result with name "object" in restored cache file "%s"', cpath))
+      e$object
     }
   )
 )
