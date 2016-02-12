@@ -1,14 +1,18 @@
 library(foreach)
 library(dplyr)
 
-SummarizeResults = function(results, fold.summary=NULL, model.summary=NULL){
+SummarizeTrainingResults = function(results, is.classification, fold.summary=NULL, model.summary=NULL){
   
   preds <- foreach(m=results, .combine=rbind) %do% {
     foreach(fold=m, .combine=rbind) %do% {
-      data.frame(
-        fold=fold$fold, y.pred=fold$y.pred, 
-        y.test=fold$y.test, model=fold$model
-      )
+      res <- data.frame(fold=fold$fold, y.test=fold$y.test, model=fold$model)
+      if (is.classification){
+        res$y.pred.class <- fold$y.pred$class
+        res$y.pred.prob <- fold$y.pred$prob
+      } else {
+        res$y.pred <- fold$y.pred
+      }
+      res
     }
   }
   
