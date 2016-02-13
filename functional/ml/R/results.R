@@ -24,5 +24,5 @@ SummarizeTrainingResults = function(results, is.classification, fold.summary=NUL
   if (!is.null(model.summary)) model.summary <- preds %>% group_by(model) %>% do({model.summary(.)})
   else model.summary <- NULL
   
-  list(model.summary=model.summary, fold.summary=fold.summary)
+  list(predictions=preds, model.summary=model.summary, fold.summary=fold.summary)
 }
