@@ -1,6 +1,0 @@
-library(caret)
-
-d <- diamonds
-
-
-

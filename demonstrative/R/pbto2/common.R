@@ -13,8 +13,11 @@ gos.to.ord <- function(x){
 }
 
 gos.to.binom <- function(x){
-  if (x <= 3) 0
-  else 1
+  if (x <= 3) 0 else 1
+}
+
+gos.to.mort <- function(x){
+  if (x == 1) 1 else 0
 }
 
 sample.uids <- function(d, frac=1) {

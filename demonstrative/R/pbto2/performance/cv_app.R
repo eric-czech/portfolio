@@ -8,7 +8,7 @@ library(cvTools)
 library(doMC)
 library(ROCR)
 library(loo)
-
+library(parallel)
 source('~/repos/portfolio/demonstrative/R/pbto2/performance/cv_runner.R')
 source('~/repos/portfolio/demonstrative/R/pbto2/performance/cv_utils.R')
 
@@ -16,15 +16,15 @@ rstan_options(auto_write=T)
 options(mc.cores = parallel::detectCores())
 
 # Set timeseries feature to be used in modeling
-ts.feature <- c('pha')
+ts.feature <- c('pbto2')
 
 static.features <- c('age', 'marshall', 'gcs', 'sex')
 
 # Run on mac for do par
 
 # Parallel CV on Ubuntu (no dopar)
-registerDoMC(15)
-res <- run.cv(ts.feature, static.features, k=15, dopar=T, 
+registerDoMC(1)
+res <- run.cv(ts.feature, static.features, k=15, dopar=F, 
               warmup = 300, iter = 5300, thin = 5, chains = 1, verbose = FALSE)
 # temp.res <- run.cv(ts.feature, static.features, k=2, dopar=F, 
 #               warmup = 100, iter = 1000, thin = 3, chains = 1, verbose = FALSE)
