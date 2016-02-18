@@ -1,10 +1,11 @@
 library(foreach)
+library(iterators)
 library(dplyr)
 library(ggplot2)
 library(gridExtra)
 library(rstan)
 library(reshape2)
-library(cvTools)
+library(caret)
 library(doMC)
 library(ROCR)
 library(loo)
@@ -13,6 +14,7 @@ source('~/repos/portfolio/demonstrative/R/pbto2/common.R')
 source('~/repos/portfolio/demonstrative/R/pbto2/nonlinear_utils.R')
 source('~/repos/portfolio/demonstrative/R/pbto2/nonlinear_binom_utils.R')
 
+SEED <- 23883
 
 run.cv <- function(ts.feature, static.features, k=10, dopar=F, ...){
   features <- c(static.features, ts.feature)
@@ -34,13 +36,15 @@ run.cv <- function(ts.feature, static.features, k=10, dopar=F, ...){
   rm.uids <- setdiff(unique(c(dws$uid, dls$uid)), uids) %>% paste(., collapse=',') 
   print(paste0('Dropping uids: ', rm.uids))
   
+  
   dwu <- filter(dwu, uid %in% uids)
   dws <- filter(dws, uid %in% uids)
   dlu <- filter(dlu, uid %in% uids)
   dls <- filter(dls, uid %in% uids)
   
-  set.seed(123)
-  folds <- cvFolds(length(uids), K = k, type = 'random')
+  set.seed(SEED)
+  folds <- createMultiFolds(dwu$gos, k = 2, times = 1)
+  #folds <- cvFolds(length(uids), K = k, type = 'random')
   
   setwd('~/repos/portfolio/demonstrative/R/pbto2/models/stan')
   dlogit.model <- 'nonlinear_binom_kfold.stan'
@@ -49,10 +53,10 @@ run.cv <- function(ts.feature, static.features, k=10, dopar=F, ...){
   
   reset.uid <- function(d) d %>% mutate(uid=as.integer(factor(uid)))
   
-  run.fold <- function(fold, ...){
-    print(paste0('Running fold number ', fold))
-    uid.tr <- uids[folds$subsets[folds$which != fold]]
-    uid.ho <- uids[folds$subsets[folds$which == fold]]
+  run.fold <- function(fold, fold.i, ...){
+    print(paste0('Running fold number ', fold.i))
+    uid.tr <- uids[fold]
+    uid.ho <- uids[-fold]
     
     # Create long dataset for modeling
     dl.all <- dls %>% reset.uid
@@ -75,10 +79,9 @@ run.cv <- function(ts.feature, static.features, k=10, dopar=F, ...){
     dn.stan.cv <- get.wide.model.data(dw.tr[,null.feat], static.features, d.ho=dw.ho[,null.feat])
     dn.stan.fl <- get.wide.model.data(dw.all[,null.feat], static.features, d.ho=head(dw.ho[,null.feat], 2))
     
-    #browser()
     # Run nonlinear, double logistic, unaggregated timeseries model
     ml.cv <- stan(dlogit.model, data = dl.stan.cv, ...)
-    if (fold == 1)
+    if (fold.i == 1)
       ml.fl <- stan(dlogit.model, data = dl.stan.fl, ...)
     else
       ml.fl <- NULL
@@ -87,7 +90,7 @@ run.cv <- function(ts.feature, static.features, k=10, dopar=F, ...){
     dsc.cv <- dl.stan.cv
     dsc.fl <- dl.stan.fl
     msc.cv <- stan(slogit.model, data = dsc.cv, ...)
-    if (fold == 1)
+    if (fold.i == 1)
       msc.fl <- stan(slogit.model, data = dsc.fl, ...)
     else
       msc.fl <- NULL
@@ -98,7 +101,7 @@ run.cv <- function(ts.feature, static.features, k=10, dopar=F, ...){
     dsl.fl <- dl.stan.fl
     dsl.fl[['max_z']] <- 0
     msl.cv <- stan(slogit.model, data = dsl.cv, ...)
-    if (fold == 1)
+    if (fold.i == 1)
       msl.fl <- stan(slogit.model, data = dsl.fl, ...)
     else
       msl.fl <- NULL
@@ -109,27 +112,27 @@ run.cv <- function(ts.feature, static.features, k=10, dopar=F, ...){
     dsh.fl <- dl.stan.fl
     dsh.fl[['min_z']] <- 0
     msh.cv <- stan(slogit.model, data = dsh.cv, ...)
-    if (fold == 1)
+    if (fold.i == 1)
       msh.fl <- stan(slogit.model, data = dsh.fl, ...)
     else
       msh.fl <- NULL
     
     # Run linear, aggregated timeseries model
     mw.cv <- stan(linear.model, data = dw.stan.cv, ...)
-    if (fold == 1)
+    if (fold.i == 1)
       mw.fl <- stan(linear.model, data = dw.stan.fl, ...)
     else
       mw.fl <- NULL
     
     # Run linear, null model
     mn.cv <- stan(linear.model, data = dn.stan.cv, ...)
-    if (fold == 1)
+    if (fold.i == 1)
       mn.fl <- stan(linear.model, data = dn.stan.fl, ...)
     else
       mn.fl <- NULL
     
     list(
-      fold=fold,
+      fold=fold.i,
       dl=dl.stan.cv, ml.cv=ml.cv, ml.fl=ml.fl, # Double logistic results
       dsc=dsc.cv, msc.cv=msc.cv, msc.fl=msc.fl, # Single logistic results (centered)
       dsl=dsl.cv, msl.cv=msl.cv, msl.fl=msl.fl, # Single logistic results (lower)
@@ -141,7 +144,7 @@ run.cv <- function(ts.feature, static.features, k=10, dopar=F, ...){
   
   # Run the cross validation loop and return results as list
   if (dopar)
-    foreach(i=1:k) %dopar% run.fold(i, ...)
+    foreach(fold=folds, i=icount()) %dopar% run.fold(fold, i, ...)
   else
-    foreach(i=1:k) %do% run.fold(i, ...)
+    foreach(fold=folds, i=icount()) %do% run.fold(fold, i, ...)
 }

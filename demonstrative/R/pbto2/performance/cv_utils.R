@@ -50,8 +50,7 @@ extract.waic <- function(res){
 
 extract.rhat <- function(res){
   extract <- function(stanfit, model, type){
-    if (is.null(stanfit))
-      return(NULL)
+    if (is.null(stanfit)) return(NULL)
     rhat <- summary(stanfit)$summary[,'Rhat']
     data.frame(rhat) %>% add_rownames('variable') %>% 
       mutate(model.name=model, model.type=type)
@@ -70,7 +69,7 @@ extract.rhat <- function(res){
       extract(r$mw.cv, 'Wide', 'CV'),
       extract(r$mn.fl, 'Null', 'Full'),
       extract(r$mn.cv, 'Null', 'CV')
-    ) %>% mutate(fold=r$fold)
+    ) %>% mutate(fold=r$fold.i)
   }
 }
 

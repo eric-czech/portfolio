@@ -1,0 +1,207 @@
+---
+  title: "Traumatic Brain Injury Study Results (pt. 3)"
+author: "Eric Czech"
+date: "February 18, 2015"
+#output: ioslides_presentation
+output: html_document
+widescreen: yes
+date: "`r format(Sys.time(), '%d %B, %Y, %H:%M')`"
+knit: (function(inputFile, encoding) { rmarkdown::render(
+  inputFile, encoding=encoding, 
+  output_file=file.path(dirname(inputFile), 'TBIResults03', '48hr', 'pres.doc.html')) })
+---
+  
+```{r init, echo=FALSE, message=FALSE, warning=FALSE}
+library(dplyr)
+library(knitr)
+library(glmulti)
+library(MASS)
+library(dummies)
+library(foreach)
+library(plotly)
+library(reshape2)
+library(pander)
+library(doMC)
+registerDoMC(8)
+set.seed(123)
+select <- dplyr::select
+source('~/repos/portfolio/demonstrative/R/pbto2/common.R')
+source('~/repos/portfolio/demonstrative/R/pbto2/performance/cv_utils.R')
+source('~/repos/portfolio/demonstrative/R/pbto2/selection/model_comparisons_lib.R')
+
+set.data.config('config3') # 48 hour source data
+#set.data.config('config2') # 24 hour source data
+#set.data.config('config6') # 72 hour source data
+#set.data.config('config4') # 96 hour source data
+
+##### Rendering Functions #####
+
+get.model.coefs <- function(m){
+  mc <- round(m$coefficients, 4)
+  mc[,4] <- sapply(mc[,4], function(x) {
+    x <- round(x, 2)
+    if (x <= .001) paste(x, '***')
+    else if (x <= .01) paste(x, '**')
+    else if (x <= .05) paste(x, '*')
+    else if (x <= .1) paste(x, '.')
+    else x
+  })
+  mc
+}
+
+get.model.results <- function(d, m){
+  cat(paste('**Formula** = ', deparse(m, width.cutoff = 500), '<br>'))
+  cat(paste('**N** =', nrow(d)))
+  d %>% glm(m, data=., family='binomial') %>% summary %>% get.model.coefs
+}
+
+plot.ly <- function(p) { p %>% plotly::config(showLink = F, displayModeBar = F) }
+```
+
+```{r loading, echo=FALSE, cache=TRUE}
+dsu <- get.wide.data(outcome.func=gos.to.binom, scale.vars=F, remove.na.flags=F)
+dmu <- get.wide.data(outcome.func=gos.to.mort, scale.vars=F, remove.na.flags=F)
+p <- c('age', 'sex', 'marshall', 'gcs')
+
+
+models <- get.models()
+all.vars <- models[['all.vars']]
+models <- models[['models']]
+```
+
+```{r linear_modeling, echo=FALSE}
+## PbtO2 + Outcome (linear models)
+
+d.glm.stat.pbto2 <- dsu %>% prep.df('pbto2')
+f.glm.stat.pbto2 <- get.form(models[['wcov_pbto2']])
+m.glm.stat.pbto2 <- glm(f.glm.stat.pbto2, data=d.lin.stat.pbto2, family='binomial')
+r.glm.stat.pbto2 <- summary(m.glm.stat.pbto2)
+  
+m.glmulti.pbto2 <- glmulti(f.glm.stat.pbto2, data=d.lin.stat.pbto2, 
+                           family='binomial', level=1, crit=AICc, plotty=F, report=F)
+r.glmulti.pbto2 <- summary(m.glmulti.pbto2@objects[[1]])
+
+# - Show coefficients and AIC from covariates + PbtO2 
+# - Validation of known lower cutoff for pbto2
+# - Explain significance of PbtO2
+# - ask about validation of 20 for pbto2
+# - ask about upper pbto2 cutoff
+
+
+```
+
+# 
+# ```{r exhaustive_modeling, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+# d.glmulti <- dbu %>% prep.df(c('icp1', 'pbto2', 'pao2', 'paco2'))
+# f.glmulti <- get.form(models[['wcov_icp_pao2_pbto2_paco2']])
+# m.glmulti <- glmulti(f.glmulti, data=d.glmulti, family='binomial', level=1, crit=AICc, plotty=F, report=F)
+# ```
+# 
+# ```{r predictive_modeling, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+# results.glm <- run.models(pred.binary.glm, T, ic.score=ic.binary.glm)
+# model.filter <- c('wcov_icp_pao2_pbto2_paco2', 'wcov_icp_pao2_pbto2', 'wcov_icp_pbto2', 'wcov_icp', 'wcov_none')
+# results.gbm <- run.models(pred.binary.gbm, T, model.filter=model.filter)
+# results.rft <- run.models(pred.binary.rf, T, model.filter=model.filter)
+# results.knn <- run.models(pred.binary.knn, T, model.filter=model.filter)
+# #results.svm <- run.models(pred.binary.svm, T, model.filter='wcov_icp_pao2_pbto2_paco2')
+# 
+# ```
+# 
+# ```{r interaction_modeling, echo=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+# d.int <- dbu %>% prep.df(c('icp1', 'pbto2', 'pao2'), scale.vars=F) %>%
+#   select(gos, age, marshall, gcs, sex, pao2_0_300, pbto2_0_20, icp1_20_inf)
+# d.int.noicp <- dbu %>% prep.df(c('pbto2', 'pao2'), scale.vars=F) %>%
+#   select(gos, age, marshall, gcs, sex, pao2_0_300, pbto2_0_20)
+# 
+# d.int.1 <- d.int %>% mutate_each(funs(scale), -gos) 
+# d.int.2 <- d.int %>% mutate_each(funs(scale), -gos) %>%
+#   model.matrix(gos ~ (.)*pbto2_0_20 - 1, data=.) %>% data.frame %>% 
+#   cbind(., data.frame(gos=d.int$gos))
+# d.int.3 <- d.int.noicp %>% mutate_each(funs(scale), -gos) 
+# d.int.4 <- d.int.noicp %>% mutate_each(funs(scale), -gos) %>%
+#   model.matrix(gos ~ (.)*pbto2_0_20 - 1, data=.) %>% data.frame %>% 
+#   cbind(., data.frame(gos=d.int.noicp$gos))
+# 
+# # d.int.bins <- d.int %>% mutate(pao2=cut(
+# #     d.int$pao2_0_300, breaks = c(0, .25, .75, 1), 
+# #     labels = c('_0_25', '_25_75', '_75_1'), include.lowest = T, right=T)) %>%
+# #   select(-pao2_0_300, -sex) %>% mutate_each(funs(scale), -gos, -pao2)
+# 
+# m.int.1 <- glm(gos ~ . + pao2_0_300:pbto2_0_20, data=d.int.1, family='binomial')
+# #m.int.2 <- glmulti(gos ~ . + pbto2_0_20:pao2_0_300, data=d.int.1, family='binomial', level=1, crit = AICc)
+# m.int.3 <- glmulti(gos ~ ., data=d.int.2, family='binomial', level=1, crit = AICc, plotty = F, report=F)
+# m.int.4 <- glm(gos ~ . + pao2_0_300:pbto2_0_20, data=d.int.3, family='binomial')
+# #m.int.2 <- glmulti(gos ~ . + pbto2_0_20:pao2_0_300, data=d.int.1, family='binomial', level=1, crit = AICc)
+# m.int.6 <- glmulti(gos ~ ., data=d.int.4, family='binomial', level=1, crit = AICc, plotty = F, report=F)
+# 
+# 
+# ```
+
+
+<br><br>
+<hr>
+  
+# TBI Study Results
+
+## Organization
+
+1. Findings for PbtO2 + Outcome (where "outcome" means gos of 1,2,3 vs 4,5)
+2. Findings for PbtO2 + Mortality (where "mortality" means gos of 1 vs 2,3,4,5)
+3. Findings for PbtO2 vs PaO2 and ICP
+
+# Part 1: PbtO2 + Outcome 
+  
+Assumptions and definitions
+
+
+
+## Findings
+
+- PbtO2 is a significant predictor of outcomes after controlling for age, gender, marshall, and gcs 
+- 
+- Show coefficients and AIC from covariates + PbtO2 
+- Validation of known lower cutoff for pbto2
+- Explain significance of PbtO2
+- ask about validation of 20 for pbto2
+- ask about upper pbto2 cutoff
+
+## PbtO2 + Outcome {.smaller}
+
+Summary of findings:
+  
+
+
+```{r}
+m.lin.stat.pbto2
+```
+
+
+## PbtO2 + Outcome (exhaustive models)
+
+- Show that PbtO2 is not lost in exhaustive AIC search
+
+## PbtO2 + Outcome (flexible models)
+
+- Show fancy model and threshold chosen for PbtO2 
+- Mention what David said about high PbtO2
+- Show CV performance (difference of AUC distributions)
+
+# Part 2: PbtO2 + Mortality
+
+- Same as part 1 but with different outcome
+
+# Part 3: PbtO2 vs PaO2
+
+## Linear Models
+
+- Show glm results from the following:
+  - PaO2 + Pbto2 all samples
+- PaO2 + Pbto2 only samples w/ icp
+- PaO2 + Pbto2 + ICP
+
+## ROC Analysis
+
+- Show ROC curves and AUC numbers for models containing all covariates + PbtO2 vs the same w/ PaO2
+- Also show the same as above with ICP
+
+
