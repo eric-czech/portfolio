@@ -23,7 +23,7 @@ dbu <- get.wide.data(outcome.func=gos.to.binom, scale.vars=F, remove.na.flags=F)
 dou <- get.wide.data(outcome.func=gos.to.ord, scale.vars=F, remove.na.flags=F) %>% mutate(gos=factor(gos))
 p <- c('age', 'sex', 'marshall', 'gcs')
 
-models <- get.models()
+models <- get.models(p)
 all.vars <- models[['all.vars']]
 models <- models[['models']]
 
