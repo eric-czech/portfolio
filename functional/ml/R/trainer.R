@@ -46,7 +46,7 @@ Trainer <- setRefClass("Trainer",
         if (!is.null(data.summarizer)) data.summarizer(d)
         
         inner.fold.index <- tryCatch(fold.index[['inner']][[i]], error=function(e) NULL)
-        list(key=fold.key, id=i, data=d, y.test=y.test, index=inner.fold.index)
+        list(key=fold.key, id=i, data=d, index=inner.fold.index)
       }
       loginfo('Fold data generation complete')
     },
@@ -80,14 +80,14 @@ Trainer <- setRefClass("Trainer",
       
       list(fit=f, y.pred=p, y.test=model$test(data), fold=fold.id, model=model$name)
     }, 
-    holdout = function(models, X, y, X.ho, y.ho, data.generator, data.summarizer=NULL, enable.cache=T){
+    holdout = function(models, X, y, X.ho, y.ho, data.generator, cache.key,
+                       data.summarizer=NULL, enable.cache=T){
       
       # Create and cache preprocessed predictor data frame
       set.seed(seed)
-      data.key <- 'holdout_data'
       tryCatch({
-        if (!enable.cache) cache$invalidate(data.key)
-        d <- cache$load(data.key, function(){ data.generator(X, y, X.ho, y.ho) })
+        if (!enable.cache) cache$invalidate(cache.key)
+        d <- cache$load(cache.key, function(){ data.generator(X, y, X.ho, y.ho) })
       }, error=function(e) {
         logerror('An error occurred while creating/fetching hold out data.')
         logerror(e)
