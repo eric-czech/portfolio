@@ -75,7 +75,7 @@ sGdaCV2<-function(data=NULL,cv=5,lam=0){
 #' @return returns a list object with following items. 
 #' \item{pred}{predictions for class labels on the new dataset}
 #' \item{lik}{likelihood of each class on the new dataset}
-sGda<-function(data=NULL,data.new=NULL,lam=0){
+  sGda<-function(data=NULL,data.new=NULL,lam=0){
   
   group<-unique(colnames(data))
   prior<-rep(1,length(group))/length(group)
