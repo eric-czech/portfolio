@@ -355,7 +355,7 @@ run.model.set <- function(form, data, metric, ml.models=T, loo=T, preproc=c('cen
     - At least 8 PbtO2 measurements
 
 - Only complete cases were considered for models using multiple gas measurements.  In other words, these results do not include imputations of predictors (though imputations were tried and showed no difference in results).
-- If a 3-month GOS outcome was not present, the 6 month outcome was used instead.
+- If a 3-month GOS outcome was not present, the 6-month outcome was used instead.  However, this only occurred in 18 of 263 samples or in other words the 3-month GOS was directly available for 245 samples (93%).
 - All of the following results consider only gas and pressure measurements taken within the first 48 hours since the time of injury (all other timeframes show weaker results)
 
 ### Sample Size by Variable
