@@ -17,7 +17,7 @@ gos.to.binom <- function(x){
 }
 
 gos.to.mort <- function(x){
-  if (x == 1) 1 else 0
+  if (x == 1) 0 else 1
 }
 
 sample.uids <- function(d, frac=1) {

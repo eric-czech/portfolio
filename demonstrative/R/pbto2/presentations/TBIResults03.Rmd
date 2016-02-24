@@ -1,0 +1,668 @@
+---
+title: "TBI Study Results (pt. 3)"
+author: "Eric Czech"
+#output: ioslides_presentation
+output: html_document
+widescreen: yes
+date: "`r format(Sys.time(), '%d %B, %Y, %H:%M')`"
+knit: (function(inputFile, encoding) { rmarkdown::render(
+  inputFile, encoding=encoding, 
+  output_file=file.path(dirname(inputFile), 'TBIResults03', '48hr', 'pres.doc.html')) })
+---
+  
+```{r init, echo=FALSE, message=FALSE, warning=FALSE}
+library(caret)
+library(MASS)
+library(AICcmodavg)
+library(pander)
+library(plyr)
+library(dplyr)
+library(knitr)
+library(glmulti)
+library(dummies)
+library(foreach)
+library(plotly)
+library(stringr)
+library(reshape2)
+library(doMC)
+library(xtable)
+
+SEED <- 23823
+set.seed(SEED)
+source('~/repos/portfolio/demonstrative/R/pbto2/common.R')
+source('~/repos/portfolio/demonstrative/R/pbto2/performance/glmulti_cv.R')
+source('~/repos/portfolio/demonstrative/R/pbto2/performance/prep_utils.R')
+
+select <- dplyr::select
+MD_CACHE_DIR <- '/Users/eczech/data/pbto2/cache'
+
+set.data.config('config3') # 48 hour source data
+#set.data.config('config2') # 24 hour source data
+#set.data.config('config6') # 72 hour source data
+#set.data.config('config4') # 96 hour source data
+
+##### Rendering Functions #####
+
+add.p.stars <- function(p){
+  sapply(p, function(x) {
+    if (x <= .001) paste(x, '***')
+    else if (x <= .01) paste(x, '**')
+    else if (x <= .05) paste(x, '*')
+    else if (x <= .1) paste(x, '.')
+    else x
+  })
+}
+
+print.coef.table <- function(coefs, n, title, outcome.desc, extra=NULL){
+  if (is.null(extra))
+    extra <- ''
+  else if (is(extra, "formula"))
+    extra <- sprintf('<br>Formula = %s<br>', deparse(extra, width.cutoff = 100))
+  
+  caption <- sprintf('%s (%s, n=%s)%s', title, outcome.desc, n, extra)
+  data.frame(round(coefs, 3)) %>% 
+    setNames(c('Coefficient', 'std', 'z', 'P.Value')) %>%
+    add_rownames(var='Predictor') %>%
+    mutate('Odds.Ratio'=round(exp(Coefficient), 3)) %>%
+    mutate(P.Value=add.p.stars(P.Value)) %>%
+    select(-std, -z) %>% select(Predictor, Coefficient, Odds.Ratio, P.Value) %>%
+    pandoc.table(caption=caption)
+    #xtable(digits=3, caption = caption) %>%
+    #print(type="html", caption.placement = "top", include.rownames=F, scalebox='0.75')
+}
+
+print.loo.table <- function(loo.res, n, title, outcome.desc, limit=4, extra=NULL){
+    if (is.null(extra))
+    extra <- ''
+  caption <- sprintf('%s (%s, n=%s)%s', title, outcome.desc, n, extra)
+  loo.summary <- loo.res %>% select(-auc2, AUC=auc1, Model=formula) %>% 
+    arrange(desc(AUC)) %>% head(limit)
+  loo.summary[1,1] <- paste('*', loo.summary[1,1])
+  loo.summary %>% pandoc.table(caption=caption)
+}
+
+plot.ly <- function(p) { p %>% plotly::config(showLink = F, displayModeBar = F) }
+```
+
+```{r loading, echo=FALSE, warning=FALSE, cache=FALSE}
+dsu <- get.wide.data(outcome.func=gos.to.binom, scale.vars=F, remove.na.flags=F)
+dmu <- get.wide.data(outcome.func=gos.to.mort, scale.vars=F, remove.na.flags=F)
+p <- c('age', 'sex', 'marshall', 'gcs')
+
+# Calculate outcome frequencies
+d.stat.freq <- dsu %>% mutate(gos=ifelse(gos==0, 'Bad', 'Good')) %>% 
+  group_by(gos) %>% tally %>% data.frame
+d.mort.freq <- dmu %>% mutate(gos=ifelse(gos==0, 'Dead', 'Alive')) %>% 
+  group_by(gos) %>% tally %>% data.frame
+
+# Calculate covariate frequencies
+d.cov.dist <- dsu %>% select(uid, one_of(p)) %>% 
+  mutate(age=cut(age, breaks=seq(0, 100, by=10), right=T)) %>%
+  mutate_each(funs(factor), one_of(c('sex', 'marshall', 'gcs'))) %>% 
+  melt(id.vars='uid') %>% group_by(variable, value) %>% summarise(count=n()) %>% 
+  ungroup %>% mutate(pct=round(100*count/nrow(dsu), 2))
+
+# Calculate gas/pressure distributions
+d.var.n <- dsu %>% select(contains('is_na')) %>% melt(id.vars=NULL) %>% 
+  group_by(variable) %>% summarise(ct=sum(value), n=n()) %>%
+  mutate(variable=str_replace(variable, '_is_na', '')) %>%
+  filter(variable %in% c('icp1', 'pao2', 'pbto2')) %>%
+  mutate(N=n-ct, Total=n, Percent.Present=round(100*(n-ct)/n, 2)) %>%
+  rename(Variable=variable) %>% select(-ct, -n) %>% data.frame
+```
+
+```{r linear_modeling, echo=FALSE, warning=FALSE, cache=FALSE}
+### Define data and formulas ###
+
+factor.good.bad <- function(gos) 
+  factor(ifelse(gos==0, 'bad', 'good'), levels=c('bad', 'good'))
+
+d.glm.stat.pbto2 <- dsu %>% prep.df('pbto2') %>% mutate(gos=factor.good.bad(gos))
+d.glm.mort.pbto2 <- dmu %>% prep.df('pbto2') %>% mutate(gos=factor.good.bad(gos))
+
+d.pbto2.pao2 <- dsu %>% prep.df(c('pbto2', 'pao2')) %>% mutate(gos=factor.good.bad(gos))
+d.icp1.pbto2.pao2 <- dsu %>% prep.df(c('pbto2', 'pao2', 'icp1')) %>% mutate(gos=factor.good.bad(gos))
+
+
+create.form <- function(vars) as.formula(sprintf('gos ~ %s + %s', paste(p, collapse=' + '), vars))
+
+# Formulas with upper threshold variables
+f.glm.pbto2 <- create.form('pbto2_0_20 + pbto2_70_inf')
+f.glm.pbto2.int <- as.formula(sprintf('gos ~ pbto2_0_20*(%1$s) + pbto2_70_inf*(%1$s)', paste(p, collapse='+')))
+
+# Formulas with only lower threshold variables
+f.pbto2 <- create.form('pbto2_0_20')
+f.pao2 <- create.form('pao2_0_300')
+f.pbto2.pao2 <- create.form('pbto2_0_20 + pao2_0_300')
+f.pbto2.pao2.int <- create.form('pbto2_0_20 * pao2_0_300')
+f.icp1.pbto2.pao2 <- create.form('pbto2_0_20 + pao2_0_300 + icp1_20_inf')
+f.icp1.pbto2.pao2.int <- create.form('pbto2_0_20 * (pao2_0_300 + icp1_20_inf) + pao2_0_300 * icp1_20_inf')
+f.icp1.pbto2 <- create.form('icp1_20_inf + pbto2_0_20')
+f.icp1.pbto2.int <- create.form('icp1_20_inf * pbto2_0_20')
+f.icp1.pao2 <- create.form('icp1_20_inf + pao2_0_300')
+f.icp1.pao2.int <- create.form('icp1_20_inf * pao2_0_300')
+
+
+### GLM Fitting ###
+
+m.glm.stat.pbto2 <- glm(f.glm.pbto2, data=d.glm.stat.pbto2, family='binomial')
+r.glm.stat.pbto2 <- summary(m.glm.stat.pbto2)
+
+m.glm.mort.pbto2 <- glm(f.glm.pbto2, data=d.glm.mort.pbto2, family='binomial')
+r.glm.mort.pbto2 <- summary(m.glm.mort.pbto2)
+
+m.glm.pbto2.pao2.all     <- glm(f.pbto2.pao2,     data=d.pbto2.pao2, family='binomial')
+m.glm.pbto2.pao2.int.all <- glm(f.pbto2.pao2.int, data=d.pbto2.pao2, family='binomial')
+m.glm.pbto2.all          <- glm(f.pbto2,          data=d.pbto2.pao2, family='binomial')
+m.glm.pao2.all           <- glm(f.pao2,           data=d.pbto2.pao2, family='binomial')
+
+m.glm.icp.pbto2.pao2.red <- glm(f.icp1.pbto2.pao2, data=d.icp1.pbto2.pao2, family='binomial')
+m.glm.pbto2.pao2.red     <- glm(f.pbto2.pao2,      data=d.icp1.pbto2.pao2, family='binomial')
+m.glm.pbto2.pao2.int.red <- glm(f.pbto2.pao2.int,  data=d.icp1.pbto2.pao2, family='binomial')
+m.glm.pbto2.red          <- glm(f.pbto2,           data=d.icp1.pbto2.pao2, family='binomial')
+m.glm.pao2.red           <- glm(f.pao2,            data=d.icp1.pbto2.pao2, family='binomial')
+
+# anova(m.glm.pbto2.pao2.red, m.glm.pbto2.red, test="Chisq")
+
+
+### Stepwise AICc search ###
+
+# Results from glmulti pulled from disk (so they must be manually updated)
+# * This is because of this problem with glmulti + knitr: 
+#   http://stackoverflow.com/questions/3661500/why-cant-i-pass-a-dataset-to-a-function
+
+# # PbtO2 only - outcome
+# m.glmulti.stat.pbto2 <- glmulti(f.glm.pbto2.int, data=d.glm.stat.pbto2, 
+#                                 family='binomial', crit = AICc, level=1, plotty=F, report=F)
+# save(m.glmulti.stat.pbto2, file=file.path(MD_CACHE_DIR, 'm.glmulti.stat.pbto2.rda'))
+# 
+# # PbtO2 only - mortality
+# m.glmulti.mort.pbto2 <- glmulti(f.glm.pbto2.int, data=d.glm.mort.pbto2, 
+#                                 family='binomial', crit = AICc, level=1, plotty=F, report=F)
+# save(m.glmulti.mort.pbto2, file=file.path(MD_CACHE_DIR, 'm.glmulti.mort.pbto2.rda'))
+# 
+# # PbtO2 + PaO2 (all samples)
+# m.glmulti.stat.pbto2.pao2 <- glmulti(f.pbto2.pao2.int, data=d.pbto2.pao2, 
+#                                 family='binomial', crit = AICc, level=1, plotty=F, report=F)
+# save(m.glmulti.stat.pbto2.pao2, file=file.path(MD_CACHE_DIR, 'm.glmulti.stat.pbto2.pao2.rda'))
+# 
+# # PbtO2 + PaO2 (reduced samples)
+# m.glmulti.stat.pbto2.pao2.red <- glmulti(f.pbto2.pao2.int, data=d.icp1.pbto2.pao2, 
+#                                 family='binomial', crit = AICc, level=1, plotty=F, report=F)
+# save(m.glmulti.stat.pbto2.pao2.red, file=file.path(MD_CACHE_DIR, 'm.glmulti.stat.pbto2.pao2.red.rda'))
+# 
+# # PbtO2 + PaO2 + ICP
+# m.glmulti.stat.icp1.pbto2.pao2 <- glmulti(f.icp1.pbto2.pao2, data=d.icp1.pbto2.pao2, 
+#                                 family='binomial', crit = AICc, level=1, plotty=F, report=F)
+# save(m.glmulti.stat.icp1.pbto2.pao2 , file=file.path(MD_CACHE_DIR, 'm.glmulti.stat.icp1.pbto2.pao2.rda'))
+
+load(file.path(MD_CACHE_DIR, 'm.glmulti.stat.pbto2.rda'))
+load(file.path(MD_CACHE_DIR, 'm.glmulti.mort.pbto2.rda'))
+load(file.path(MD_CACHE_DIR, 'm.glmulti.stat.pbto2.pao2.rda'))
+load(file.path(MD_CACHE_DIR, 'm.glmulti.stat.pbto2.pao2.red.rda'))
+load(file.path(MD_CACHE_DIR, 'm.glmulti.stat.icp1.pbto2.pao2.rda'))
+
+
+# - Show coefficients and AIC from covariates + PbtO2 
+# - Validation of known lower cutoff for pbto2
+# - Explain significance of PbtO2
+# - ask about validation of 20 for pbto2
+# - ask about upper pbto2 cutoff
+```
+
+```{r resample_modeling, echo=FALSE, message=FALSE, cache=TRUE}
+
+### Stepwise LOOCV Search ###
+
+run.loocv <- function(form, data, covariates){
+  df <- model.matrix(form, data=data)
+  df <- cbind(df, data.frame(gos=data$gos))
+  df <- df %>% select(-one_of('(Intercept)'))
+  vars <- df %>% select(-one_of(c('gos', covariates))) %>% names
+  # Ensure that the levels of the gos factor have 'good' outcomes first
+  df$gos <- relevel(df$gos, 'good') 
+  RunLOOCV(df, 'gos', covariates, vars)
+}
+registerDoMC(4)
+r.loo.pao2.pbto2.all <- run.loocv(f.pbto2.pao2, d.pbto2.pao2, c())
+r.loo.pao2.pbto2.red <- run.loocv(f.pbto2.pao2, d.icp1.pbto2.pao2, c())
+r.loo.icp.pao2.pbto2 <- run.loocv(f.icp1.pbto2.pao2, d.icp1.pbto2.pao2, c())
+
+##### Define Training Routine #####
+
+run.model.set <- function(form, data, metric, ml.models=T, loo=T, preproc=c('center', 'scale')){
+  
+  # Create Data Partition
+  set.seed(SEED)
+  if (loo) {
+    folds <- createFolds(data$gos, k = length(data$gos), returnTrain=T)
+    summary.func <- function(...) defaultSummary(...)['Accuracy']
+  } else {
+    folds <- createMultiFolds(data$gos, k = 10, times = 8)
+    summary.func <- function(...) c(defaultSummary(...), twoClassSummary(...))
+  }
+  
+  trctl <- trainControl(index=folds, savePredictions=T, classProbs=T, summaryFunction=summary.func)
+  
+  # Fit each model
+  train.model <- function(method, pre=preproc, ...){
+    cat('Training model "', method, '" ...\n')
+    set.seed(SEED)
+    train(form, data=data, method=method, preProcess=pre, metric=metric, trControl=trctl, ...)
+  }
+  
+  res <- list()
+  res$glm <- train.model('glm')
+  if (ml.models){
+    res$rpart <- train.model('rpart', tuneLength=25)
+    res$gbm <- train.model('gbm', tuneLength=5)
+    res$nnet <- train.model('nnet', tuneLength=5, maxit=1000)
+    res$lda <- train.model('lda', tuneLength=15)
+    res$knn <- train.model('knn', tuneLength=15)
+  }
+  cat('Model training complete\n')
+  list(models=res, folds=folds, form=form, n=nrow(data))
+}
+
+
+##### Get Performance Measures #####
+
+# target.metric <- 'Accuracy'
+# tr.res <- list()
+# 
+# # Full set with PbtO2 + PaO2 (N=~262)
+# full.res <- list()
+# full.res.data <- d.pbto2.pao2
+# full.res$pbto2.pao2     <- run.model.set(f.pbto2.pao2, full.res.data, target.metric, ml.models=F)
+# full.res$pbto2.pao2.int <- run.model.set(f.pbto2.pao2.int, full.res.data, target.metric, ml.models=F)
+# full.res$pbto2          <- run.model.set(f.pbto2, full.res.data, target.metric, ml.models=F)
+# full.res$pao2           <- run.model.set(f.pao2, full.res.data, target.metric, ml.models=F)
+# 
+# # Reduced set with PbtO2 + PaO2 + ICP (N=~166)
+# red.res <- list()
+# red.res.data <- d.icp1.pbto2.pao2
+# red.res$icp.pbto2.pao2 <- run.model.set(f.icp1.pbto2.pao2, red.res.data, target.metric, ml.models=F)
+# red.res$pbto2.pao2     <- run.model.set(f.pbto2.pao2, red.res.data, target.metric, ml.models=F)
+# red.res$pbto2.pao2.int <- run.model.set(f.pbto2.pao2.int, red.res.data, target.metric, ml.models=F)
+# red.res$pbto2          <- run.model.set(f.pbto2, red.res.data, target.metric, ml.models=F)
+# red.res$pao2           <- run.model.set(f.pao2, red.res.data, target.metric, ml.models=F)
+# 
+# 
+# plot.metric <- 'ROC'
+# extract.roc <- function(tr.res){
+#   foreach(dn=names(tr.res), .combine=rbind) %do% {
+#     foreach(mn=names(tr.res[[dn]]$models), .combine=rbind) %do%{
+#       pred <- tr.res[[dn]]$models[[mn]]$pred
+#       pred <- prediction(pred[,levels(pred$obs)[1]], pred$obs)
+#       perf <- performance(pred, 'tpr', 'fpr')
+#       auc <- performance(pred, 'auc')@y.values[[1]]
+#       data.frame(x=perf@x.values[[1]], y=perf@y.values[[1]], t=perf@alpha.values[[1]]) %>%
+#         mutate(Model=mn, Dataset=dn, AUC=auc)
+#     }
+#   } 
+# }
+# roc.data <- extract.roc(red.res)
+# roc.data %>% ggplot(aes(x=x, y=y, color=Dataset)) + 
+#   geom_line()
+# 
+# # lev <- levels(tr.res[[dn]]$models[[mn]]$pred$obs)
+# # stats <- twoClassSummary(tr.res[[dn]]$models[[mn]]$pred, lev=lev)
+# model.perf <- foreach(dn=names(tr.res), .combine=rbind) %do% {
+#   foreach(mn=names(tr.res[[dn]]$models), .combine=rbind) %do%{
+#     tr.res[[dn]]$models[[mn]]$resample %>%
+#       select(Resample, one_of(plot.metric)) %>%
+#       rename_(Value=plot.metric) %>%
+#       mutate(Model=mn, Dataset=dn) 
+#   }
+# } 
+#   
+# n <- dplyr::n
+# model.perf %>% ggplot(aes(x=model, fill=dataset, y=value)) + 
+#   geom_bar(stat='identity', position='dodge')
+# 
+# 
+# model.perf %>%
+#   mutate(Model=reorder(Model, model.perf$Value, FUN = mean)) %>%
+#   ggplot(aes(x=Model, y=Value, color=Dataset)) + 
+#   geom_boxplot(width=.5, alpha=.5, position='dodge') +
+#   #geom_jitter(position = position_jitter(width=.5), alpha=.5) + 
+#   theme_bw() + coord_flip()
+
+
+```
+
+<br>
+
+<hr>
+
+## Contents
+
+- **Section 1**: [Data Overview and Assumptions](#id1)
+- **Section 2**: [Findings for PbtO2 + Outcome](#id2) (where "outcome" means gos of 1,2,3 vs 4,5)
+- **Section 3**: [Findings for PbtO2 + Mortality](#id3) (where "mortality" means gos of 1 vs 2,3,4,5)
+- **Section 4**: [Findings for PbtO2 vs PaO2 and ICP](#id4)
+- **Section 5**: [Conclusions](#id5)
+
+<hr>
+<center><h2><a id="id1">1. Data Overview and Assumptions</a></center></h2></center>
+<hr>
+
+### Assumptions
+
+- All samples rejected if any of the following were not present:
+    - GOS Outcome (3 OR 6 month)
+    - Age, Gender, GCS, Marshall Score
+    - At least 8 PbtO2 measurements
+
+- Only complete cases were considered for models using multiple gas measurements.  In other words, these results do not include imputations of predictors (though imputations were tried and showed no difference in results).
+- If a 3-month GOS outcome was not present, the 6 month outcome was used instead.
+- All of the following results consider only gas and pressure measurements taken within the first 48 hours since the time of injury (all other timeframes show weaker results)
+
+### Sample Size by Variable
+
+A count of the number of samples present for each variable to be modeled:
+
+```{r, echo=FALSE}
+d.var.n
+```
+
+### Data Distributions
+
+### Covariate Histograms
+
+All of the following are from a population of size: 
+```{r, echo=F} 
+cat(paste('N =', nrow(dsu)))
+```
+
+```{r, echo=FALSE, warning=FALSE, fig.width=9, fig.height=6, fig.align='center'}
+ggplot(d.cov.dist, aes(x=value, y=count)) + geom_bar(stat='identity') + 
+  facet_wrap(~variable, nrow=2, scales='free') + theme_bw() 
+```
+
+Raw data for the above:
+
+```{r, echo=FALSE}
+variables <- unique(d.cov.dist$variable)
+lapply(variables, function(x){
+  subset(d.cov.dist, variable==x) %>% select(-variable) %>%
+    rename(Value=value, Frequency=count, Percentage=pct) %>%
+    data.frame
+}) %>% setNames(paste('Distribution Summary for Variable:', variables))
+```
+
+### Gas and Pressure Distributions
+
+Distributions of gas and pressure measurements across all applicable samples:
+
+```{r, echo=FALSE, fig.width=8, fig.height=5, fig.align='center'}
+dsu %>% select(uid, starts_with('pao2'), starts_with('icp1'), starts_with('pbto2')) %>%
+  select(-ends_with('is_na')) %>% melt(id.vars='uid') %>% 
+  ggplot(aes(x=value)) + geom_histogram(binwidth=.05) + 
+  facet_wrap(~variable, nrow=2, scales='free') + theme_bw()
+```
+
+Note that for each variable above, a single patient's value for that variable was computed as the fraction of time for which the measurements were above or below are particular threshold.  Those thresholds are in the names of the variables where a name like ```pao2_875_inf``` indicates the fraction of time (over all their measurements) the patient had a PaO2 value measured as greater than 875.
+
+<hr>
+<center><h1><a id="id2">2. PbtO2 + Outcome</a></center></h1></center>
+<hr>
+
+### Results
+
+- **Result 1**: PbtO2 is an important predictor of outcomes
+- **Result 2**: PbtO2 is retained in stepwise model selection
+- **Result 3**: PbtO2 thresholds are optimal when set at 20 and ~70
+
+#### Result 1: PbtO2 is an important predictor of outcomes
+
+PbtO2 is a significant predictor of outcomes after controlling for age, gender, marshall, and gcs.
+
+Here are results from a linear, logistic model for a "Good vs Bad" outcome (where ```outcome = 0 if GOS <= 3, 1 otherwise```) showing this:
+
+<center>
+```{r, echo=FALSE, results='asis'}
+print.coef.table(coef(summary(m.glm.stat.pbto2)), nrow(m.glm.stat.pbto2$data), 
+                 'PbtO2 Logistic Model Results',
+                 'Good vs Bad', m.glm.stat.pbto2$terms)
+```
+</center>
+<br>
+
+#### Result 2: PbtO2 is retained in stepwise model selection
+
+Stepwise model selection (using exhaustive AICc search) for a similar model to the above, but with interactions, again shows that PbtO2 is an important predictor.  This shown by the fact that PbtO2 is retained the best model.
+
+Best model chosen after starting with the model in **Result 1** above:
+
+<center>
+```{r, echo=FALSE, results='asis'}
+m.summary <- summary(m.glmulti.stat.pbto2@objects[[1]])
+desc <- sprintf(
+  '<br>Starting Model = %s<br>Best Model = %s',
+  deparse(f.glm.pbto2.int, width.cutoff = 100),
+  deparse(m.summary$terms, width.cutoff = 100)
+)
+print.coef.table(coef(m.summary), nrow(d.glm.stat.pbto2), 
+                 'PbtO2 Model Selection via AICc',
+                 'Good vs Bad', desc)
+```
+</center>
+
+<br>
+Note that the variables ```sex``` and ```pbto2_70_inf``` were excluded from the best model.
+
+<br>
+
+#### Result 3: PbtO2 thresholds are optimal when set at 20 and ~70
+
+In the models above the lowest and highest values considered to be "safe" for PbtO2 were 20 and 70 respectively.  The lower setting for these thresholds, 20, was set based on prior knowledge.  The upper setting, however, was determined using a model designed to find these optimal thresholds.  This approach was designed to determine which of the following are true:
+
+1. There is **no** threshold in PbtO2 values that best predicts outcomes
+2. There is **one** threshold in PbtO2 values for which time spent above and below that value best predict outcomes
+3. There are **two** thresholds in PbtO2 values that best predict outcomes
+
+The results from applying this technique shows two things:
+
+1. Time spent (by patients) with PbtO2 values below 15-20 are highly correlated with poor outcomes
+2. Time spent with PbtO2 values **above** 70-100 are also correlated with poor outcomes (but less so)
+
+Item #1 above seems to be common knowledge while item #2 is not.  To better illustrate why #2 is true, here is a plot of the PbtO2 values for every single patient that ever had a value above 100 and their corresponding GOS outcome:
+
+<center>
+<img src="/Users/eczech/repos/portfolio/demonstrative/R/pbto2/images/high_pbto2.png" width="800px" height="400px"/><br>
+</center>
+
+Note that all but one patient had a GOS score of 3 or lower (which are all poor outcomes).
+
+
+<hr>
+<center><h2><a id="id3">3. PbtO2 + Mortality</a></center></h2></center>
+<hr>
+
+#### Results
+
+PbtO2 is **not** a signficant predictor of mortality.
+
+Here are the linear modeling coefficient results applied in exactly the same way as with good/bad outcomes, but with a new "Alive vs Dead" outcome defined as ```outcome = 0 if GOS = 1, 1 otherwise```:
+
+Model coefficients:
+
+<center>
+```{r, echo=FALSE, results='asis'}
+print.coef.table(coef(summary(m.glm.mort.pbto2)), nrow(m.glm.mort.pbto2$data),
+                 'PbtO2 Logistic Model Results',
+                 'Alive vs Dead', m.glm.mort.pbto2$terms)
+```
+</center>
+<br>
+Only age and GCS are significant in this case.
+
+Similarly, PbtO2 is also lost in stepwise model selection where the below shows the best model chosen from all combinations of predictors in the model above:
+
+<center>
+```{r, echo=FALSE, results='asis'}
+m.summary <- summary(m.glmulti.mort.pbto2@objects[[1]])
+desc <- sprintf(
+  '<br>Starting Model = %s<br>Best Model = %s',
+  deparse(f.glm.pbto2.int, width.cutoff = 100),
+  deparse(m.summary$terms, width.cutoff = 100)
+)
+print.coef.table(coef(m.summary), nrow(d.glm.mort.pbto2), 
+                 'PbtO2 Model Selection via AICc',
+                 'Alive vs Dead', desc)
+```
+</center>
+<br>
+Again, only age and GCS are significant while PbtO2, sex, and marshall scores are all lost.
+
+<hr>
+<center><h1><a id="id4">4. Findings for PbtO2 vs PaO2 and ICP</a></center></h1></center>
+<hr>
+
+### Results
+
+- **Result 1**: PbtO2 vs PaO2 (all samples)
+- **Result 2**: PbtO2 vs PaO2 (samples w/ ICP)
+- **Result 3**: PbtO2 vs PaO2 vs ICP
+
+<br>
+
+#### Result 1: PbtO2 vs PaO2 (all samples)
+
+**Linear Model** - Modeling results when also including PaO2 as predictor across all available samples:
+
+<center>
+```{r, echo=FALSE, results='asis'}
+print.coef.table(coef(summary(m.glm.pbto2.pao2.all)), nrow(m.glm.pbto2.pao2.all$data), 
+                 'PbtO2 vs PaO2 Logistic Model Results',
+                 'Good vs Bad', m.glm.pbto2.pao2.all$terms)
+```
+</center>
+
+<br>
+
+**Stepwise AICc Model Selection** - Best model chosen via AICc when including PbtO2 and PaO2:
+
+<center>
+```{r, echo=FALSE, results='asis'}
+m.summary <- summary(m.glmulti.stat.pbto2.pao2@objects[[1]])
+desc <- sprintf(
+  '<br>Starting Model = %s<br>Best Model = %s',
+  deparse(f.pbto2.pao2.int, width.cutoff = 250),
+  deparse(m.summary$terms, width.cutoff = 100)
+)
+print.coef.table(coef(m.summary), nrow(d.pbto2.pao2), 
+                 'PbtO2 vs PaO2 Model Selection via AICc',
+                 'Good vs Bad', desc)
+```
+</center>
+
+<br>
+
+**LOOCV Model Selection** - Model selection results from leave-one-out cross validation looking at ROC AUC:
+
+<center>
+```{r, echo=FALSE, results='asis'}
+print.loo.table(r.loo.pao2.pbto2.all, nrow(d.pbto2.pao2),
+                'Top 5 PbtO2 vs PaO2 Models by AUC',
+                'Good vs Bad', limit=5, extra='<br>* Best Model (higher AUC is better)')
+```
+</center>
+<br>
+
+#### Result 2: PbtO2 vs PaO2 (samples w/ ICP)
+
+**Linear Model** - Results for the same model as the previous section (PaO2 vs PbtO2), but where the data for the model is restricted to only samples available for all of PbtO2, PaO2, and ICP:
+
+<center>
+```{r, echo=FALSE, results='asis'}
+print.coef.table(coef(summary(m.glm.pbto2.pao2.red)), nrow(m.glm.pbto2.pao2.red$data), 
+                 'PbtO2 vs PaO2 Logistic Model Results on Smaller Sample',
+                 'Good vs Bad', m.glm.pbto2.pao2.red$terms)
+```
+</center>
+
+<br>
+
+**Stepwise AICc Model Selection** - Best model chosen via AICc when including PbtO2 and PaO2 (with data limited to only samples avaiable for ICP):
+
+<center>
+```{r, echo=FALSE, results='asis'}
+m.summary <- summary(m.glmulti.stat.pbto2.pao2.red@objects[[1]])
+desc <- sprintf(
+  '<br>Starting Model = %s<br>Best Model = %s',
+  deparse(f.pbto2.pao2.int, width.cutoff = 250),
+  deparse(m.summary$terms, width.cutoff = 100)
+)
+print.coef.table(coef(m.summary), nrow(d.icp1.pbto2.pao2), 
+                 'PbtO2 vs PaO2 Model Selection via AICc on Smaller Sample',
+                 'Good vs Bad', desc)
+```
+</center>
+<br>
+
+**LOOCV Model Selection** - Model selection results from leave-one-out cross validation looking at ROC AUC:
+
+<center>
+```{r, echo=FALSE, results='asis'}
+print.loo.table(r.loo.pao2.pbto2.red, nrow(d.icp1.pbto2.pao2),
+                'Top 5 PbtO2 vs PaO2 Models by AUC on Smaller Sample',
+                'Good vs Bad', limit=5, extra='<br>* Best Model (higher AUC is better)')
+```
+</center>
+<br>
+
+#### Result 3: PbtO2 vs PaO2 vs ICP
+
+**Linear Model** - Results for a logistic model including PbtO2, PaO2, and ICP:
+
+<center>
+```{r, echo=FALSE, results='asis'}
+print.coef.table(coef(summary(m.glm.icp.pbto2.pao2.red)), nrow(m.glm.icp.pbto2.pao2.red$data), 
+                 'PbtO2 vs PaO2 vs ICP Logistic Model Results',
+                 'Good vs Bad', m.glm.icp.pbto2.pao2.red $terms)
+```
+</center>
+
+<br>
+
+**Stepwise AICc Model Selection** - Best model chosen via AICc when including PbtO2, PaO2, and ICP:
+
+<center>
+```{r, echo=FALSE, results='asis'}
+m.summary <- summary(m.glmulti.stat.icp1.pbto2.pao2@objects[[1]])
+desc <- sprintf(
+  '<br>Starting Model = %s<br>Best Model = %s',
+  deparse(f.icp1.pbto2.pao2, width.cutoff = 250),
+  deparse(m.summary$terms, width.cutoff = 100)
+)
+print.coef.table(coef(m.summary), nrow(d.icp1.pbto2.pao2), 
+                 'PbtO2 vs PaO2 vs ICP Model Selection via AICc',
+                 'Good vs Bad', desc)
+```
+</center>
+<br>
+
+**LOOCV Model Selection** - Model selection results from leave-one-out cross validation looking at ROC AUC:
+
+<center>
+```{r, echo=FALSE, results='asis'}
+print.loo.table(r.loo.icp.pao2.pbto2, nrow(d.icp1.pbto2.pao2),
+                'Top 5 PbtO2 vs PaO2 vs ICP Models by AUC',
+                'Good vs Bad', limit=5, extra='<br>* Best Model (higher AUC is better)')
+```
+</center>
+<br>
+
+<hr>
+<center><h1><a id="id5">5. Conclusions</a></center></h1></center>
+<hr>
+
+Summary of findings:
+
+- Thresholding models show that a lower boundary for PbtO2 of 15-20 is ideal
+- The same threshold models also suggest that an upper bound on PbtO2 of 70+ may be correlated with bad outcomes 
+- PbtO2 is a stronger predictor of outcomes than PaO2.  This was confirmed by stepwise model selection, cross-validation, and predictor statistical significance.
+- ICP is also a significant predictor of outcomes.  For model spaces that include all of ICP, PbtO2, and PaO2, model selection via AICc and cross validation both show that PaO2 is not as important as PbtO2 and ICP (though both of these are important).
+

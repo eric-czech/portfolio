@@ -5,24 +5,16 @@ library(gbm)
 library(randomForest)
 library(ggplot2)
 library(caret)
+library(foreach)
+library(iterators)
+library(caret)
+
+source('~/repos/portfolio/demonstrative/R/pbto2/performance/prep_utils.R')
 
 get.form <- function(e) as.formula(paste0('gos ~ ', paste(e, collapse=' + ')))
 
-scale.df <- function(d) d %>% mutate_each(funs(scale), -gos, -uid)
-
-prep.df <- function(d, ts.features, scale.vars=T){
-  if (length(ts.features) > 0){
-    ts.na <- d %>% select_(.dots=paste0(ts.features, '_is_na')) %>% apply(1, sum)
-    d <- d %>% filter(ts.na == 0)
-  }
-  if (scale.vars) {
-    d %>% select(-ends_with('_is_na')) %>% scale.df
-  } else {
-    d %>% select(-ends_with('_is_na'))
-  }
-}
-
-run.model <- function(m, d, modelfun, cv.score=score.predictions, ic.score=NULL, prep.with.all.vars=F){
+run.model <- function(m, d, modelfun, cv.score=score.predictions, 
+                      ic.score=NULL, prep.with.all.vars=F, cv.folds=NULL){
   set.seed(1)
   
   # Determine unique predictor prefixes in this model
@@ -36,9 +28,11 @@ run.model <- function(m, d, modelfun, cv.score=score.predictions, ic.score=NULL,
   form <- get.form(m)
   
   # Run LOO CV loop and compute scores
-  preds <- foreach(i=1:nrow(d), .combine=rbind) %dopar% {
-    d.tr <- d[-i,]
-    d.ho <- d[i,]
+  if (is.null(folds))
+    folds <- createFolds(1:nrow(d), 1:nrow(d), returnTrain=T)
+  preds <- foreach(fold=folds, i=icount(), .combine=rbind) %dopar% {
+    d.tr <- d[fold,]
+    d.ho <- d[-fold,]
     modelfun(form, d.tr, d.ho) %>% 
       mutate(y.true=d.ho$gos, i=i)
   } 
@@ -50,7 +44,7 @@ run.model <- function(m, d, modelfun, cv.score=score.predictions, ic.score=NULL,
   list(cv.scores=cv.scores, preds=preds, data=d)
 }
 
-run.models <- function(modelfun, prep.with.all.vars, ic.score=NULL, model.filter=c()){
+run.models <- function(modelfun, prep.with.all.vars, ic.score=NULL, model.filter=c(), cv.folds=NULL){
   res <- foreach(m=names(models))%do%{
     if (length(model.filter) > 0 && !m %in% model.filter)
       return(NULL)
@@ -58,7 +52,8 @@ run.models <- function(modelfun, prep.with.all.vars, ic.score=NULL, model.filter
     #score <- cv.run(models[[m]], d, predictor=bin.predict.probs, score=logloss)
     #score <- cv.run(models[[m]], do, predictor=ord.predict.probs, score=mlogloss)
     #score <- cv.run(models[[m]], dbu, predictor=ord.predict.class, score=accuracy.score)
-    r <- run.model(models[[m]], dbu, modelfun=modelfun, ic.score=ic.score, prep.with.all.vars=prep.with.all.vars) 
+    r <- run.model(models[[m]], dbu, modelfun=modelfun, ic.score=ic.score, 
+                   prep.with.all.vars=prep.with.all.vars, cv.folds=cv.folds) 
     r[['cv.scores']] <- r[['cv.scores']] %>% mutate(model=m, formula=paste(models[[m]], collapse=' + '))
     r
   } 
@@ -72,7 +67,7 @@ get.cv.results <- function(r, s, desc=T){
   r[order(r[,s], decreasing = desc),] %>% select(-formula)
 }
 
-get.models <- function(){
+get.models <- function(p){
   gas.models <- list(
     icp=c('icp1_20_inf'),
     paco2=c('paco2_0_28', 'paco2_42_inf'),
