@@ -1,8 +1,6 @@
 #source_url('http://cdn.rawgit.com/eric-czech/portfolio/master/functional/common/R/utils.R')
 #source_url('http://cdn.rawgit.com/eric-czech/portfolio/master/functional/common/R/cache.R')
 source('~/repos/portfolio/functional/common/R/cache.R')
-library(foreach)
-library(iterators)
 library(logging)
 library(stringr)
 
@@ -24,30 +22,25 @@ Trainer <- setRefClass("Trainer",
     getFoldIndex = function(){ fold.index },
     generateFoldData = function(X, y, data.generator, data.summarizer=NULL, enable.cache=T){
       if (length(fold.index[['outer']]) == 0)
-        stop('Training cannot be done until fold index has been generated (must call generateFoldIndex first)')
-      fold.data <<- foreach(fold=fold.index[['outer']], i=icount(), .errorhandling='stop') %do%{
+        stop('Training cannot be done before fold index has been generated (must call generateFoldIndex first)')
+      fold.data <<- lapply(seq_along(fold.index[['outer']]), function(i){
+        fold <- fold.index[['outer']][[i]]
         loginfo('Generating data for fold %s of %s', i, length(fold.index[['outer']]))
         
         # Folds should be for training set, not test set
         X.train <- X[fold,]; y.train <- y[fold]
         X.test <- X[-fold,]; y.test <- y[-fold]
         
-        set.seed(seed)
         fold.key <- sprintf('fold_%s', i)
-        tryCatch({
-          if (!enable.cache) cache$invalidate(fold.key)
-          d <- cache$load(fold.key, function(){ data.generator(X.train, y.train, X.test, y.test) })
-        }, error=function(e) {
-            logerror('An error occurred while generating/fetching training data.')
-            logerror(e)
-            browser()
-        })
+        if (!enable.cache) cache$invalidate(fold.key)
+        set.seed(seed)
+        d <- cache$load(fold.key, function(){ data.generator(X.train, y.train, X.test, y.test) })
         
         if (!is.null(data.summarizer)) data.summarizer(d)
         
         inner.fold.index <- tryCatch(fold.index[['inner']][[i]], error=function(e) NULL)
         list(key=fold.key, id=i, data=d, index=inner.fold.index)
-      }
+      })
       loginfo('Fold data generation complete')
     },
     getFoldData = function(){
@@ -60,23 +53,11 @@ Trainer <- setRefClass("Trainer",
       
       # Run model training routine
       set.seed(seed)
-      tryCatch({ 
-        f <- model$train(data, fold.index, fold.id) 
-      }, error=function(e){
-        logerror('An error occurred during training.')
-        logerror(e)
-        browser()
-      })
+      f <- model$train(data, fold.index, fold.id) 
       
       # Reset seed and produce predictions from model
       set.seed(seed)
-      tryCatch({ 
-        p <- model$predict(f, data, fold.id)
-      }, error=function(e){
-        logerror('An error occurred during model prediction')
-        logerror(e)
-        browser()
-      })
+      p <- model$predict(f, data, fold.id)
       
       list(fit=f, y.pred=p, y.test=model$test(data), fold=fold.id, model=model$name)
     }, 
@@ -84,22 +65,16 @@ Trainer <- setRefClass("Trainer",
                        data.summarizer=NULL, enable.cache=T){
       
       # Create and cache preprocessed predictor data frame
+      if (!enable.cache) cache$invalidate(cache.key)
       set.seed(seed)
-      tryCatch({
-        if (!enable.cache) cache$invalidate(cache.key)
-        d <- cache$load(cache.key, function(){ data.generator(X, y, X.ho, y.ho) })
-      }, error=function(e) {
-        logerror('An error occurred while creating/fetching hold out data.')
-        logerror(e)
-        browser()
-      })
+      d <- cache$load(cache.key, function(){ data.generator(X, y, X.ho, y.ho) })
       
       if (!is.null(data.summarizer)) data.summarizer(d)
       
-      res <- foreach(model=models) %do% {
+      res <- lapply(models, function(model){
         loginfo('Creating holdout predictions for model "%s"', model$name)
         .self$predict(model, d, NULL, 0)
-      } %>% setNames(sapply(models, function(m) m$name))
+      }) %>% setNames(sapply(models, function(m) m$name))
       loginfo('Holdout predictions complete')
       res
     },
@@ -112,16 +87,17 @@ Trainer <- setRefClass("Trainer",
       
       if (!enable.cache) cache$invalidate(model.key)
       res <- cache$load(model.key, function(){ 
-        foreach(fold=fold.data, i=icount(), .errorhandling='stop') %do% {
+        lapply(seq_along(fold.data), function(i){
+          fold <- fold.data[[i]]
           loginfo('Running model trainer for fold %s of %s', i, length(fold.data))
           
           if (!is.null(data.summarizer)) data.summarizer(fold$data)
           
           # Fit model and get predictions for this fold
           res <- .self$predict(model, fold$data, fold$index, fold$id)
-
+          
           res
-        }
+        })
       })
       loginfo('Training complete for model "%s"', model$name)
       res
