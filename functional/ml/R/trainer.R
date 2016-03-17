@@ -89,7 +89,7 @@ Trainer <- setRefClass("Trainer",
       res <- cache$load(model.key, function(){ 
         lapply(seq_along(fold.data), function(i){
           fold <- fold.data[[i]]
-          loginfo('Running model trainer for fold %s of %s', i, length(fold.data))
+          loginfo('Running %s model for fold %s of %s', model$name, i, length(fold.data))
           
           if (!is.null(data.summarizer)) data.summarizer(fold$data)
           

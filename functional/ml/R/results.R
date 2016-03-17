@@ -77,9 +77,27 @@ GetPerfData <- function(models, metric.extraction.fun=DefaultMetricExtractor){
   
   foreach(m=names(models), .combine=rbind)%do%{
     model <- models[[m]]
-    if (is.null(model$pred))
-      stop('Model must have resampled prediction data ("final" only)')
-    model$pred %>% dplyr::rename(resample=Resample) %>% 
+    
+    if (!any(c('train', 'caretStack', 'caretEnsemble') %in% class(model))){
+      warning(sprintf('Ignoring model with incompatible class "%s"', class(model)))
+      return(NULL)
+    }
+    
+    # Verify existence of resampling predictions
+    has.train.model <- !is.null(model$pred)
+    has.train.ens   <- !is.null(model$ens_model) && !is.null(model$ens_model$pred)
+    if (!has.train.model && !has.train.ens)
+      stop('Model must have resampled prediction data ("final" ONLY)')
+    
+    pred <- if (has.train.model) model$pred else model$ens_model$pred
+    has.dupes <- pred %>% group_by(Resample, rowIndex) %>% tally %>% .$n %>% max
+    if (has.dupes > 1)
+      stop(paste(
+        'Found repeated observations in resample predictions. ',
+        'Saved predictions should be "final" ONLY'
+      ))
+    
+    pred %>% dplyr::rename(resample=Resample) %>% 
       group_by(resample) %>% do({ metric.extraction.fun(.) }) %>%
       dplyr::mutate(model=m)
   }
@@ -100,7 +118,8 @@ GetDefaultPerfPlot <- function(perf.data, metric, metric.title=NULL){
     dplyr::rename_(value=metric) %>%
     dplyr::mutate(model=factor(model)) %>%
     dplyr::mutate(model=reorder(model, value)) %>%
-    ggplot(aes(x=model, y=value, color=model)) + geom_boxplot() + 
+    ggplot(aes(x=model, y=value, color=model)) + 
+    geom_boxplot(outlier.size=0) + 
     geom_jitter(alpha=.2, width=.5) + theme_bw() + 
     ylab(ifelse(is.null(metric.title), metric, metric.title)) +
     scale_colour_discrete(guide = FALSE) + xlab('Model') +
@@ -139,25 +158,57 @@ GetVarImp <- function(models){
   require(foreach)
   
   foreach(m=names(models), .combine=rbind) %do% {
-    vimp <- varImp(models[[m]])
-    if (is.null(vimp) || ncol(vimp$importance) > 1) return(NULL)
-    setNames(vimp$importance, 'score') %>%
+    model <- models[[m]]
+    
+    is.ens <- 'caretEnsemble' %in% class(model)
+    
+    # Ignore caret stacked ensembles, they do not have var imp
+    if (!is.ens && 'caretStack' %in% class(model))
+      return(NULL)
+    
+    if (!is.ens && !'train' %in% class(model)){
+      warning(sprintf('Ignoring model with incompatible class "%s"', class(model)))
+      return(NULL)
+    }
+
+    vimp <- varImp(model)
+    if (is.null(vimp)) return(NULL)
+    
+    if (is.ens) vimp <- vimp[,'overall',drop=F]
+    else {
+      vimp <- vimp$importance
+      # Ignore when multiple measures of variable importance are returned
+      # for non-ensemble model (not sure what to do with those yet)
+      if (ncol(vimp) > 1) return(NULL)
+    }
+
+    setNames(vimp, 'score') %>%
       add_rownames(var='feature') %>% 
       dplyr::mutate(model=m)
   }  
 }
 
 #' @title Plot results from \code{GetVarImp}
-PlotVarImp <- function(var.imp, limit=15){
+PlotVarImp <- function(var.imp, limit=15, compress=F){
   require(dplyr)
   require(ggplot2)
   
-  var.imp %>% 
+  var.imp <- var.imp %>% 
     dplyr::mutate(feature=reorder(factor(feature), score, FUN=mean, order=T)) %>%
-    dplyr::filter(feature %in% tail(levels(feature), limit)) %>%
-    ggplot(aes(x=feature, y=score, color=model)) + geom_point() +
-    theme_bw() + ggtitle('Feature Importance by Model') +
-    theme(axis.text.x = element_text(angle = 25, hjust = 1)) 
+    dplyr::filter(feature %in% tail(levels(feature), limit))
+  
+  if (compress){
+    ggplot(var.imp, aes(x=feature, y=score)) + 
+      geom_boxplot(outlier.size=0) +
+      geom_jitter(width=.5, alpha=.2) + 
+      theme_bw() + ggtitle('Feature Importance Across Models') +
+      theme(axis.text.x = element_text(angle = 25, hjust = 1)) 
+  } else {
+    ggplot(var.imp, aes(x=feature, y=score, color=model)) + geom_point() +
+      theme_bw() + ggtitle('Feature Importance by Model') +
+      theme(axis.text.x = element_text(angle = 25, hjust = 1))
+  }
+
 }
 
 ##### Partial Dependence #####
@@ -177,9 +228,17 @@ GetPartialDependence <- function(
     ))
   }
   
+  get.training.data <- function(model){
+    if (!is.null(model$trainingData)) 
+      return(model$trainingData)
+    if (!is.null(model$models) && !is.null(model$models[[1]]$trainingData))
+      return(model$models[[1]]$trainingData)
+    return(NULL)
+  }
+  
   use.training.data <- F
   if (is.null(X)){
-    mask <- sapply(models, function(x) is.null(x$trainingData))
+    mask <- sapply(models, function(x) is.null(get.training.data(x)))
     bad.models <- names(models)[mask]
     if (length(bad.models) > 0){
       stop(paste0(
@@ -201,7 +260,7 @@ GetPartialDependence <- function(
     model <- models[[m]]
     
     if (use.training.data)
-      X <- model$trainingData %>% dplyr::select(-.outcome)
+      X <- get.training.data(model) %>% dplyr::select(-.outcome)
     
     if (!is.null(seed))
       set.seed(seed)

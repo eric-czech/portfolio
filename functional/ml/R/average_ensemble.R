@@ -1,6 +1,5 @@
 library(caret)
 library(dplyr)
-library(caretEnsemble)
 
 MOST_FREQUENT <- function(x, lvl) names(sort(table(x), decreasing=TRUE)[1])
 CLASS_FREQUENCY <- function(x, lvl) sum(x == lvl[1])/length(x)
@@ -46,7 +45,7 @@ GetEnsembleAveragingModel <- function(
       if (all.factors) p <- apply(newdata, 1, class.to.prob, modelFit$lev)
       else p <- apply(newdata, 1, prob.to.prob, modelFit$lev)
       
-      p <- cbind(1-p, p)
+      p <- cbind(p, 1-p)
       dimnames(p)[[2]] <- modelFit$obsLevels
       p
     },
@@ -104,7 +103,7 @@ GetEnsembleQuantileModel <- function(){
       if (all.factors) p <- apply(newdata, 1, class.to.prob, modelFit$lev)
       else p <- apply(newdata, 1, prob.to.prob, modelFit$lev, modelFit$quantile)
       
-      p <- cbind(1-p, p)
+      p <- cbind(p, 1-p)
       dimnames(p)[[2]] <- modelFit$obsLevels
       p
     },
@@ -116,6 +115,7 @@ GetEnsembleQuantileModel <- function(){
 }
 
 GetCaretEnsembleModel <- function(caret.list.args, caret.stack.args){
+  require(caretEnsemble)
   list(
     label = "Caret Ensemble Model",
     library = NULL,
@@ -145,38 +145,38 @@ GetCaretEnsembleModel <- function(caret.list.args, caret.stack.args){
 }
 
 # Quick Test:
-n <- 100
-
-X1 <- data.frame(x1=runif(n), x2=runif(n))
-X2 <- data.frame(x1=sample(c('pos', 'neg'), n, T), x2=sample(c('pos', 'neg'), n, T))
-y <- apply(X1, 1, function(x) if (mean(x) > .5 && x[1] > .2) 'pos' else 'neg')
-y <- factor(y, levels=c('pos', 'neg'))
-
-m <- train(X1, y, method=GetEnsembleAveragingModel(), metric='Accuracy',
-      trControl=trainControl(method='cv', number=10, classProbs=T))
-m$resample
-
-m <- train(X2, y, method=GetEnsembleAveragingModel(), metric='Accuracy',
-           trControl=trainControl(method='cv', number=10, classProbs=T))
-m$resample
-
-m <- train(X2, y, method=GetEnsembleQuantileModel(), metric='Accuracy', tuneLength=5,
-           trControl=trainControl(method='cv', number=10, classProbs=T))
-
-
-
-
-caret.list.args <- list(
-  trControl=trainControl(method='cv', number=3, classProbs=T, savePredictions='final'),
-  methodList=c("glm", "rpart"),
-  tuneList=list(
-    rf1=caretModelSpec(method="rf", tuneGrid=data.frame(.mtry=2))
-  )
-)
-ens.model <- GetEnsembleAveragingModel()
-caret.stack.args <- list(method=ens.model, trControl=trainControl(method='none', classProbs=T))
-m <- train(
-  X1, y, method=GetCaretEnsembleModel(caret.list.args, caret.stack.args), 
-  trControl=trainControl(method='cv', number=5, classProbs=T)
-)
+# n <- 100
+# 
+# X1 <- data.frame(x1=runif(n), x2=runif(n))
+# X2 <- data.frame(x1=sample(c('pos', 'neg'), n, T), x2=sample(c('pos', 'neg'), n, T))
+# y <- apply(X1, 1, function(x) if (mean(x) > .5 && x[1] > .2) 'pos' else 'neg')
+# y <- factor(y, levels=c('pos', 'neg'))
+# 
+# m <- train(X1, y, method=GetEnsembleAveragingModel(), metric='Accuracy',
+#       trControl=trainControl(method='cv', number=10, classProbs=T))
+# m$resample
+# 
+# m <- train(X2, y, method=GetEnsembleAveragingModel(), metric='Accuracy',
+#            trControl=trainControl(method='cv', number=10, classProbs=T))
+# m$resample
+# 
+# m <- train(X2, y, method=GetEnsembleQuantileModel(), metric='Accuracy', tuneLength=5,
+#            trControl=trainControl(method='cv', number=10, classProbs=T))
+# 
+# 
+# 
+# library(caretEnsemble)
+# caret.list.args <- list(
+#   trControl=trainControl(method='cv', number=3, classProbs=T, savePredictions='final'),
+#   methodList=c("glm", "rpart"),
+#   tuneList=list(
+#     rf1=caretModelSpec(method="rf", tuneGrid=data.frame(.mtry=2))
+#   )
+# )
+# ens.model <- GetEnsembleAveragingModel()
+# caret.stack.args <- list(method=ens.model, trControl=trainControl(method='none', classProbs=T))
+# m <- train(
+#   X1, y, method=GetCaretEnsembleModel(caret.list.args, caret.stack.args), 
+#   trControl=trainControl(method='cv', number=5, classProbs=T)
+# )
 

@@ -43,7 +43,7 @@ partialDependence <- function(
   # Generate predictor value grid to compute PDP for
   N <- nrow(X)
   x <- X[, predictor]
-  if (is.factor(x)){
+  if (is.factor(x) || length(unique(x)) <= 2){
     grid <- unique(x)
   } else {
     grid <- as.numeric(x)
@@ -53,6 +53,12 @@ partialDependence <- function(
   
   # Set number of grid points to compute pdp for
   n.grid <- length(grid)
+  if (n.grid == 1){
+    stop(sprintf(
+      'Predictor "%s" only has one unique value.  Partial dependence calculation requires at least 2', 
+      predictor
+    ))
+  }
   
   if (verbose) {
     cat(sprintf(
