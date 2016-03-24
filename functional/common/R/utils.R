@@ -51,3 +51,25 @@ import_source <- function(path, root=NULL, return.status=F){
 
 #' Binary operator used to remove items from a vector
 `%wo%` <- function(sequence, removals) sequence[!sequence %in% removals]
+
+#' @title Removes the '.Environment' attribute from a modeling result
+#' @description This is often necessary because some libraries return 
+#' model objects that somewhat inexplicably large in memory and on disk.  The 
+#' culprit here seems to often be a hidden attribute attached to the 'terms'
+#' and 'formula' attributes in those objects called '.Environment'.  See here
+#' for an example: http://stackoverflow.com/questions/29481331/r-attribute-environment-consuming-large-amounts-of-ram-in-nnet-package
+#' This can be fixed by setting that attribute to an empty vector (See
+#' http://www.r-bloggers.com/trimming-the-fat-from-glm-models-in-r/)
+#' @note Note that verifying the size of objects in memory using object.size is very
+#' unreliable.  A much more accurate way is \code{length(serialize(object, NULL))}
+#' @param model to remove unncessary and often large attributes from
+#' @return trimmed model result
+trim_model <- function(model){
+  try({
+    if ('terms' %in% names(model))
+      attr(model$terms, '.Environment') <- c()
+    if ('terms' %in% names(model))
+      attr(model$terms, '.Environment') <- c()
+  }, silent=T)
+  model
+}
