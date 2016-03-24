@@ -200,7 +200,7 @@ PlotVarImp <- function(var.imp, limit=15, compress=F){
   if (compress){
     ggplot(var.imp, aes(x=feature, y=score)) + 
       geom_boxplot(outlier.size=0) +
-      geom_jitter(width=.5, alpha=.2) + 
+      geom_jitter(aes(x=feature, y=score, color=model), width=.5, alpha=.5) + 
       theme_bw() + ggtitle('Feature Importance Across Models') +
       theme(axis.text.x = element_text(angle = 25, hjust = 1)) 
   } else {

@@ -4,7 +4,8 @@ source('~/repos/portfolio/functional/common/R/cache.R')
 library(logging)
 library(stringr)
 
-Trainer <- setRefClass("Trainer",
+Trainer <- setRefClass(
+  "Trainer",
   fields = list(cache='Cache', seed='numeric', fold.data='list', fold.index='list'),
   methods = list(
     initialize = function(..., cache.dir, cache.project, seed=1){
@@ -106,3 +107,30 @@ Trainer <- setRefClass("Trainer",
 )
 
 # t <- Trainer(cache.dir='/tmp', cache.project='test')
+
+SimpleTrainer <- setRefClass(
+  "SimpleTrainer",
+  fields = list(cache='Cache', seed='numeric'),
+  methods = list(
+    initialize = function(..., cache.dir, cache.project, seed=1){
+      cache <<- Cache(dir=cache.dir, project=cache.project)
+      callSuper(..., cache=cache, seed=seed)
+    },
+    cleanModelName = function(model.name){
+      str_replace_all(str_replace_all(model.name, '\\.', '_'), '\\W+', '')
+    },
+    train = function(model, X, y, enable.cache=T){
+      model.key <- sprintf('model_%s', cleanModelName(model$name))
+      loginfo('Beginning training for model "%s" (cache name = "%s")', model$name, model.key)
+      
+      if (!enable.cache) cache$invalidate(model.key)
+      f <- cache$load(model.key, function(){ 
+        set.seed(seed)
+        model$train(X, y)
+      })
+      
+      loginfo('Training complete for model "%s"', model$name)
+      list(fit=f)
+    }
+  )
+)
