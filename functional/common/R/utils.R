@@ -66,10 +66,17 @@ import_source <- function(path, root=NULL, return.status=F){
 #' @return trimmed model result
 trim_model <- function(model){
   try({
+    m <- model
+    is.caret <- 'finalModel' %in% names(model)
+    
+    if (is.caret) m <- model$finalModel
+    
+    if ('terms' %in% names(m))
+      attr(m$terms, '.Environment') <- c()
     if ('terms' %in% names(model))
-      attr(model$terms, '.Environment') <- c()
-    if ('terms' %in% names(model))
-      attr(model$terms, '.Environment') <- c()
+      attr(m$terms, '.Environment') <- c()
+    
+    if (is.caret) model$finalModel <- m
   }, silent=T)
   model
 }
