@@ -37,6 +37,25 @@ SummarizeTrainingResults = function(results, is.classification, fold.summary=NUL
 ##### Generic result summary utilities #####
 ############################################
 
+##### Utility Functions #####
+
+#' @title Internal function used to resolve and/or verify
+#' that a given model object is valid
+#' @param model a caret::train, caretEnsemble, or list object
+#' with a "fit" attribute (that is itself a caret or caretEnsemble
+#' result)
+#' @return resolved and validated model
+.GetModel <- function(model){
+  if (class(model) == 'list' && 'fit' %in% names(model))
+    model <- model$fit
+  
+  if (!any(c('train', 'caretStack', 'caretEnsemble') %in% class(model))){
+    warning(sprintf('Ignoring model with incompatible class "%s"', class(model)))
+    return(NULL)
+  }
+  model
+}
+
 ##### Resampling Summarizations #####
 
 #' @title Default metric extractor for use with \code{GetPerfData}
@@ -63,39 +82,84 @@ DefaultMetricExtractor <- function(pred){
   )
 }
 
+#' @title Internal function used to extract prediction data frames (from resampling)
+#' @param model a caret::train or caretEnsemble model
+#' @param verify.unique if true, ensures that no observations are duplicated in
+#' prediction results
+#' @return predicted data for resamples
+.GetModelPredictions <- function(model, verify.unique=T){
+  has.pred.model <- !is.null(model$pred)
+  has.pred.ens   <- !is.null(model$ens_model) && !is.null(model$ens_model$pred)
+  if (!has.pred.model && !has.pred.ens)
+    stop('Model must have resampled prediction data ("final" ONLY)')
+  pred <- if (has.pred.model) model$pred else model$ens_model$pred
+  
+  if (verify.unique){
+    has.dupes <- pred %>% group_by(rowIndex) %>% tally %>% .$n %>% max
+    if (has.dupes > 1){
+      stop(paste(
+        'Found repeated observations in resample predictions. ',
+        'Saved predictions should be "final" ONLY'
+      ))
+    }
+  }
+  pred
+}
+
+#' @title Internal function used to extract resample data frames
+#' @param model a caret::train or caretEnsemble model
+#' @return resample data for model
+.GetModelResample <- function(model){
+  has.resamp.model <- !is.null(model$resample)
+  has.resamp.ens   <- !is.null(model$ens_model) && !is.null(model$ens_model$resample)
+  if (!has.resamp.model && !has.resamp.ens)
+    stop('Model must have resampled prediction data ("final" ONLY)')
+  if (has.resamp.model) model$resample else model$ens_model$resample
+}
+
 #' @title Extracts performance and CM metrics for several trained models
-#' @param models a list of caret::train objects 
+#' @param models a named list of caret::train objects (or list objects with
+#' a "fit" attribute, that is a caret::train object)
+#' @note The given train objects must have had returnResamp='final' in 
+#' trainControl (results may be misleading if returnResamp='all')
+#' @seealso \link{GetPerfData} for calculating custom performance metrics
+#' @return A data frame containing performance measures for each model
+GetResampleData <- function(models){
+  if (is.null(names(models)))
+    stop('Modeling results must be a named list (no names found)')
+  
+  foreach(m=names(models), .combine=rbind)%do%{
+    model <- .GetModel(models[[m]])
+    .GetModelResample(model) %>% setNames(tolower(names(.))) %>%
+      mutate(model=m)
+  }
+}
+
+#' @title Computes performance and CM metrics for several trained models
+#' @description Calculates statistics/metrics associated with predicted
+#' data in resampling; note that these metrics may already be attached to
+#' model results and rather than recomputing or specifying custom metrics,
+#' \code{GetResampleData} can be used instead for greater efficiency.
+#' @param models a named list of caret::train objects (or list objects with
+#' a "fit" attribute, that is a caret::train object)
 #' @note The given train objects must have had savePredictions='final' in 
-#' trainControl (results will be misleading if savePredictions='all')
+#' trainControl (results may be misleading if savePredictions='all')
+#' @seealso \link{GetResampleData}
 #' @return A data frame containing performance measures for each model
 GetPerfData <- function(models, metric.extraction.fun=DefaultMetricExtractor){
   require(foreach)
   require(dplyr)
   
+  if (is.null(names(models)))
+    stop('Modeling results must be a named list (no names found)')
   if (is.null(metric.extraction.fun))
     stop('Metric extraction function must be specified')
   
   foreach(m=names(models), .combine=rbind)%do%{
-    model <- models[[m]]
+    model <- .GetModel(models[[m]])
     
-    if (!any(c('train', 'caretStack', 'caretEnsemble') %in% class(model))){
-      warning(sprintf('Ignoring model with incompatible class "%s"', class(model)))
-      return(NULL)
-    }
-    
-    # Verify existence of resampling predictions
-    has.train.model <- !is.null(model$pred)
-    has.train.ens   <- !is.null(model$ens_model) && !is.null(model$ens_model$pred)
-    if (!has.train.model && !has.train.ens)
-      stop('Model must have resampled prediction data ("final" ONLY)')
-    
-    pred <- if (has.train.model) model$pred else model$ens_model$pred
-    has.dupes <- pred %>% group_by(Resample, rowIndex) %>% tally %>% .$n %>% max
-    if (has.dupes > 1)
-      stop(paste(
-        'Found repeated observations in resample predictions. ',
-        'Saved predictions should be "final" ONLY'
-      ))
+    # Extract prediction data attached to model
+    pred <- .GetModelPredictions(model)
     
     pred %>% dplyr::rename(resample=Resample) %>% 
       group_by(resample) %>% do({ metric.extraction.fun(.) }) %>%
@@ -158,7 +222,7 @@ GetVarImp <- function(models){
   require(foreach)
   
   foreach(m=names(models), .combine=rbind) %do% {
-    model <- models[[m]]
+    model <- .GetModel(models[[m]])
     
     is.ens <- 'caretEnsemble' %in% class(model)
     
@@ -215,7 +279,7 @@ PlotVarImp <- function(var.imp, limit=15, compress=F){
 
 GetPartialDependence <- function(
   models, vars, pred.fun, X=NULL, grid.size=50, grid.window=c(0, 1), 
-  sample.rate=1, verbose=verbose, seed=NULL){
+  sample.rate=1, verbose=T, seed=NULL){
   
   require(dplyr)
   require(reshape2)
@@ -229,16 +293,15 @@ GetPartialDependence <- function(
   }
   
   get.training.data <- function(model){
+    model <- .GetModel(model)
     if (!is.null(model$trainingData)) 
       return(model$trainingData)
-    if (!is.null(model$models) && !is.null(model$models[[1]]$trainingData))
-      return(model$models[[1]]$trainingData)
     return(NULL)
   }
   
   use.training.data <- F
   if (is.null(X)){
-    mask <- sapply(models, function(x) is.null(get.training.data(x)))
+    mask <- sapply(models, function(m) is.null(get.training.data(m)))
     bad.models <- names(models)[mask]
     if (length(bad.models) > 0){
       stop(paste0(
@@ -257,7 +320,7 @@ GetPartialDependence <- function(
       cat(sprintf('Calculating "%s" partial dependence for model "%s"\n', var, m))
     
     # Compute partial dependence for single variable + model
-    model <- models[[m]]
+    model <- .GetModel(models[[m]])
     
     if (use.training.data)
       X <- get.training.data(model) %>% dplyr::select(-.outcome)
@@ -284,27 +347,37 @@ GetPartialDependence <- function(
   mapply(pd.fun, arg[, 1], arg[, 2], SIMPLIFY = F, USE.NAMES = F)
 }
 
-PlotPartialDependence <- function(pd.data){
-  is.discrete <- sapply(pd.data, function(r) is.factor(r$x))
-  pd.discrete.data <- foreach(pd=pd.data[is.discrete], .combine=rbind)%do%{
-    pd$pd %>% mutate(predictor=pd$predictor, model=pd$model)
-  }
-  pd.numeric.data <- foreach(pd=pd.data[!is.discrete], .combine=rbind)%do%{
-    pd$pd %>% mutate(predictor=pd$predictor, model=pd$model)
+
+PlotPartialDependence <- function(pd.data, se=T, mid=T, facet.scales='free', use.smooth=T){
+  
+  # Combine all PD data frames for each predictor and model
+  pd.data <- foreach(pd=pd.data, .combine=rbind)%do%{
+    pd$pd %>% dplyr::mutate(predictor=pd$predictor, model=pd$model)
   }
   
-  pd.discrete <- NULL
-  if (is.data.frame(pd.discrete.data) && nrow(pd.discrete.data) > 0){
-    pd.discrete <- ggplot(pd.discrete.data, aes(x=x, y=y, color=model)) + 
-      geom_boxplot(position='dodge') + 
-      facet_wrap(~predictor) + theme_bw()
-  }
+  # Compute PDP summary values (e.g. mean)
+  pd.sum <- pd.data %>% 
+    dplyr::group_by(predictor, model, x) %>% 
+    dplyr::summarise(y.min=mean(y)-sd(y), y.max=mean(y)+sd(y), y.mid=mean(y)) %>%
+    ungroup
   
-  pd.numeric <- NULL
-  if (is.data.frame(pd.numeric.data) && nrow(pd.numeric.data) > 0){
-    pd.numeric <- ggplot(pd.numeric.data, aes(x=x, y=y, color=model)) +
-      geom_smooth(size=1) + facet_wrap(~predictor) + theme_bw()
-  }
+  # Create a base plot, using a smoother if specified, a summary line otherwise
+  p <- ggplot(NULL) 
+  if (use.smooth) p <- p + geom_smooth(data=pd.data, aes(x=x, y=y, color=model), size=1.5)
+  else p <- p + stat_summary(data=pd.data, aes(x=x, y=y, color=model), fun.y=mean, geom="line", size=1.5)
   
-  list(pd.numeric=pd.numeric, pd.discrete=pd.discrete)
+  # Facet by the predictor variable
+  p <- p + facet_wrap(~predictor, scales=facet.scales)
+  
+  # Add midline and range if specified
+  if (mid) {
+    p <- p + 
+      geom_line(data=pd.sum, aes(x=x, y=y.mid, color=model), alpha=.6, size=.75) 
+  }
+  if (se){
+    p <- p + 
+      geom_line(data=pd.sum, aes(x=x, y=y.max, color=model), alpha=.4, size=.5) + 
+      geom_line(data=pd.sum, aes(x=x, y=y.min, color=model), alpha=.4, size=.5)
+  }
+  p
 }

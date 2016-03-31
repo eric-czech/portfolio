@@ -1,0 +1,97 @@
+---
+title: "Results Template"
+output: html_document
+#output: ioslides_presentation
+widescreen: yes
+date: "`r format(Sys.time(), '%d %B, %Y, %H:%M')`"
+knit: (function(inputFile, encoding) { rmarkdown::render(
+        inputFile, encoding=encoding, 
+        output_file=file.path(dirname(inputFile), 'results_01_render', 'doc.html')) })
+---
+  
+
+```{r init, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+library(knitr)
+library(DT)
+library(ggplot2)
+
+PROJ_CODE_DIR <- '~/repos/portfolio/functional/ml/R/templates/project_template'
+
+opts_knit$set(root.dir=PROJ_CODE_DIR)
+setwd(opts_knit$get('root.dir'))
+source('common.R')
+```
+
+```{r load, echo=FALSE, results='hide', cache=FALSE}
+
+##### Data Summaries #####
+
+# Load raw input data for project
+# d <- proj$getData('sim.csv')
+
+# Create intermediate summaries for raw data loaded above
+
+
+##### Model Performance #####
+
+# Load all trained models 
+models <- proj$getModels(names.only=T)
+
+# Summarize trained model objects directly (optional)
+
+# Load individual performance and inference results
+perf.resample <- proj$loadResult('perf_resample')
+
+##### Model Inference #####
+
+var.imp <- proj$loadResult('var_imp')
+partial.dependence <- proj$loadResult('partial_dependence')
+```
+
+<br><hr>
+<center><h2>Contents</h2></center>
+<hr>
+
+- **Section 1**: [Data Overview and Assumptions](#id1)
+- **Section 2**: [Model Performance](#id2)
+- **Section 3**: [Model Inference](#id3)
+- **Section 4**: [Conclusions](#id4)
+
+<hr>
+<center><h2><a id="id1">Data Overview and Assumptions</a></center></h2></center>
+<hr>
+
+__Assumptions and descriptive stats go here__
+```{r, echo=T}
+knitr::kable(summary(cars))
+```
+
+```{r, echo=T}
+datatable(head(cars, 100), options=list(scrollX=T, paging=F, searching=F))
+```
+
+<hr>
+<center><h2><a id="id2">Model Performance</a></center></h2></center>
+<hr>
+
+__Assumptions and descriptive stats go here__
+
+```{r, echo=FALSE, fig.width=8, fig.height=5, fig.align='center'}
+ggplot(cars, aes(x=speed, y=dist)) + geom_point()
+```
+
+<hr>
+<center><h2><a id="id3">Model Inference</a></center></h2></center>
+<hr>
+
+__Inference results go here__
+
+```{r, echo=FALSE, fig.width=8, fig.height=5, fig.align='center'}
+ggplot(cars, aes(x=speed, y=dist)) + geom_point()
+```
+
+<hr>
+<center><h2><a id="id4">Conclusions</a></center></h2></center>
+<hr>
+
+__Conclusions go here__
