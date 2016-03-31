@@ -71,12 +71,32 @@ trim_model <- function(model){
     
     if (is.caret) m <- model$finalModel
     
-    if ('terms' %in% names(m))
-      attr(m$terms, '.Environment') <- c()
-    if ('terms' %in% names(model))
-      attr(m$terms, '.Environment') <- c()
+    # Trim nested glm objects in MARS models
+    if (length(class(m)) == 1 && class(m) == 'earth'){
+      for (i in seq_along(m$glm.list)) 
+        m$glm.list[[i]] <- trim_model(m$glm.list[[i]])
+    }
+    
+    # For every known inner object containing large, unnecessary objects
+    for (name in c('terms', 'formula', 'model')){
+      # If the model does not contain this attribute, continue
+      if (!name %in% names(m))
+        next
+        
+      # Otherwise, remove all known large attributes
+      att <-'.Environment'
+      if (att %in% names(attributes(m[[name]])) && class(attr(m[[name]], att)) == 'environment'){
+        attr(m[[name]], att) <- c() 
+      }
+      
+      # Special case for environments nested within terms object nested within a model object (MARS only so far)
+      if (name == 'model' && 'terms' %in% names(attributes(m[[name]]))){
+        attr(attr(m[[name]], 'terms'), '.Environment') <- c()
+      }
+    }
     
     if (is.caret) model$finalModel <- m
-  }, silent=T)
+    else model <- m
+  }, silent=F)
   model
 }
