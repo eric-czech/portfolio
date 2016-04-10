@@ -7,3 +7,9 @@
 [submodule "environments/vagrant/research/puppet/modules/vcsrepo"]
 	path = environments/vagrant/research/puppet/modules/vcsrepo
 	url = https://github.com/puppetlabs/puppetlabs-vcsrepo.git
+[submodule "functional/env/ansible/research/roles/ansible-r"]
+	path = functional/env/ansible/research/roles/ansible-r
+	url = https://github.com/Oefenweb/ansible-r.git
+[submodule "functional/env/ansible/research/roles/ansible-rstudio"]
+	path = functional/env/ansible/research/roles/ansible-rstudio
+	url = https://github.com/Oefenweb/ansible-rstudio.git
