@@ -1,0 +1,55 @@
+---
+title: "Poisson Regression and Exposure Variables"
+output: html_document
+---
+
+When the amount of time associated with the count observations in a poisson regression problem differs per observation, there are several ways to handle it.
+
+The intuitive, but wrong approach, would be to take the number of events for observation $i$, $y_i$, and divide that by the number of time units (i.e. the exposure), $e_i$ from which that count came, and use that result to regress against.  This will likely produce a target response with fractional values (which will result from warnings from ```glm```) and it's not technically correct since the observation will only count one time in the likelihood maximized.
+
+There are two ways to handle this properly:
+
+1. Use the ```offset``` command like ```glm(y ~ offset(log(exposure)) + x, family='poisson')```.  This reformulates the regression as: $$log(\frac{E(y|x)}{exposure}) = \alpha + \beta * x$$
+$$=> log(E(y|x)) = \alpha + log(exposure) + \beta * x$$
+
+2. Use the ```weights``` parameter in the glm function after dividing the total number of counts per observation by the exposure (i.e. the naive approach).  This is only approximately the same though if the resulting response is then rounded to the nearest integer.
+
+Examples:
+
+Create simulated dataset:
+
+```{r, results='hide', warning=FALSE, message=FALSE}
+library(dplyr)
+set.seed(1)
+n <- 100
+d <- data.frame(x1=rgamma(n, shape=2)) %>%
+  mutate(exposure=sample(1:5, replace=T, size=n)) 
+r <- exp(.5 + 2.5 * d$x1 + rnorm(n=n, mean=0, sd=.1))
+
+# Create regression response as count per single time interval
+# times number of time intervals, per row
+d$y <- sapply(r, function(p) rpois(n=1, lambda=p)) * d$exposure
+d$y <- d$y + sample(-1:1, replace=T, size=n)
+```
+
+# Modeling Results
+
+Naive approach:
+
+```{r}
+# Note that this throws warnings about response being fractional
+suppressWarnings(glm(I(y/exposure) ~ x1, d, family='poisson'))
+```
+
+Better approaches:
+
+```{r}
+# This is the only approach that has no issues with fractional responses
+glm(y ~ x1 + offset(log(exposure)), d, family='poisson')
+```
+
+```{r}
+# Note that this also throws warnings about response being fractional
+# despite the fact that results are the same as in the model above
+suppressWarnings(glm(I(y/exposure) ~ x1, d, weights=exposure, family='poisson'))
+```

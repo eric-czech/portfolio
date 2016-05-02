@@ -1,0 +1,6 @@
+---
+- hosts: all
+  become: yes
+  roles:
+    - { role: ansible-r, r_packages: [{name: 'stringr'}] }#, {name: 'doSNOW'}, {name: 'caret'}, {name: 'dplyr'}] } 
+    - { role: ansible-rstudio-server }
