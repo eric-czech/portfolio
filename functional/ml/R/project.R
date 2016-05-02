@@ -22,7 +22,9 @@ MLProject <- setRefClass(
       file.path(proj.dir, 'data')
     },
     getData = function(file.name, ...){
-      read.csv(file.path(getDataDir(), file.name), ...)
+      f <- file.path(getDataDir(), file.name)
+      cat(sprintf('Loading raw project data from file "%s"', f))
+      read.csv(f, ...)
     },
     getModels = function(filter=NULL, names.only=T){
       

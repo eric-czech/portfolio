@@ -1,0 +1,35 @@
+---
+title: "Non-Negative Samples"
+output: html_document
+---
+
+A few different distributions with sample values no less than 0:
+
+```{r, echo=F, results='hide', message=F, warning=F}
+library(reshape2)
+library(ggplot2)
+library(dplyr)
+```
+
+```{r, warning=F, fig.align='center'}
+library(reshape2)
+library(ggplot2)
+library(dplyr)
+
+set.seed(1)
+truncated.normal <- function(N, ...) rnorm(N*5, ...) %>% .[. > 0] %>% head(N)
+
+N <- 25000
+data.frame(
+  Truncated.Normal=truncated.normal(N, mean=0, sd=10),
+  Log.Normal=rlnorm(N, 2.5),
+  Gamma=rgamma(N, 1, .2),
+  Exponential=rexp(N, .15)
+) %>% 
+  melt(id.vars=NULL) %>% 
+  ggplot(aes(x=value, color=variable)) + geom_density() + 
+  theme_bw() + xlim(0, 100) + 
+  scale_color_discrete(guide=guide_legend(title='Distribution')) + 
+  ggtitle('Non-Negative Distributions')
+
+```

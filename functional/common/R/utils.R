@@ -100,3 +100,23 @@ trim_model <- function(model){
   }, silent=F)
   model
 }
+
+#' @title Apply function to all columns in data frame matching class
+#' @description This function is most helpful when needed to transform all columns
+#' in a data frame that match a particular data type (e.g. converting all strings to factors)
+#' @param d data frame to apply function to (column-wise)
+#' @param fun function to be applied (default is \code{factor}); function must expect a single vector
+#' and return a vector of the same length
+#' @param name class of columns to be mutated
+#' @return data frame identical to input with all fields matching the given class
+#' having been transformed to the output of \code{fun} 
+apply_by_class <- function(d, fun=factor, class.name='character'){
+  c.class <- names(d)[sapply(d, class) == class.name]
+  d %>% mutate_each(funs(fun), one_of(c.class)) 
+}
+
+#' @title Generates a comma separated key => value string for a given named vector
+#' @param x named vector
+#' @return single scalar character
+key_value_string <- function(x, sep=', ') 
+  paste(sprintf('%s => %s', names(x), x), collapse=sep)

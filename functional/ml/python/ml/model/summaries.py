@@ -58,7 +58,7 @@ def plot_feature_importance(res, figsize=(12, 4), limit=25):
     for model in feat_means:
         figs.append(plt.figure())
         yerr = feat_error[model]
-        ax = feat_means[model].order(ascending=False)\
+        ax = feat_means[model].sort_values(ascending=False)\
             .head(limit).plot(kind='bar', figsize=figsize, yerr=yerr)
         ax.set_title(model)
     return figs
@@ -91,4 +91,4 @@ def plot_partial_dependence(est, X, features, **kwargs):
 def plot_weighted_feature_importances(res, score_func, feat_agg=np.median, score_agg=np.median,
                                       figsize=(18, 4), limit=25):
     return models.summarize_weighted_importances(res, score_func, feat_agg=feat_agg, score_agg=score_agg)\
-        .order(ascending=False).head(limit).plot(kind='bar', figsize=figsize)
+        .sort_values(ascending=False).head(limit).plot(kind='bar', figsize=figsize)

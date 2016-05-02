@@ -1,8 +1,5 @@
 __author__ = 'eczech'
 
-import pandas as pd
-import numpy as np
-
 from sklearn.grid_search import Parallel, delayed, BaseSearchCV
 from sklearn.metrics import roc_curve
 from sklearn import base
@@ -32,11 +29,16 @@ def _get_clf_name(clf):
 def run_fold(args):
     i, train, test, clfs, mode, X, y, kwargs = args
     X_train, X_test, y_train, y_test = X.iloc[train], X.iloc[test], y.iloc[train], y.iloc[test]
+
+    if kwargs.get('data_resampler'):
+        X_train, X_test, y_train, y_test = kwargs.get('data_resampler')(X_train, X_test, y_train, y_test)
+
     res = []
 
     for clf in clfs:
         model = base.clone(clf[CLF_IMPL])
-        log('Running model {} ({}) on fold {}'.format(clf[CLF_NAME], _get_clf_name(model), i+1))
+        log('Running model {} ({}) on fold {} ==> dim(train) = {}, dim(test) = {}'
+            .format(clf[CLF_NAME], _get_clf_name(model), i+1, X_train.shape, X_test.shape))
         model.fit(X_train, y_train)
 
         if kwargs.get('show_best_params') and isinstance(model, BaseSearchCV):
@@ -53,8 +55,10 @@ def run_fold(args):
             'y_test': y_test.values,
             'feat_imp': feat_imp
         }
-        if kwargs.get('keep_X', False):
+        if kwargs.get('keep_training_data', False):
             fold_res['X_test'] = X_test
+            fold_res['X_train'] = X_train
+            fold_res['y_train'] = y_train
         if mode == MODE_CLASSIFIER and kwargs.get('predict_proba', True):
             fold_res['y_proba'] = model.predict_proba(X_test)
 
@@ -81,13 +85,22 @@ def run_models(X, y, clfs, cv, mode, **kwargs):
     :param cv: Cross validation definition
     :param mode: Either 'classifier' (#MODE_CLASSIFIER) or 'regressor' (#MODE_REGRESSOR)
     :param kwargs:
+        Logging kwargs:
+            log_*: log_file and log_format can be passed to determine logging output location and style
         Joblib kwargs:
             par_*: Arguments, prefixed by 'par_', to be passed to parallel executor (e.g. par_n_jobs, par_backend)
         Other:
-            keep_X: Boolean indicating whether or not test datasets should be preserved in results
-            predict_proba: Boolean indicating whether or not class probability predictions should be made for classifiers;
-                defaults to false
+            keep_training_data: Boolean indicating whether or not training/test datasets should be preserved in results
+            predict_proba: Boolean indicating whether or not class probability predictions should be made
+                for classifiers; defaults to false
             show_best_params: Prints BaseSearchCV "best_params_" in cross validation loops
+            data_resampler: Optional function to be passed X_train, X_test, y_train and y_test for each fold.  This
+                function is expected to return a new value for each of those given as a four-value tuple.  This is
+                commonly useful for implementing downsampling/upsampling prior to training, or any other more
+                complicated sort of cross-validation.
+
+                Example: lambda X_train, X_test, y_train, y_test: \
+                    X_train.head(10), X_test.head(10), y_train.head(10), y_test.head(10)
     :return: A list of lists where the outer list contains as many entries as there are folds and the inner lists
         contain per-fold results for each estimator given
     """
