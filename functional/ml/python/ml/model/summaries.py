@@ -18,15 +18,12 @@ def summarize_grid_parameters(res):
 
 
 def plot_model_scores(res, score_func=DEFAULT_REGRESSOR_SCORE, figsize=(12, 6), use_proba=None):
-    roc_scores = models.summarize_scores(res, score_func, use_proba=use_proba)
-    ax = roc_scores.boxplot('score', 'model_name', figsize=figsize)
+    scores = models.summarize_scores(res, score_func, use_proba=use_proba)
+    ax = scores .boxplot('score', 'model_name', figsize=figsize)
     return ax
-
-
 
 INTERPOLATE_FILL = lambda x: x.ffill().bfill()
 INTERPOLATE_LINEAR = lambda x: x.interpolate()
-
 
 def plot_curve(res, curve_func=roc_curve, interpolation=INTERPOLATE_LINEAR, plot_size=(8, 6)):
     d_roc = models.summarize_curve(res, curve_func=curve_func)

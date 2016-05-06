@@ -1,0 +1,129 @@
+---
+title: "Alzheimers Dataset"
+output: html_document
+---
+
+This is a dataset from a book called "Applied Predictive Modeling" attempting to identify demographic, genotype, and assay factors that correlate with dementia/impairment levels amongst Alzheimer's patients.
+
+## Key Features of the Data
+1. There are simple features in it everyone will understand, that also have a strong relationship with the outcome
+2. There are features with different types like factors (genotype), binary (gender), and numeric variables (age, tau protein)
+3. There are also more complicated features in there with a strong correlation structure (the assay features) that can be compressed into some smaller representation
+4. It's not too big and it's not too small
+
+<hr>
+## Data Summary
+
+```{r init, results='hide', warning=F, message=F, error=F, echo=F}
+library(dplyr)
+library(plotly)
+library(ggplot2)
+```
+
+```{r setup, warning=F, message=F}
+library(dplyr)
+library(plotly)
+library(DT)
+
+# Load raw data from CSV (333 rows X 131 columns)
+d <- read.csv('/tmp/alzheimers.csv') 
+
+# Show a sample of a few of the more intuitive variables
+d %>% select(response, age, gender, Genotype, tau) %>% datatable
+```
+
+
+<hr>
+## Age vs Impairment
+
+Age shows a clear, non-random relationship with impairment:
+
+```{r}
+d %>% 
+  mutate(age_range=cut(age, breaks=5)) %>%
+  group_by(response, age_range) %>% tally %>%
+  plot_ly(x=age_range, y=n, group=response, type='bar')
+```
+
+<hr>
+## Gender vs Impairment
+
+The "gender" field introduces a few encoding issues that are easily fixable:
+
+```{r}
+d %>% 
+  group_by(response, gender) %>% tally %>%
+  plot_ly(x=gender, y=n, group=response, type='bar') %>%
+  layout(barmode='stack')
+```
+
+<hr>
+## Age + Tau Protein Level vs Impairment
+
+A lot of the variables are predictive yet correlated (like tau protein levels and age), so it would be nice to eventually teach how to handle this sort of thing:
+
+```{r}
+d %>% 
+  mutate(age_range=cut(age, breaks=5)) %>%
+  mutate(tau_range=cut(tau, breaks=5)) %>%
+  group_by(age_range, tau_range) %>% 
+  summarize(percent_impaired=100*sum(response == 'Impaired')/n()) %>%
+  plot_ly(x=age_range, y=tau_range, z=percent_impaired, type='heatmap', colors='YlOrRd')
+```
+
+
+<hr>
+## Assay Feature Correlations
+
+While the simple features like age, tau, and gender are clearly related to impairment, some of the assay levels are as well.  They're all numeric, somewhat similar to one another, and since they correlate well we can eventually speak to dimensionality reduction techniques like PCA, MDS, or TSNE for them.
+
+Below is the correlation matrix for each of those assay features:
+
+```{r}
+library(reshape2)
+d.assay <- d %>% select(-age)
+d.cor <- d.assay[names(d.assay)[sapply(d.assay, class) == 'numeric']] %>% cor 
+d.cor.order <- order(predict(prcomp(d.cor), d.cor)[,'PC1'])
+d.cor <- d.cor[d.cor.order,d.cor.order]
+d.cor %>% melt %>% 
+  rename(Correlation=value) %>%
+  plot_ly(x=Var1, y=Var2, z=Correlation, type='heatmap')
+```
+
+```{r data_init, echo=F}
+# Load raw alzheimers data and run some light transformations to create final challenge dataset
+# library(dplyr)
+#
+# # Download RData source object with data frame
+# download.file(
+#   'https://github.com/cran/AppliedPredictiveModeling/raw/master/data/AlzheimerDisease.RData', 
+#   '/tmp/alzheimers.rdata'
+# )
+#
+# # Read in downloaded RData object
+# e <- new.env()
+# load('/tmp/alzheimers.rdata', envir=e)
+# d.raw <- e$predictors %>% dplyr::mutate(response=as.character(e$diagnosis))
+#
+# 
+# # Run some light transformations to make values more intuitive
+# scale.mm <- function(x) (x - min(x)) / (max(x) - min(x))
+# d <- d.raw %>%
+#   mutate(age=scale.mm(age)) %>%
+#   mutate(age=65 + age * 35) %>%
+#   mutate(gender=ifelse(male > 0, 'Male', 'Female')) %>%
+#   mutate(response=ifelse(response =='Impaired', 'Impaired', 'NotImpaired'))
+# 
+# # Manually change some gender encodings
+# d[3,'gender'] <- 'M'
+# d[20,'gender'] <- 'M'
+# d[20,'gender'] <- 'M'
+# d[33,'gender'] <- 'female'
+# d[58,'gender'] <- 'male'
+# d[90,'gender'] <- 'M'
+# d[220,'gender'] <- 'female'
+# d[281,'gender'] <- 'male'
+# 
+# write.csv(d, '/tmp/alzheimers.csv', row.names=F)
+
+```

@@ -90,6 +90,8 @@ def run_models(X, y, clfs, cv, mode, **kwargs):
         Joblib kwargs:
             par_*: Arguments, prefixed by 'par_', to be passed to parallel executor (e.g. par_n_jobs, par_backend)
         Other:
+            refit: Boolean indicating whether or not the given models should also be trained on the full dataset;
+                defaults to false
             keep_training_data: Boolean indicating whether or not training/test datasets should be preserved in results
             predict_proba: Boolean indicating whether or not class probability predictions should be made
                 for classifiers; defaults to false
@@ -102,7 +104,9 @@ def run_models(X, y, clfs, cv, mode, **kwargs):
                 Example: lambda X_train, X_test, y_train, y_test: \
                     X_train.head(10), X_test.head(10), y_train.head(10), y_test.head(10)
     :return: A list of lists where the outer list contains as many entries as there are folds and the inner lists
-        contain per-fold results for each estimator given
+        contain per-fold results for each estimator given.  If "refit=True", then two such lists will be returned as
+        a two value tuple (the first will be the same result as if refit was false, and the second will be results with
+        with nearly the same structure, minus the outer list for each fold)
     """
     validate_mode(mode)
 
@@ -117,10 +121,24 @@ def run_models(X, y, clfs, cv, mode, **kwargs):
     set_logger(log_file, log_kwargs.get('format', DEFAULT_LOG_FORMAT))
 
     print('Beginning cross validation (see {} for progress updates)'.format(log_file))
-    res = Parallel(**par_kwargs)(delayed(run_fold)(args) for args in args_list)
+    cv_res = Parallel(**par_kwargs)(delayed(run_fold)(args) for args in args_list)
     log('CV Complete ({} model(s) run)'.format(len(clfs)))
+
+    # If refitting was not requested, return the cross validation results
+    if not kwargs.get('refit'):
+        log(_HR)
+        return cv_res
+
+    # Otherwise, train models on full dataset and then return both results
+    # separately (for cross validation and full dataset training)
+    idx = np.arange(0, len(y))
+    args = (-1, idx, idx, clfs, mode, X, y, kwargs)
+
+    log('Beginning model refitting')
+    refit_res = run_fold(args)
+    log('Model refitting complete ({} model(s) run)'.format(len(clfs)))
     log(_HR)
-    return res
+    return cv_res, refit_res
 
 
 def summarize_scores(res, score_func, use_proba=False):
@@ -141,9 +159,21 @@ def summarize_scores(res, score_func, use_proba=False):
                 y_pred = clf_res['y_proba']
             else:
                 y_pred = clf_res['y_pred']
+
+            # Compute the score for this fold which may be returned either as a scalar value,
+            # or a dictionary containing several name / scalar value pairs
             score = score_func(clf, y_test, y_pred)
-            score_res.append((fold_id, clf_name, score))
-    return pd.DataFrame(score_res, columns=['fold_id', 'model_name', 'score'])
+
+            # If a scalar was returned, wrap it in a dictionary
+            if not isinstance(score, dict):
+                score = {'score': score}
+
+            # Add the row to the running result
+            row = {'fold_id': fold_id, 'model_name': clf_name}
+            row.update(score)
+
+            score_res.append(row)
+    return pd.DataFrame(score_res)
 
 
 def summarize_curve(res, curve_func=roc_curve):
