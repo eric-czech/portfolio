@@ -71,7 +71,13 @@ def plot_predictions(res, figsize=(12, 4)):
     return figs
 
 
-def plot_partial_dependence(est, X, features, **kwargs):
+def plot_weighted_feature_importances(res, score_func, feat_agg=np.median, score_agg=np.median,
+                                      figsize=(18, 4), limit=25):
+    return models.summarize_weighted_importances(res, score_func, feat_agg=feat_agg, score_agg=score_agg)\
+        .sort_values(ascending=False).head(limit).plot(kind='bar', figsize=figsize)
+
+
+def plot_gbrt_partial_dependence(est, X, features, **kwargs):
     """
     Returns partial dependence plot for the given *trained* estimator
 
@@ -84,8 +90,3 @@ def plot_partial_dependence(est, X, features, **kwargs):
     fig, axs = ptl_dep.plot_partial_dependence(est, X, features, feature_names=X.columns.tolist(), **kwargs)
     return fig, axs
 
-
-def plot_weighted_feature_importances(res, score_func, feat_agg=np.median, score_agg=np.median,
-                                      figsize=(18, 4), limit=25):
-    return models.summarize_weighted_importances(res, score_func, feat_agg=feat_agg, score_agg=score_agg)\
-        .sort_values(ascending=False).head(limit).plot(kind='bar', figsize=figsize)

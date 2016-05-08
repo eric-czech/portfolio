@@ -39,7 +39,13 @@ def run_fold(args):
         model = base.clone(clf[CLF_IMPL])
         log('Running model {} ({}) on fold {} ==> dim(train) = {}, dim(test) = {}'
             .format(clf[CLF_NAME], _get_clf_name(model), i+1, X_train.shape, X_test.shape))
-        model.fit(X_train, y_train)
+
+        # If explicitly provided, use a custom model fitting function
+        if kwargs.get('model_fit_function'):
+            kwargs.get('model_fit_function')(clf[CLF_NAME], model, X_train, y_train, X_test, y_test, i == -1)
+        # Otherwise, run base estimator fit
+        else:
+            model.fit(X_train, y_train)
 
         if kwargs.get('show_best_params') and isinstance(model, BaseSearchCV):
             log('\tBest grid parameters (model = {}, fold = {}): {}'
@@ -103,6 +109,10 @@ def run_models(X, y, clfs, cv, mode, **kwargs):
 
                 Example: lambda X_train, X_test, y_train, y_test: \
                     X_train.head(10), X_test.head(10), y_train.head(10), y_test.head(10)
+            model_fit_function: Optional custom fitting function taking a model name, model object,
+                training/testing sets, and a flag indicating whether or not this is a "refit" on whole training set.
+
+                Example: lambda clf_name, clf, X_train, y_train, X_test, y_test, is_refit: clf.fit(X_train, y_train)
     :return: A list of lists where the outer list contains as many entries as there are folds and the inner lists
         contain per-fold results for each estimator given.  If "refit=True", then two such lists will be returned as
         a two value tuple (the first will be the same result as if refit was false, and the second will be results with
@@ -139,6 +149,15 @@ def run_models(X, y, clfs, cv, mode, **kwargs):
     log('Model refitting complete ({} model(s) run)'.format(len(clfs)))
     log(_HR)
     return cv_res, refit_res
+
+
+def extract_model_results(clf_name, cv_res):
+    clf_res = []
+    for fold_res in cv_res:
+        for model_res in fold_res:
+            if model_res['model']['name'] == clf_name:
+                clf_res.append(model_res)
+    return clf_res
 
 
 def summarize_scores(res, score_func, use_proba=False):
