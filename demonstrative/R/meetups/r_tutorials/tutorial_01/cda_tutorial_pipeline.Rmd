@@ -1,0 +1,36 @@
+---
+title: "Pipeline Example"
+output: html_document
+---
+
+# Pipelining
+
+Doing this full analysis and then some in a one-liner:
+
+```{r, echo=F, results='hide', warning=FALSE, error=FALSE, message=FALSE}
+library(dplyr)
+library(ggplot2)
+```
+
+```{r, fig.align='center'}
+library(dplyr)
+library(ggplot2)
+
+# Load raw data
+read.csv("~/Downloads/Diabetes.csv", header = TRUE, sep = ",") %>%
+  
+  # Remove NA values
+  filter(!is.na(glyhb) & !is.na(weight)) %>%
+  
+  # Break age and weight into groups
+  mutate(age=cut(age, breaks=c(0, 15, 30, 45, 60, Inf))) %>%
+  mutate(weight=cut(weight, breaks=3, labels=c('Light', 'Medium', 'Heavy'))) %>%
+  
+  # Compute mean hemoglobin per age + weight group
+  group_by(age, weight) %>% summarise(glyhb=mean(glyhb)) %>%
+  
+  # Visualize the above
+  ggplot(aes(x=age, y=glyhb, fill=weight)) +
+    geom_bar(stat='identity', position='dodge') + 
+    theme_bw() + ggtitle('Average Hemoglobin by Age Range')
+```
