@@ -60,3 +60,22 @@ def _get_polynomial_features(cols, pf, interaction_sign=' x '):
             feat_names = ['Intercept']
         res.append(interaction_sign.join(feat_names))
     return res
+
+
+def get_percentiles(x):
+    """
+    Converts given array to percentile rankings
+
+    This percentile scoring method assumes that rank ties should be averaged and that all percentile outputs
+    should be scaled from 0 to 1 (where 0 is equal to minimum value and 1 is equal to maximum)
+
+    :param x: Array or Series to convert to percentiles
+    :return: Series with same length as input values containing percentile rankings
+    """
+    if not isinstance(x, pd.Series) and not isinstance(x, np.ndarray) and not isinstance(x, list):
+        raise ValueError('Given array must be a numpy array, pandas series, or list (type given = {})'.format(type(x)))
+    x = pd.Series(list(x))
+    if len(x) == 0:
+        return pd.Series()
+    ranks = x.rank(method='average')
+    return (ranks - ranks.min()) / (ranks.max() - ranks.min())

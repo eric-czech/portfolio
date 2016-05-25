@@ -21,34 +21,36 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file leaf-file-name="gbrt.py" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/ml/model/gbrt.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.0">
-              <caret line="7" column="0" selection-start-line="7" selection-start-column="0" selection-end-line="7" selection-end-column="53" />
-              <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="importances.py" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/ml/model/importances.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.0">
-              <caret line="48" column="19" selection-start-line="48" selection-start-column="19" selection-end-line="48" selection-end-column="19" />
-              <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="models.py" pinned="false" current-in-tab="true">
+      <file leaf-file-name="models.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/ml/model/models.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.3118503">
-              <caret line="153" column="25" selection-start-line="153" selection-start-column="4" selection-end-line="153" selection-end-column="25" />
+            <state vertical-scroll-proportion="0.0">
+              <caret line="159" column="18" selection-start-line="159" selection-start-column="18" selection-end-line="159" selection-end-column="18" />
               <folding>
                 <element signature="e#23#86#0" expanded="true" />
               </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="visualization.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/ml/visualization.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state vertical-scroll-proportion="0.0">
+              <caret line="18" column="79" selection-start-line="18" selection-start-column="79" selection-end-line="18" selection-end-column="79" />
+              <folding>
+                <element signature="e#1#27#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="utilities.py" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/ml/utilities.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state vertical-scroll-proportion="0.7817048">
+              <caret line="80" column="62" selection-start-line="80" selection-start-column="62" selection-end-line="80" selection-end-column="62" />
+              <folding />
             </state>
           </provider>
         </entry>
@@ -143,7 +145,6 @@
         <option value="$PROJECT_DIR$/ml/grid_search.py" />
         <option value="$PROJECT_DIR$/ml/metrics.py" />
         <option value="$PROJECT_DIR$/ml/tests.py" />
-        <option value="$PROJECT_DIR$/ml/utilities.py" />
         <option value="$PROJECT_DIR$/ml/regressor.py" />
         <option value="$PROJECT_DIR$/ml/model/regressor.py" />
         <option value="$PROJECT_DIR$/ml/model/shared.py" />
@@ -170,6 +171,8 @@
         <option value="$PROJECT_DIR$/ml/model/partial_dependence.py" />
         <option value="$PROJECT_DIR$/ml/model/summaries.py" />
         <option value="$PROJECT_DIR$/research/wmi/data.py" />
+        <option value="$PROJECT_DIR$/ml/visualization.py" />
+        <option value="$PROJECT_DIR$/ml/utilities.py" />
       </list>
     </option>
   </component>
@@ -228,7 +231,7 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
-      <pane id="Scratches" />
+      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <PATH>
@@ -317,7 +320,7 @@
           </PATH>
         </subPane>
       </pane>
-      <pane id="Scope" />
+      <pane id="Scratches" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -518,13 +521,6 @@
     <watches-manager />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/ml/model/models.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0">
-          <caret line="97" column="4" selection-start-line="97" selection-start-column="4" selection-end-line="97" selection-end-column="53" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/ml/model/log.py">
       <provider selected="true" editor-type-id="text-editor">
         <state vertical-scroll-proportion="0.0">
@@ -763,13 +759,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/ml/utilities.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0">
-          <caret line="36" column="7" selection-start-line="36" selection-start-column="7" selection-end-line="36" selection-end-column="7" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$USER_HOME$/Library/Caches/PyCharm50/python_stubs/-1422092524/numpy/random/mtrand.py">
       <provider selected="true" editor-type-id="text-editor">
         <state vertical-scroll-proportion="0.33264032">
@@ -883,11 +872,29 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/ml/model/models.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.3118503">
-          <caret line="153" column="25" selection-start-line="153" selection-start-column="4" selection-end-line="153" selection-end-column="25" />
+        <state vertical-scroll-proportion="0.0">
+          <caret line="159" column="18" selection-start-line="159" selection-start-column="18" selection-end-line="159" selection-end-column="18" />
           <folding>
             <element signature="e#23#86#0" expanded="true" />
           </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/ml/visualization.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state vertical-scroll-proportion="0.0">
+          <caret line="18" column="79" selection-start-line="18" selection-start-column="79" selection-end-line="18" selection-end-column="79" />
+          <folding>
+            <element signature="e#1#27#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/ml/utilities.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state vertical-scroll-proportion="0.7817048">
+          <caret line="80" column="62" selection-start-line="80" selection-start-column="62" selection-end-line="80" selection-end-column="62" />
+          <folding />
         </state>
       </provider>
     </entry>
