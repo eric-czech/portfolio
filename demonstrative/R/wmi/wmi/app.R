@@ -1,7 +1,51 @@
 library(RSQLite)
 library(stringr)
-
+library(dplyr)
+library(reshape2)
+library(corrplot)
+library(DT)
 source('utils.R')
+
+#' Prepares measurement values by replacing -Inf measurements 
+#' with some sentinel value based on measurement range
+prepareMeasurementValues <- function(d){
+  wq.vars <- d %>% select(starts_with('WQ_')) %>% names
+  
+  adjust <- function(measurement){
+    # Remove NA values for measurement
+    v <- measurement[!is.na(measurement)]
+    if (length(v) == 0)
+      return(measurement)
+    
+    if (any(v == Inf)) stop('Found positive infinity measurement (not supported yet)')
+    
+    # Isolate finite values for measurement
+    v.finite <- v[is.finite(v)]
+    if (length(v.finite) == 0)
+      return(rep(NA, length(measurement)))
+    
+    # Determine sentinel value to replace -Inf measurements with
+    min.val <- min(v.finite) - .1 * (max(v.finite) - min(v.finite))
+    v <- ifelse(v == -Inf, min.val, v)
+    
+    # Return original measurement vector with NA's and finite values unchanged, and 
+    # -Inf values replace with sentinel value
+    sapply(measurement, function(x) if (is.na(x)) NA else if (x == -Inf) min.val else x)
+  }
+  for (var in wq.vars){
+    d[,var] <- adjust(d[,var])
+  }
+  d
+}
+
+getWQCorPlot <- function(d.wq){
+  wq.vars <- d.wq %>% select(starts_with('WQ_')) %>% names
+  d.cov <- d.wq %>% select(DistributionPointIdentifier, Country, one_of(wq.vars))
+  
+  c.var <- wq.vars[!sapply(wq.vars, function(v) all(is.na(d.wq[,v])) || sd(d.wq[,v], na.rm=T) == 0)]
+  impute <- function(x) ifelse(is.na(x), mean(x, na.rm=T), x)
+  d.wq[,c.var] %>% mutate_each(funs(impute)) %>% cor %>% corrplot
+}
 
 getWQRawData <- function(start.date, stop.date){
   con = dbConnect(drv=SQLite(), dbname='/Users/eczech/data/research/wmi/data/wmi.db')
@@ -11,50 +55,80 @@ getWQRawData <- function(start.date, stop.date){
     mutate(DistributionPointIdentifier = sapply(DistributionPointIdentifier, abbr)) %>%
     mutate(Date=ymd(str_sub(Date, end=10))) %>%
     filter(Date >= start.date & Date <= stop.date)
+  d.wq <- prepareMeasurementValues(d.wq)
   d.wq
 }
 
-getWQGeoData <- function(d.wq, metric){
+getWQGeoData <- function(d.wq, metrics, group.cols, text.gen){
+  c.meta <- unique(c(group.cols, 'Lat', 'Lon'))
   d.geo <- d.wq %>% 
-    filter(!is.na(GPSLatitude) & !is.na(GPSLongitude)) %>%
-    mutate(GPSLatitude=as.numeric(GPSLatitude)) %>%
-    mutate(GPSLongitude=as.numeric(GPSLongitude)) %>%
-    group_by(DistributionPointIdentifier, Country, Region, GPSLatitude, GPSLongitude) %>%
-    do({
+    
+    # Convert lat/lon values to float
+    rename(Lat=GPSLatitude, Lon=GPSLongitude) %>%
+    mutate(Lat=as.numeric(Lat), Lon=as.numeric(Lon)) %>% 
+    
+    # Pivot water quality measurements into rows
+    select(one_of(c.meta), one_of(metrics)) %>%
+    melt(id.vars=c.meta, variable.name='Variable', value.name='Value') %>% 
+    
+    # Group by selected columns and determine aggregate measurement value for each group
+    group_by_(.dots=c(group.cols, 'Variable')) %>% do({
       d <- .
-      v <- data.frame(d)[,metric]
-      v <- v[is.finite(v)]
-      if (length(v) == 0) return(data.frame())
-      data.frame(Value=mean(v))
-    }) %>% ungroup %>%
-    mutate(Size=1 + 10 * (Value - min(Value)) / (max(Value) - min(Value))) %>%
-    mutate(Text=sprintf('%s<br>%s/%s', DistributionPointIdentifier, Country, Region))
+          
+      # Determine location centroid
+      get.geo.center <- function(x) median(x[!is.na(x)])
+      lat <- get.geo.center(d$Lat)
+      lon <- get.geo.center(d$Lon)
+      data.frame(Lat=lat, Lon=lon, Value=mean(d$Value, na.rm=T))
+    }) %>% ungroup %>% 
+    
+    # Remove records for locations with no associated value
+    filter(!is.na(Value)) %>%
+    
+    # Determine size for plotting as value on 2-15 scale
+    group_by(Variable) %>%
+    mutate(Size=2 + 13 * (Value - min(Value)) / (max(Value) - min(Value))) %>% 
+    ungroup %>%
+    
+    # Add text description of each record
+    ungroup %>% text.gen %>%
+    
+    # Add variable id, which is useful for map generation
+    mutate(VariableId=as.integer(Variable), Variable=as.character(Variable))
 }
 
-plotAssessmentWQGeoData <- function(d.geo){
-  plot_ly(d.geo, lon = GPSLongitude, lat = GPSLatitude, text = Text, color = Country,
-          marker = list(size = Size), type = 'scattergeo', autosize=T)
+plotWQGeoData <- function(d.geo, title=''){
+  d.geo %>%
+    filter(!is.na(Lat) & !is.na(Lon)) %>%
+    plot_ly(
+      lon = Lon, lat = Lat, text = Text, color = Country,
+      shape=Variable, marker = list(size = Size), type = 'scattergeo'
+    ) %>% 
+    layout(title=title)
 }
 
-getAssessmentIds <- function(d.wq){
+getWQAssessmentIds <- function(d.wq){
   d.wq %>% group_by(AssessmentIdentifier) %>% 
     summarise(Num.DistPoints=length(unique(DistributionPointIdentifier))) %>%
     ungroup %>% arrange(desc(Num.DistPoints)) %>%
     mutate(AssessmentIdLabel=sprintf('%s [%s]', AssessmentIdentifier, Num.DistPoints))
 }
 
-getAssessmentWQData <- function(d.wq, assessment.id){
-  id.vars <- c('AssessmentIdentifier', 'DistributionPointIdentifier', 'Country')
+getFIAssessmentIds <- function(d.fi){
+  d.fi %>% group_by(AssessmentIdentifier) %>% 
+    summarise(Num.Months=length(unique(Date))) %>%
+    ungroup %>% arrange(desc(Num.Months)) %>%
+    mutate(AssessmentIdLabel=sprintf('%s [%s]', AssessmentIdentifier, Num.Months))
+}
 
-  wq.vars <- c(
-    'WQ_Alkalinity', 'WQ_Conductivity_Log', 'WQ_Chlorine_Free_Log', 
-    'WQ_Chlorine_Total_Log', 'WQ_Fecal_Coliforms', 'WQ_Hardness', 
-    'WQ_Total_Coliforms', 'WQ_Turbidity_Log'
-  )
+
+getAssessmentWQData <- function(d.wq, assessment.id, metrics){
+  id.vars <- c('AssessmentIdentifier', 'DistributionPointIdentifier', 'Country')
   
   d.all <- d.wq %>% 
-    select(one_of(id.vars), one_of(wq.vars)) %>% 
-    melt(id.vars=id.vars, value.name='Value', variable.name='Variable')
+    select(one_of(id.vars), one_of(metrics)) %>% 
+    melt(id.vars=id.vars, value.name='Value', variable.name='Variable') %>%
+    filter(!is.na(Value))
   
   d.proj <- d.all %>% filter(AssessmentIdentifier==assessment.id)
   cty <- d.proj$Country[1]
@@ -64,7 +138,9 @@ getAssessmentWQData <- function(d.wq, assessment.id){
   list(all=d.all, cty=d.cty, proj=d.proj)
 }
 
-plotAssessmentWQData <- function(d.proj, type){
+# plotWQAlerts() <- function(d.proj)
+
+plotWQProjectDistribution <- function(d.proj, type){
   if (!type %in% c('histogram', 'density'))
     stop(sprintf('Plot type "%s" is not valid (must be "histogram" or "density")', type))
   
@@ -74,19 +150,15 @@ plotAssessmentWQData <- function(d.proj, type){
     plot_fun <- function(...) geom_density(...)
   }
   
-  finite.only <- function(v) v[is.finite(v)]
-  
   d.dist <- d.proj$proj %>% 
     group_by(Variable) %>% do({
       d <- .
       
       # Compute range of values for this measurement type globally
       d.all <- d.proj$all %>% filter(Variable == d$Variable[1])
-      min.val <- min(finite.only(d.all$Value))
-      rng <- max(finite.only(d.all$Value)) - min.val
+      rng <- max(d.all$Value) - min(d.all$Value)
       
-      d %>% na.omit %>%
-        mutate(Value=ifelse(Value == -Inf, min.val - rng * .2, Value)) %>%
+      d %>% filter(!is.na(Value)) %>%
         mutate(Value=Value + rnorm(length(Value), 0, rng * .01)) # Add jitter for vertical lines
     }) %>% ungroup
   
@@ -98,4 +170,17 @@ plotAssessmentWQData <- function(d.proj, type){
     facet_wrap(~Variable, scales='free', ncol=2) + 
     scale_fill_brewer(palette = "Set2") +
     theme_bw()
+}
+
+
+##### Financial Data #####
+
+getFIRawData <- function(start.date, stop.date){
+  con = dbConnect(drv=SQLite(), dbname='/Users/eczech/data/research/wmi/data/wmi.db')
+  d.fi <- dbReadTable(con, 'wmi_project_timelines') 
+  abbr <- function(x) paste0(str_split(x, ' ')[[1]][1], '...', str_sub(x, -25, -1))
+  d.fi <- d.fi %>% 
+    mutate(Date=ymd(str_sub(Date, end=10))) %>%
+    filter(Date >= start.date & Date <= stop.date)
+  d.fi
 }

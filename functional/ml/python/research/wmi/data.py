@@ -527,7 +527,9 @@ def get_project_view_01(rm_na=False, rm_test_projects=True):
 
     # Remove testing/debugging projects, if specified to do so
     if rm_test_projects:
-        mask = d.reset_index()['AssessmentName'].apply(lambda x: 'test project' in x.lower())
+        def is_test_project(p):
+            return 'test project' in p.lower() or 'ryan' in p.lower()
+        mask = d.reset_index()['AssessmentName'].apply(is_test_project)
         d = d[~mask.values]
 
     return d, idx_meta, val_meta, idx_time, val_time
