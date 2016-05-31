@@ -4,6 +4,7 @@ library(dplyr)
 library(reshape2)
 library(corrplot)
 library(DT)
+library(scales)
 source('utils.R')
 
 #' Prepares measurement values by replacing -Inf measurements 
@@ -121,7 +122,6 @@ getFIAssessmentIds <- function(d.fi){
     mutate(AssessmentIdLabel=sprintf('%s [%s]', AssessmentIdentifier, Num.Months))
 }
 
-
 getAssessmentWQData <- function(d.wq, assessment.id, metrics){
   id.vars <- c('AssessmentIdentifier', 'DistributionPointIdentifier', 'Country')
   
@@ -183,4 +183,54 @@ getFIRawData <- function(start.date, stop.date){
     mutate(Date=ymd(str_sub(Date, end=10))) %>%
     filter(Date >= start.date & Date <= stop.date)
   d.fi
+}
+
+getAssessmentFIData <- function(d.wq, assessment.id, metrics){
+  id.vars <- c('AssessmentIdentifier', 'Date', 'Interpolated', 'Country')
+  
+  d.all <- d.wq %>% 
+    select(one_of(id.vars), one_of(metrics)) %>% 
+    melt(id.vars=id.vars, value.name='Value', variable.name='Variable') %>%
+    filter(!is.na(Value))
+  
+  d.proj <- d.all %>% filter(AssessmentIdentifier==assessment.id)
+  cty <- d.proj$Country[1]
+  
+  d.cty <- d.all %>% filter(Country == cty)
+  
+  list(all=d.all, cty=d.cty, proj=d.proj)
+}
+
+plotFIProjectDistribution <- function(d.proj, type){
+  # if (!type %in% c('histogram', 'density'))
+  #   stop(sprintf('Plot type "%s" is not valid (must be "histogram" or "density")', type))
+  # 
+  # if (type == 'histogram') {
+  #   plot_fun <- function(...) geom_histogram(..., bins=10) 
+  # } else {
+  #   plot_fun <- function(...) geom_density(...)
+  # }
+  
+  # d.proj$cty %>% group_by(Date) %>% summarise()
+  # d.proj$cty %>% ggplot(aes(x=Date, y=Value)) + geom_smooth()
+  # browser()
+  # save(d.proj, file='/tmp/dproj.Rdata')
+  # e <- new.env()
+  # load(file='/tmp/dproj.Rdata', envir = e)
+  # d.proj <- e$d.proj
+  # print(d.proj$proj %>% arrange(Variable) %>% data.frame)
+  
+  d.proj$proj <- d.proj$proj %>% 
+    mutate(IsEstimate=factor(Interpolated, levels=c(0, 1), labels=c('No', 'Yes')))
+  
+  ggplot(NULL) +
+    #plot_fun(data=d.proj$all %>% filter(is.finite(Value)), aes(x=Value, fill='Global'), alpha=.3) +
+    geom_smooth(data=d.proj$cty, aes(x=Date, y=Value, color='Country Benchmark')) +
+    geom_line(data=d.proj$proj, aes(x=Date, y=Value, color=AssessmentIdentifier)) +
+    geom_point(data=d.proj$proj, aes(x=Date, y=Value, shape=IsEstimate)) +
+    facet_wrap(~Variable, ncol=1, scales='free_y') + 
+    scale_color_discrete(guide=guide_legend(title='Timeseries')) +
+    scale_fill_brewer(palette = "Set2") +
+    theme_bw() + 
+    ggtitle('Project Performance (vs Country Benchmark)')
 }

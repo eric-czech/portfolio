@@ -71,10 +71,10 @@ shinyServer(function(input, output, session) {
     metrics <- input$wq.metrics
     if (is.null(metrics) || length(metrics) == 0)
       return(NULL)
-    d.proj <- getAssessmentWQData(d$d.wq, input$wq.assessment.id, metrics)
-    if (nrow(d.proj$proj) == 0)
+    d <- getAssessmentWQData(d$d.wq, input$wq.assessment.id, metrics)
+    if (nrow(d$proj) == 0)
       return(NULL)
-    plotWQProjectDistribution(d.proj, input$wq.plot.type)
+    plotWQProjectDistribution(d, input$wq.plot.type)
   })
   
   output$wq.dist.dt <- renderDataTable({
@@ -212,6 +212,40 @@ shinyServer(function(input, output, session) {
       rename_(Value=metric) %>%
       filter(!is.na(Value)) %>%
       plot_ly(type='box', x=Country, y=Value, boxmean=T) %>%
-      layout(xaxis=list(title=''), title='Value By Country')
+      layout(xaxis=list(title=''), title='Distribution By Country')
+  })
+  
+  output$fi.proj.cty.ts.plot <- renderPlotly({
+    metric <- input$fi.proj.map.metric
+    if (str_length(metric) == 0)
+      return(NULL)
+    d <- fiData()
+    group.cols <- c('AssessmentID', 'AssessmentName', 'Country', 'Date')
+
+    d$d.fi %>% select(one_of(c(group.cols, metric))) %>%
+      rename_(Value=metric) %>%
+      group_by(Country, Date) %>% summarise(Value=mean(Value, na.rm=T)) %>%
+      plot_ly(x=Date, y=Value, color=Country, pallette='Set1') %>%
+      layout(title='Value by Country')
+    
+    # asinh_trans = function() trans_new("asinh", function(x) asinh(x), function(x) sinh(x))
+    # d$d.fi %>% select(one_of(c(group.cols, metric))) %>%
+    #   rename_(Value=metric) %>%
+    #   filter(!is.na(Value)) %>%
+    #   mutate(Value=asinh(Value)) %>%
+    #   ggplot(aes(x=Date, y=Value, color=Country)) + geom_smooth(se=F) +
+    #   theme_bw()
+  })
+  
+  output$fi.proj.plot <- renderPlot({
+    d <- fiData()
+    metrics <- input$fi.metrics
+    if (is.null(metrics) || length(metrics) == 0)
+      return(NULL)
+    
+    d <- getAssessmentFIData(d$d.fi, input$fi.assessment.id, metrics)
+    if (nrow(d$proj) == 0)
+      return(NULL)
+    plotFIProjectDistribution(d, input$fi.plot.type)
   })
 })

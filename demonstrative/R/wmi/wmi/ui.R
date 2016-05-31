@@ -11,35 +11,7 @@ library(shiny)
 library(plotly)
 source('utils.R')
 
-# Define UI for application that draws a histogram
-# shinyUI(fluidPage(
-#   
-#   # Application title
-#   titlePanel("WMI - Project Analysis"),
-#   
-#   # Sidebar with a slider input for number of bins 
-#   sidebarLayout(
-#     sidebarPanel(
-#       selectizeInput("country", "Country:", choices=NULL),
-#       selectizeInput("assessment.id", "Project Identifier:", choices=NULL),
-#       radioButtons("wq.plot.type", "Plot Type", c('density', 'histogram')),
-#       selectizeInput("wq.metrics", "Water Quality Metrics", choices=NULL, multiple=T),
-#       width=3
-#     ),
-#   
-#     # Show a plot of the generated distribution
-#     
-#     mainPanel(
-#       tabsetPanel(
-#         tabPanel("WQ - Distributions", plotOutput("wq.dist.plot", height="400px")),
-#         tabPanel("WQ - Maps", fluidRow(
-#           column(2, radioButtons("wq.map.metric", "Metric", c(''), inline=T)),
-#           column(10, plotlyOutput("wq.map.plot", height="400px"))
-#         ))
-#       )
-#     )
-#   )
-# ))
+br <- shiny::br
 
 shinyUI(navbarPage("WMI - Project Analysis",
                    
@@ -60,16 +32,16 @@ shinyUI(navbarPage("WMI - Project Analysis",
       # Show a plot of the generated distribution
       mainPanel(
         tabsetPanel(
-          tabPanel("Distribution Points", fluidRow(
-            column(12, selectInput("wq.dist.map.metric", "Metric", c(''))),
-            column(12, dataTableOutput("wq.dist.dt")), 
-            column(12, plotlyOutput("wq.dist.box.plot", width="1000px")), 
-            column(12, plotlyOutput("wq.dist.map.plot", width="1000px", height="400px"))
-          )),
+          tabPanel("Distribution Points", 
+            fluidRow(column(12, selectInput("wq.dist.map.metric", "Metric", c('')))),
+            fluidRow(column(12, dataTableOutput("wq.dist.dt"), br(), br())), 
+            fluidRow(column(12, plotlyOutput("wq.dist.box.plot", width="1000px"), br(), br())),
+            fluidRow(column(12, plotlyOutput("wq.dist.map.plot", width="1000px", height="400px")))
+          ),
           tabPanel("Projects Overall", fluidRow(
             column(12, selectInput("wq.proj.map.metric", "Metric", c(''))),
-            column(12, dataTableOutput("wq.proj.dt")), 
-            column(12, plotlyOutput("wq.proj.box.plot", width="1000px")), 
+            column(12, dataTableOutput("wq.proj.dt"), br(), br()), 
+            column(12, plotlyOutput("wq.proj.box.plot", width="1000px"), br(), br()), 
             column(12, plotlyOutput("wq.proj.map.plot", width="1000px", height="400px"))
           )),
           tabPanel("Single Project", plotOutput("wq.dist.plot", height="400px")),
@@ -100,9 +72,10 @@ shinyUI(navbarPage("WMI - Project Analysis",
              column(12, selectInput("fi.proj.map.metric", "Metric", c(''))),
              column(12, dataTableOutput("fi.proj.dt")), 
              column(12, plotlyOutput("fi.proj.box.plot", width="1000px")), 
+             column(12, plotlyOutput("fi.proj.cty.ts.plot", width="1000px")), 
              column(12, plotlyOutput("fi.dproj.map.plot", width="1000px", height="400px"))
            )),
-           tabPanel("Single Project", plotOutput("fi.proj.plot", height="400px"))
+           tabPanel("Single Project", plotOutput("fi.proj.plot", height="600px", width="1000px"))
          )
        )
      )
