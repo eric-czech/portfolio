@@ -215,26 +215,26 @@ shinyServer(function(input, output, session) {
       layout(xaxis=list(title=''), title='Distribution By Country')
   })
   
-  output$fi.proj.cty.ts.plot <- renderPlotly({
+  output$fi.proj.cty.ts.plot <- renderPlot({
     metric <- input$fi.proj.map.metric
     if (str_length(metric) == 0)
       return(NULL)
     d <- fiData()
     group.cols <- c('AssessmentID', 'AssessmentName', 'Country', 'Date')
 
-    d$d.fi %>% select(one_of(c(group.cols, metric))) %>%
-      rename_(Value=metric) %>%
-      group_by(Country, Date) %>% summarise(Value=mean(Value, na.rm=T)) %>%
-      plot_ly(x=Date, y=Value, color=Country, pallette='Set1') %>%
-      layout(title='Value by Country')
-    
-    # asinh_trans = function() trans_new("asinh", function(x) asinh(x), function(x) sinh(x))
     # d$d.fi %>% select(one_of(c(group.cols, metric))) %>%
     #   rename_(Value=metric) %>%
-    #   filter(!is.na(Value)) %>%
-    #   mutate(Value=asinh(Value)) %>%
-    #   ggplot(aes(x=Date, y=Value, color=Country)) + geom_smooth(se=F) +
-    #   theme_bw()
+    #   group_by(Country, Date) %>% summarise(Value=mean(Value, na.rm=T)) %>%
+    #   plot_ly(x=Date, y=Value, color=Country, pallette='Set1') %>%
+    #   layout(title='Value by Country')
+    
+    # asinh_trans = function() trans_new("asinh", function(x) asinh(x), function(x) sinh(x))
+    d$d.fi %>% select(one_of(c(group.cols, metric))) %>%
+      rename_(Value=metric) %>%
+      filter(!is.na(Value)) %>%
+      mutate(Value=asinh(Value)) %>%
+      ggplot(aes(x=Date, y=Value, color=Country)) + geom_smooth(se=F) +
+      theme_bw()
   })
   
   output$fi.proj.plot <- renderPlot({

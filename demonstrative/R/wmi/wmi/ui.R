@@ -72,7 +72,7 @@ shinyUI(navbarPage("WMI - Project Analysis",
              column(12, selectInput("fi.proj.map.metric", "Metric", c(''))),
              column(12, dataTableOutput("fi.proj.dt")), 
              column(12, plotlyOutput("fi.proj.box.plot", width="1000px")), 
-             column(12, plotlyOutput("fi.proj.cty.ts.plot", width="1000px")), 
+             column(12, plotOutput("fi.proj.cty.ts.plot", width="1000px")), 
              column(12, plotlyOutput("fi.dproj.map.plot", width="1000px", height="400px"))
            )),
            tabPanel("Single Project", plotOutput("fi.proj.plot", height="600px", width="1000px"))

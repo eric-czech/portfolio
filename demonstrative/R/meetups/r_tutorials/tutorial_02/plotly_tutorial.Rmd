@@ -1,0 +1,363 @@
+---
+title: "Alzheimers Analysis (w/ Plot.ly)"
+output: html_document
+---
+
+
+# Visualization Frameworks for R
+
+There are several:
+
+1. [R Base Graphics Package](http://rpubs.com/SusanEJohnston/7953)
+    - Great for quick-one, off visuals without much complexity
+    - Base graphics can make very complex, static visuals -- but your eyes will bleed looking at the code
+2. [Ggplot2](http://docs.ggplot2.org/current/)
+    - The de facto static visualization library very popular amongst casual and hardcore users
+    - Mature, great documentation, and after an initial learning curve very intuitive
+3. [Lattice](http://www.statmethods.net/advgraphs/trellis.html)
+    - Great for creating more even more complex, static visuals than ggplot
+    - Supports some 3d visuals (ggplot does not)
+4. [Ggvis](http://ggvis.rstudio.com/)
+    - Generates more __dynamic__ visualizations using the same grammar design as ggplot
+    - Not very mature, but promising
+5. [Plot.ly](https://plot.ly/r/)
+    - Once a closed source project/company trying to implement the best language-agnostic data visualization toolkit for engineers, that recently open-sourced all of its work
+    - Supports a wide spectrum of visualization complexity (can be static or dynamic)
+    - Makes sharing and editing visuals publicly as easy as possible
+    - Probably the easiest package to learn
+
+# Plot.ly Basics
+
+```{r init, results='hide', warning=F, message=F, error=F, echo=F}
+library(dplyr)
+library(plotly)
+library(ggplot2)
+library(corrplot)
+options(DT.options=list(searching=F, paging=F))
+```
+
+### Load Some Data to Experiment With
+
+Load "mtcars", built-in dataset:
+
+```{r setup, warning=F, message=F}
+# First load everything we'll need
+library(dplyr)
+library(plotly)
+library(DT)
+
+# Experiment with one of R's built in datasets
+data <- mtcars
+
+datatable(head(data))
+```
+
+<br>
+
+This data frame is a little weird, because the names of the vehicles aren't assigned to a column.  We'll move those names into one, but before doing that, let's see how row names work:
+
+```{r}
+# Create a test data frame with two opposing sequences
+example.data <- data.frame(x=1:10, y=10:1) 
+
+# Add row names to the data frame
+row.names(example.data) <- paste('Custom Row Name', 1:10) 
+
+# Print what we have so far
+datatable(head(example.data))
+```
+
+<br>
+
+This should look familiar, and moving the row names into a column is pretty straightforward:
+
+```{r}
+# Move row names into a column
+example.data$my.row.name <- row.names(example.data)
+
+# Now print what we have, without the row names
+datatable(head(example.data), rownames=F)
+```
+
+<br>
+
+Getting back to the mtcars dataset, now do the same thing (move row names into columns):
+
+```{r}
+data$vehicle <- row.names(data)
+datatable(head(data), rownames=F)
+```
+
+Now we have what we want, so we can move on to some basic visualizations.
+
+### Scatter Plots
+
+<center><h1>Horsepower vs MPG</h1></center>
+```{r}
+# Choose what you want on the x-axis, on the y-axis, and as text in the hover-overs
+plot_ly(data, type='scatter', mode='markers', x=hp, y=mpg, text=vehicle)
+```
+
+<center><h1>Horsepower vs MPG vs Cylinders</h1></center>
+```{r}
+# Do the same thing, except color the dots by number of cylinders vehicle has
+plot_ly(
+  data, type='scatter', mode='markers', x=hp, y=mpg, text=vehicle, 
+  color=cyl # This is all we have to add
+)
+```
+<br>
+
+<center><h1>Horsepower vs MPG vs Cylinders (factored)</h1></center>
+```{r}
+# This time, force the number of cylinders to be a discrete number
+plot_ly(data, type='scatter', mode='markers', x=hp, y=mpg, text=vehicle, 
+  color=factor(cyl),   # This time factor the number of cylinders
+  marker=list(size=10) # Also make the dots a little bigger
+)
+```
+
+### Bar Plots
+
+<center><h1>Vehicle Count by Num Gears</h1></center>
+```{r}
+# Group by number of gears, count number of vehicles, and make bar plot
+data %>% group_by(gear) %>% tally %>%
+  plot_ly(type='bar', x=gear, y=n)
+```
+
+### Histograms
+
+Alternatively, we could make plot.ly do the counting as a histogram:
+
+<center><h1>Num Gears Histogram</h1></center>
+```{r}
+# Make plot_ly do the work this time
+plot_ly(data, type='histogram', x=gear)
+```
+
+# More Realistic Plot.ly Examples
+
+Load the Alzheimers dataset and take a look at a raw version of it again:
+
+```{r}
+# Load in the whole Alzheimers data file
+data <- read.csv('~/repos/portfolio/demonstrative/R/datasets/alzheimers/alzheimers.csv')
+
+# Remove this field ... I forgot to do that when creating the dataset
+data <- data %>% select(-male)
+
+# Add a subject identifier field which will come in handy later 
+data$id <- 1:nrow(data)
+
+# Subset to just demographic and response fields (we'll work with this first)
+demographic.data <- data %>% select(response, age, gender)
+
+datatable(head(demographic.data))
+```
+
+### Boxplot Example
+
+```{r, warning=F}
+# See if impaired people are generally older, and if there is a difference amongst men and women
+demographic.data %>%
+  plot_ly(x=gender, y=age, color=response, type='box') %>%
+  layout(boxmode='group', title='Gender vs Age by Impairment')
+```
+<br>
+
+The gender encodings are a little wonky so fix them:
+
+```{r, warning=F}
+# See if impaired people are generally older, and if there is a difference amongst men and women
+demographic.data %>%
+  
+  # Use the first letter of the gender instead, after capitalizing everything
+  mutate(gender=substr(toupper(gender), 1, 1)) %>%  
+  
+  # Create the same boxplot as above
+  plot_ly(x=gender, y=age, color=response, type='box') %>%
+  layout(boxmode='group', title='Gender vs Age by Impairment')
+```
+
+### Heatmap Examples
+
+Analyzing the demographic data is pretty easy, but what about the rest?  There 132 different fields ... what can we do with those?
+
+For one, we could just try to visualize them all together:
+
+```{r}
+# First determine which fields are numeric
+numeric.cols <- sapply(data, class) %>% .[. == 'numeric'] %>% names
+
+# Alternatively:
+# col.classes <- sapply(data, class)
+# numeric.cols <- col.classes[col.classes == 'numeric']
+# numeric.cols <- names(numeric.cols)
+
+# Remove the 'Age' numeric column, since we've already looked at that
+#numeric.cols <- numeric.cols[numeric.cols != 'age']
+
+# Ok now isolate the numeric data
+plot.data <- data[, numeric.cols]
+
+# Print first couple rows and also limit to first 10 columns (otherwise it's too many to see)
+datatable(head(plot.data[,1:10]), options=list(scrollX=T))
+```
+
+<br><br>
+Ok, so we can jump straight to visualizing this:
+
+```{r}
+numeric.values <- as.matrix(plot.data)
+plot_ly(z=numeric.values, x=numeric.cols, y=data$id, type='heatmap') %>% 
+  layout(
+    title='Everything Numeric in Our Data', 
+    xaxis=list(title=''), 
+    yaxis=list(title='Subject ID')
+  )
+```
+
+<br><br>
+Alright that's not very good, all the different columns clearly have different scales.  Let's unscale them and see what that gives us:
+
+```{r}
+numeric.values <- as.matrix(scale(plot.data))
+plot_ly(z=numeric.values, x=numeric.cols, y=data$id, type='heatmap') %>% 
+  layout(
+    title='Scaled Numeric Values in Our Data', 
+    xaxis=list(title=''), 
+    yaxis=list(title='Subject ID')
+  )
+```
+
+<br><br>
+Looks like a bunch of random noise, but let's try seeing if there are any obvious differences in these values amongst ```Impaired``` and ```NotImpaired``` subjects:
+
+```{r}
+# Create a true/false vector indicating whether or not each subject was impaired
+is.impaired <- data$response == 'Impaired'
+
+# Split data into two new data frames, one for those impaired and one for those not impaired
+data.impaired <- numeric.values[is.impaired, ]
+data.not.impaired <- numeric.values[!is.impaired, ]
+
+subplot(
+  # Draw a heatmap of the numeric values for impaired people only
+  plot_ly(z=data.impaired, x=numeric.cols, type='heatmap', zmin=-4, zmax=4, colorbar=list(title='Value')),
+  
+  # And then draw a separate heatmap below this one containing values for unimpaired people
+  plot_ly(z=data.not.impaired, x=numeric.cols, type='heatmap', showscale=F),
+  
+  # Formatting options
+  nrows=2, margin=.08
+) %>% layout(
+  xaxis=list(title=''),
+  yaxis=list(title='Impaired Subjects'),
+  xaxis2=list(title=''),
+  yaxis2=list(title='Not Impaired Subjects')
+)
+```
+
+<br><br>
+Still nothing too obvious there, so go one step further and only consider the numeric values that have the average largest difference in average values amongst impaired and unimpaired subjects:
+
+```{r}
+# Get the mean value of each column for impaired as well as unimpaired subject groups
+mean.impaired <- apply(data[is.impaired, numeric.cols], 2, mean)
+mean.not.impaired <- apply(data[!is.impaired, numeric.cols], 2, mean)
+
+# Compute the absolute value of the differences and sort the result
+mean.diff <- sort(abs(mean.impaired - mean.not.impaired))
+
+# Now take only the top 25 columns by average difference
+top.cols <- names(tail(mean.diff, 25))
+
+# Finally replot these all the same way as before:
+data.impaired <- numeric.values[is.impaired, top.cols]
+data.not.impaired <- numeric.values[!is.impaired, top.cols]
+subplot(
+  plot_ly(z=data.impaired, x=top.cols, type='heatmap', zmin=-4, zmax=4, colorbar=list(title='Value')),
+  plot_ly(z=data.not.impaired, x=top.cols, type='heatmap', showscale = F),
+  nrows=2,
+  margin = 0.08
+) %>% layout(
+  xaxis=list(title=''),
+  yaxis=list(title='Impaired Subjects'),
+  xaxis2=list(title=''),
+  yaxis2=list(title='Not Impaired Subjects')
+)
+```
+
+<br>
+
+### Correlation and Dimensionality Reduction
+
+Now that we've isolated some of the more important protein-assay values (and age), we can start to get a better sense of how they correlate before moving any further:
+
+```{r}
+library(corrplot)
+corrplot(cor(data[,top.cols]), order='hclust', tl.col='black', tl.cex=.5)
+```
+
+<br><br>
+The features appear to be correlated in two major groups, one that includes ```age``` and one that includes ```tau``` protein levels.  Because all of these values are so highly correlated, we can assume that they're redundant and that we only really need to consider how they relate with impairment in 2 dimensions.  We can do that a bunch of different ways, but here's one way using Principal Components:
+
+```{r, echo=F}
+# Hidden PCA calculations
+pca <- prcomp(numeric.values[,top.cols])
+pca.pred <- predict(pca, numeric.values[,top.cols])[,1:2]
+pca.pred <- as.data.frame(pca.pred)
+pca.pred$response <- data$response
+
+pca.rot <- pca$rotation[,1:2] %>% 
+  as.data.frame %>% add_rownames(var='variable') %>%
+  mutate(norm=sqrt(PC1^2 + PC2^2)) %>% 
+  arrange(desc(norm)) %>% head(20)
+
+extend.num <- function(x) unlist(lapply(x, function(v) c(0, v, NA)))
+extend.var <- function(x) unlist(lapply(x, function(v) c(NA, v, NA)))
+pca.rot <- data.frame(
+  variable=extend.var(pca.rot$variable),
+  PC1=extend.num(pca.rot$PC1),
+  PC2=extend.num(pca.rot$PC2)
+)
+
+# Parameters for axis with no grid lines, ticks or labels
+empty.axis <- list(
+  title = '',
+  zeroline = FALSE,
+  showline = FALSE,
+  showticklabels = FALSE,
+  ticklen = 0,
+  showgrid = FALSE
+)
+```
+
+```{r}
+# Create a line plot of each variable showing which direction it moves within our 2D space
+p1 <- plot_ly(
+  pca.rot, x=PC1, y=PC2, text=variable, type='scatter', 
+  mode='lines+text', opacity=1, line=list(color='black'), textfont=list(color='white', size=14)
+  ) %>% layout(
+    xaxis=list(range = c(-.5, .5), showgrid=F, zeroline=F), 
+    yaxis=list(showgrid=F, zeroline=F)
+  )
+
+# Create a heatmap of impairment incidence rate across our 2D space
+p2 <- pca.pred %>% 
+  mutate(PC1=cut(PC1, breaks=3), PC2=cut(PC2, breaks=3)) %>%
+  group_by(PC1, PC2) %>% summarise(Percent.Impaired=100*sum(response == 'Impaired')/n()) %>%
+  plot_ly(x=PC1, y=PC2, z=Percent.Impaired, type='heatmap', reversescale=T) %>%
+  layout(xaxis=empty.axis, yaxis=empty.axis)
+
+# Overlay the above plots on top of one another
+subplot(p2, p1, margin=-1) %>% 
+  layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', width=900, height=600)
+```
+
+<br>
+**Takeaways from the above:**
+  - Age, and all protein levels correlated with it, happens to coincide with impairment as it increases
+  - For the two people of the same age, tau protein and it's correlated variables make the difference, leading to increased incidence of impairment
+  - We did not directly "model" the outcome in this case, only analyzed all the variables in a descriptive way and it just so happens that they have this nice relationship with the outcome
