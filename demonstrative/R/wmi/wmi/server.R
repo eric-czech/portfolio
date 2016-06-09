@@ -26,6 +26,7 @@ shinyServer(function(input, output, session) {
   wqData <- reactive({
     dates <- wqDateRangeData()
     d.wq <- getWQRawData(dates[1], dates[2]) 
+    d.wq <- prepareMeasurementValues(d.wq)
     
     if (str_length(input$wq.country) > 0){
       print(paste('filtering to ', input$wq.country))
@@ -234,7 +235,8 @@ shinyServer(function(input, output, session) {
       filter(!is.na(Value)) %>%
       mutate(Value=asinh(Value)) %>%
       ggplot(aes(x=Date, y=Value, color=Country)) + geom_smooth(se=F) +
-      theme_bw()
+      theme_bw() + ggtitle('Trends by Country')
+      
   })
   
   output$fi.proj.plot <- renderPlot({

@@ -6,6 +6,8 @@ library(corrplot)
 library(DT)
 library(scales)
 source('utils.R')
+source('dineof.R')
+source('geo_utils.R')
 
 #' Prepares measurement values by replacing -Inf measurements 
 #' with some sentinel value based on measurement range
@@ -27,7 +29,6 @@ prepareMeasurementValues <- function(d){
     
     # Determine sentinel value to replace -Inf measurements with
     min.val <- min(v.finite) - .1 * (max(v.finite) - min(v.finite))
-    v <- ifelse(v == -Inf, min.val, v)
     
     # Return original measurement vector with NA's and finite values unchanged, and 
     # -Inf values replace with sentinel value
@@ -41,23 +42,27 @@ prepareMeasurementValues <- function(d){
 
 getWQCorPlot <- function(d.wq){
   wq.vars <- d.wq %>% select(starts_with('WQ_')) %>% names
-  d.cov <- d.wq %>% select(DistributionPointIdentifier, Country, one_of(wq.vars))
+  wq.vars <- apply(d.wq[,wq.vars], 2, function(x) sum(!is.na(x))) / nrow(d.wq)
+  wq.vars <- names(wq.vars[wq.vars > .5])
   
-  c.var <- wq.vars[!sapply(wq.vars, function(v) all(is.na(d.wq[,v])) || sd(d.wq[,v], na.rm=T) == 0)]
-  impute <- function(x) ifelse(is.na(x), mean(x, na.rm=T), x)
-  d.wq[,c.var] %>% mutate_each(funs(impute)) %>% cor %>% corrplot
+  d.wq[,wq.vars] %>% 
+    cor(use='pairwise.complete', method='spearman') %>% as.data.frame %>% 
+    apply(2, function(x) ifelse(is.na(x), 0, x)) %>%
+    corrplot(order='hclust', tl.cex=.7, tl.col='black')
+}
+
+getAllWQData <- function(){
+  con = dbConnect(drv=SQLite(), dbname='/Users/eczech/data/research/wmi/data/wmi.db')
+  d.wq <- dbReadTable(con, 'wmi_water_quality')
+  abbr <- function(x) paste0(str_split(x, ' ')[[1]][1], '...', str_sub(x, -25, -1))
+  d.wq %>% 
+    mutate(DistributionPointIdentifier = sapply(DistributionPointIdentifier, abbr)) %>%
+    mutate(Date=ymd(str_sub(Date, end=10)))
 }
 
 getWQRawData <- function(start.date, stop.date){
-  con = dbConnect(drv=SQLite(), dbname='/Users/eczech/data/research/wmi/data/wmi.db')
-  d.wq <- dbReadTable(con, 'wmi_water_quality') 
-  abbr <- function(x) paste0(str_split(x, ' ')[[1]][1], '...', str_sub(x, -25, -1))
-  d.wq <- d.wq %>% 
-    mutate(DistributionPointIdentifier = sapply(DistributionPointIdentifier, abbr)) %>%
-    mutate(Date=ymd(str_sub(Date, end=10))) %>%
-    filter(Date >= start.date & Date <= stop.date)
-  d.wq <- prepareMeasurementValues(d.wq)
-  d.wq
+  # Note that there are 14 records with dates in 2018
+  getAllWQData() %>% filter(Date >= start.date & Date <= stop.date)  
 }
 
 getWQGeoData <- function(d.wq, metrics, group.cols, text.gen){
@@ -88,24 +93,34 @@ getWQGeoData <- function(d.wq, metrics, group.cols, text.gen){
     
     # Determine size for plotting as value on 2-15 scale
     group_by(Variable) %>%
-    mutate(Size=2 + 13 * (Value - min(Value)) / (max(Value) - min(Value))) %>% 
+    mutate(Size=3 + 13 * (Value - min(Value)) / (max(Value) - min(Value))) %>% 
     ungroup %>%
     
     # Add text description of each record
     ungroup %>% text.gen %>%
     
     # Add variable id, which is useful for map generation
-    mutate(VariableId=as.integer(Variable), Variable=as.character(Variable))
+    mutate(VariableId=as.integer(Variable), Variable=as.character(Variable)) %>%
+    
+    # Finally, attempt to fix obviously incorrect coordinate pairs
+    correctMistakenCoordinates
 }
 
 plotWQGeoData <- function(d.geo, title=''){
+  geo <- list(
+    showland = TRUE,
+    showcountries = T,
+    landcolor = toRGB("gray98"),
+    countrycolor = toRGB("gray65"),
+    countrywidth = 0.3
+  )
   d.geo %>%
     filter(!is.na(Lat) & !is.na(Lon)) %>%
     plot_ly(
       lon = Lon, lat = Lat, text = Text, color = Country,
       shape=Variable, marker = list(size = Size), type = 'scattergeo'
     ) %>% 
-    layout(title=title)
+    layout(title=title, geo=geo)
 }
 
 getWQAssessmentIds <- function(d.wq){

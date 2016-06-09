@@ -4,6 +4,7 @@ library(plotly)
 library(reshape2)
 
 source('app.R')
+source('dineof.R')
 
 ##### Water Quality #####
 
@@ -135,16 +136,30 @@ d.geo %>%
 
 # WQ Covariance Analysis
 
-d.all <- prepareMeasurementValues(d)
-wq.vars <- d.all %>% select(starts_with('WQ_')) %>% names
-d.cov <- d.all %>% select(DistributionPointIdentifier, Country, one_of(wq.vars))
-
-c.var <- wq.vars[!sapply(wq.vars, function(v) all(is.na(d.cov[,v])) || sd(d.cov[,v], na.rm=T) == 0)]
+wq.vars <- d %>% select(starts_with('WQ_')) %>% names
 impute <- function(x) ifelse(is.na(x), mean(x, na.rm=T), x)
-d.cov[,c.var] %>% mutate_each(funs(impute)) %>% cor %>% corrplot
-pairs(d.cov[,c.var])
-cor(d.cov[,wq.vars], use='pairwise.complete.obs')
+d.cov <- d[,wq.vars] 
+common.vars <- apply(d.cov, 2, function(x) sum(!is.na(x))) / nrow(d.cov)
+common.vars <- names(common.vars[common.vars > .5])
+d.cov <- d[,common.vars] 
 
+# Correlation with truncation
+d.cov %>% prepareMeasurementValues %>% 
+  cor(use='pairwise.complete') %>% as.data.frame %>% 
+  apply(2, function(x) ifelse(is.na(x), 0, x)) %>%
+  corrplot(order='hclust')
+
+# Correlation with nonparametric method
+d.cov %>% 
+  cor(use='pairwise.complete', method='spearman') %>% as.data.frame %>% 
+  apply(2, function(x) ifelse(is.na(x), 0, x)) %>%
+  corrplot(order='hclust')
+
+# Nonparametric correlation with DINEOF imputation
+unexponentiate <- function(x) 10^x
+reexponentiate <- function(x) asinh(10^x)
+d.cov %>% mutate_each(funs(reexponentiate), ends_with('Log')) %>% scale %>% 
+  as.matrix %>% dineof %>% .$Xa %>% cor(method='spearman') %>% corrplot(order='hclust')
 
 
 ##### Financials #####

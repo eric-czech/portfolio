@@ -369,6 +369,8 @@ empty.axis <- list(
 ```
 
 ```{r}
+### PCA calculations hidden for brevity ###
+
 # Create a line plot of each variable showing which direction it moves within our 2D space
 p1 <- plot_ly(
     pca.rot, x=PC1, y=PC2, text=variable, type='scatter', 

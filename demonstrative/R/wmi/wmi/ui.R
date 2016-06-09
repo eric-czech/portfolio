@@ -44,8 +44,8 @@ shinyUI(navbarPage("WMI - Project Analysis",
             column(12, plotlyOutput("wq.proj.box.plot", width="1000px"), br(), br()), 
             column(12, plotlyOutput("wq.proj.map.plot", width="1000px", height="400px"))
           )),
-          tabPanel("Single Project", plotOutput("wq.dist.plot", height="400px")),
-          tabPanel("Measurement Correlation", plotOutput("wq.corr.plot", height="400px"))
+          tabPanel("Single Project", plotOutput("wq.dist.plot", height="600px")),
+          tabPanel("Measurement Correlation", plotOutput("wq.corr.plot", height="600px"))
         )
       )
     )
