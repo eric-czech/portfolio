@@ -1,13 +1,7 @@
 __author__ = 'eczech'
 
 from .common import *
-import logging
-import multiprocessing
-
-#LOGGER = multiprocessing.log_to_stderr()
-#LOGGER.setLevel(logging.IN)
 from sklearn.grid_search import BaseSearchCV
-from sklearn.pipeline import Pipeline
 
 
 def _resolve_clf(clf):

@@ -226,8 +226,15 @@ def summarize_predictions(res):
                 pred = pd.DataFrame()
 
             # Add fold predictions to frame
-            pred[pref + 'y_pred'] = clf_res['y_pred']
-            pred[pref + 'y_true'] = clf_res['y_test']
+            y_pred = clf_res['y_pred']
+            if len(y_pred.shape) == 1 or y_pred.shape[1] == 1:
+                pred[pref + 'y_pred'] = clf_res['y_pred']
+                pred[pref + 'y_true'] = clf_res['y_test']
+            else:
+                for i in range(y_pred.shape[1]):
+                    pred[pref + 'y_pred_{}'.format(i)] = clf_res['y_pred'][:, i]
+                    pred[pref + 'y_true_{}'.format(i)] = clf_res['y_test'][:, i]
+
             if 'y_proba' in clf_res:
                 y_proba = clf_res['y_proba']
                 for i in range(y_proba.shape[1]):
@@ -254,7 +261,6 @@ def summarize_importances(res):
     if len(imp_res) == 0:
         return None
     res = functools.reduce(pd.DataFrame.append, imp_res)
-    #res.columns.name = 'feature'
     return res.reset_index(drop=True)
 
 

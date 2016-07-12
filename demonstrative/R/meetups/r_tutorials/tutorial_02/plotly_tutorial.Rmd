@@ -214,7 +214,7 @@ For one, we could just try to visualize them all together:
 
 ```{r}
 # First determine which fields are numeric
-numeric.cols <- sapply(data, class) %>% .[. == 'numeric'] %>% names
+  numeric.cols <- sapply(data, class) %>% .[. == 'numeric'] %>% names
 
 # Alternatively:
 # col.classes <- sapply(data, class)
@@ -413,7 +413,7 @@ To verify the above results, we could also look more directly at the relationshi
 ```{r, is.plotly=T}
 # Bucket age and tau into 4 groups, and determine percent impaired within each
 plot.data <- data %>% 
-  mutate(age=cut(age, breaks=4), tau=cut(tau, breaks=4)) %>%
+  mutate(age=cut(age, breaks=4), tau=cut(tau, breaks=4)) %>% head
   mutate(age=as.numeric(str_extract(age, '[\\d\\.]+')), tau=as.numeric(str_extract(tau, '[\\d\\.]+'))) %>%
   group_by(age, tau) %>% summarise(pct=100*sum(response == 'Impaired')/n())
 

@@ -23,8 +23,13 @@ def get_partial_dependence_1d(clf, X, features, pred_fun, force_discrete=False, 
         if len(x.unique()) <= 10 or force_discrete:
             grid = x.unique()
         else:
-            xmin = np.percentile(x, grid_window[0] * 100)
-            xmax = np.percentile(x, grid_window[1] * 100)
+            if isinstance(grid_window, dict):
+                assert feature in grid_window
+                gw = grid_window[feature]
+            else:
+                gw = grid_window
+            xmin = np.percentile(x, gw[0] * 100)
+            xmax = np.percentile(x, gw[1] * 100)
             grid = np.linspace(xmin, xmax, grid_size)
 
         X_pd = X.copy()
@@ -36,7 +41,8 @@ def get_partial_dependence_1d(clf, X, features, pred_fun, force_discrete=False, 
     return res
 
 
-def plot_partial_dependence(pdp, n_cols=3, title='Partial Dependence', smooth_window=None):
+def plot_partial_dependence(pdp, n_cols=3, title='Partial Dependence', smooth_window=None,
+                            filename=None):
     n_feats = len(pdp)
     if n_feats < n_cols:
         n_cols = n_feats
@@ -54,4 +60,7 @@ def plot_partial_dependence(pdp, n_cols=3, title='Partial Dependence', smooth_wi
         fig.append_trace(trace, int(np.floor(i / n_cols) + 1), (i % n_cols) + 1)
 
     fig['layout'].update(title=title, showlegend=False)
-    offline.plot(fig, show_link=False, auto_open=True)
+    if filename is None:
+        return offline.iplot(fig, show_link=False)
+    else:
+        return offline.plot(fig, show_link=False, auto_open=True, filename=filename)

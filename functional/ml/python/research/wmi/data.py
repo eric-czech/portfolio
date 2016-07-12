@@ -271,6 +271,13 @@ def get_country_data():
 
 def convert_water_quality_units(g):
 
+    g['OriginalUnits'] = g['Units']
+
+    # Special exception for Free Chlorine to deal with likely mistake in reporting
+    param = g['Parameter'].iloc[0]
+    if param.lower() == 'chlorine, free':
+        g['Units'] = np.where(g['Units'].isin(['mg/L', 'CFU/100ml']), 'mg/L', g['Units'])
+
     def validate_units(g, expected, unit_type):
         unit_unique = g['Units'].unique()
         rem = np.setdiff1d(unit_unique, expected)
