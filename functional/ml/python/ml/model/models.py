@@ -248,13 +248,24 @@ def summarize_predictions(res):
     return functools.reduce(pd.DataFrame.append, pred_res)
 
 
-def summarize_importances(res):
+def summarize_importances(res, feat_imp_calc=None):
     imp_res = []
     for fold_res in res:
         for clf_res in fold_res:
-            if clf_res['feat_imp'] is None:
+            model = clf_res['model'][CLF_NAME]
+            feat_imp = None
+
+            # If a feature importance calculation function has been specified
+            # for this model, use it instead of any pre-computed importances
+            if feat_imp_calc is not None and model in feat_imp_calc:
+                feat_imp = feat_imp_calc[model](clf_res['model'][CLF_IMPL], clf_res['X_test'].columns)
+
+            # If no explicit feature importance function was given, skip this model if no
+            # precomputed values exist either
+            if feat_imp is None and clf_res['feat_imp'] is None:
                 continue
-            feat_imp = pd.DataFrame(clf_res['feat_imp']).T
+
+            feat_imp = pd.DataFrame(feat_imp).T
             feat_imp['model_name'] = clf_res['model'][CLF_NAME]
             feat_imp['fold_id'] = clf_res['fold']
             imp_res.append(feat_imp)

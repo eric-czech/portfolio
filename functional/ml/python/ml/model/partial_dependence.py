@@ -42,7 +42,7 @@ def get_partial_dependence_1d(clf, X, features, pred_fun, force_discrete=False, 
 
 
 def plot_partial_dependence(pdp, n_cols=3, title='Partial Dependence', smooth_window=None,
-                            filename=None):
+                            filename=None, fig_dimension=None, transform=None):
     n_feats = len(pdp)
     if n_feats < n_cols:
         n_cols = n_feats
@@ -56,10 +56,17 @@ def plot_partial_dependence(pdp, n_cols=3, title='Partial Dependence', smooth_wi
             y = pd.rolling_mean(y, min_periods=1, window=smooth_window)
         y = list(y)
         line = dict(color='black')
-        trace = go.Scatter(x=x, y=y, name=feature, fillcolor='blue', line=line)
+        trace = go.Scatter(x=x, y=y, name=feature, line=line)
         fig.append_trace(trace, int(np.floor(i / n_cols) + 1), (i % n_cols) + 1)
 
+        if transform is not None:
+            y_trans = transform['function'](x, y)
+            trace = go.Scatter(x=x, y=y_trans, name=transform['title'], line=dict(color=transform['color']))
+            fig.append_trace(trace, int(np.floor(i / n_cols) + 1), (i % n_cols) + 1)
+
     fig['layout'].update(title=title, showlegend=False)
+    if fig_dimension is not None:
+        fig['layout'].update(width=fig_dimension[0], height=fig_dimension[1])
     if filename is None:
         return offline.iplot(fig, show_link=False)
     else:

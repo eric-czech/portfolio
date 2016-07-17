@@ -46,10 +46,20 @@ def plot_curve(res, curve_func=roc_curve, interpolation=INTERPOLATE_LINEAR, plot
         ax.set_title(model)
 
 
-def plot_feature_importance(res, limit=25, xrot=35, rmargin=100, bmargin=160, width=1000, height=400, filename=None):
-    feat_imp = models.summarize_importances(res)
+def plot_feature_importance(res, limit=25, xrot=35, rmargin=100, bmargin=160,
+                            width=1000, height=400, filename=None, normalize=True,
+                            feat_imp_calc=None):
+    feat_imp = models.summarize_importances(res, feat_imp_calc=feat_imp_calc)
     if feat_imp is None:
         return None
+
+    # If requested, make sure all feature importance scores
+    # per model and fold are normalized to [0, 1]
+    if normalize:
+        feat_imp = feat_imp\
+            .set_index(['model_name', 'fold_id'])\
+            .apply(lambda r: r / r.sum(), axis=1)\
+            .reset_index()
 
     feat_means = feat_imp.drop('fold_id', axis=1)
     feat_means = feat_means.groupby('model_name')

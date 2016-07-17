@@ -4,7 +4,7 @@ from .common import *
 from sklearn.grid_search import BaseSearchCV
 
 
-def _resolve_clf(clf):
+def resolve_clf(clf):
     # If model is grid search, fetch underlying, best estimator
     if isinstance(clf, BaseSearchCV):
         return clf.best_estimator_
@@ -12,7 +12,7 @@ def _resolve_clf(clf):
     # If model is pipeline, resolved contained estimator
     pipe_clf = resolve_estimator_from_pipeline(clf)
     if pipe_clf is not None:
-        return _resolve_clf(pipe_clf)
+        return resolve_clf(pipe_clf)
 
     # Otherwise, return as is
     return clf
@@ -20,7 +20,7 @@ def _resolve_clf(clf):
 
 def get_classifier_fi(clf, columns):
     res = None
-    clf = _resolve_clf(clf)
+    clf = resolve_clf(clf)
 
     # SVC - univariate importance exists only with linear kernel
     # and when number of classes == 2
@@ -46,7 +46,7 @@ def get_classifier_fi(clf, columns):
 
 def get_regressor_fi(clf, columns):
     res = None
-    clf = _resolve_clf(clf)
+    clf = resolve_clf(clf)
 
     # SVR - univariate importance is only present with linear kernel
     if isinstance(clf, SVR) \
