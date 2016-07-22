@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+     <key>EnvironmentVariables</key>
+     <dict>
+        <key>PATH</key>
+        <string>/Users/eczech/anaconda/envs/research3.5/bin/:/Users/eczech/anaconda/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin</string>
+    </dict>
+    <key>WorkingDirectory</key>
+    <string>/Users/eczech/.jupyter/configs/research3.5</string>
+    <key>Label</key>
+    <string>jupyter.research3.5</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/eczech/anaconda/envs/research3.5/bin/jupyter</string>
+        <string>notebook</string>
+	<string>--config=/Users/eczech/.jupyter/configs/research3.5/jupyter_notebook_config.py</string>
+	<string>--no-browser</string>
+    </array>
+    <key>StandardOutPath</key>
+    <string>/tmp/jupyter_research3.5.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/jupyter_research3.5.stderr.log</string>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>
