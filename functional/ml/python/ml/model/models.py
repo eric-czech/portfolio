@@ -211,7 +211,7 @@ def summarize_curve(res, curve_func=roc_curve):
         .reset_index()[['model_name', 'fold_id', 'x', 'y', 'thresh']]
 
 
-def summarize_predictions(res):
+def asummarize_predictions(res):
     pred_res = []
     for fold_res in res:
         for clf_res in fold_res:
@@ -226,8 +226,15 @@ def summarize_predictions(res):
                 pred = pd.DataFrame()
 
             # Add fold predictions to frame
-            pred[pref + 'y_pred'] = clf_res['y_pred']
-            pred[pref + 'y_true'] = clf_res['y_test']
+            y_pred = clf_res['y_pred']
+            if len(y_pred.shape) == 1 or y_pred.shape[1] == 1:
+                pred[pref + 'y_pred'] = clf_res['y_pred']
+                pred[pref + 'y_true'] = clf_res['y_test']
+            else:
+                for i in range(y_pred.shape[1]):
+                    pred[pref + 'y_pred_{}'.format(i)] = clf_res['y_pred'][:, i]
+                    pred[pref + 'y_true_{}'.format(i)] = clf_res['y_test'][:, i]
+
             if 'y_proba' in clf_res:
                 y_proba = clf_res['y_proba']
                 for i in range(y_proba.shape[1]):
@@ -241,20 +248,33 @@ def summarize_predictions(res):
     return functools.reduce(pd.DataFrame.append, pred_res)
 
 
-def summarize_importances(res):
+def summarize_importances(res, feat_imp_calc=None):
     imp_res = []
     for fold_res in res:
         for clf_res in fold_res:
-            if clf_res['feat_imp'] is None:
+            model = clf_res['model'][CLF_NAME]
+            feat_imp = None
+
+            # If a feature importance calculation function has been specified
+            # for this model, use it instead of any pre-computed importances
+            if feat_imp_calc is not None and model in feat_imp_calc:
+                feat_imp = feat_imp_calc[model](clf_res['model'][CLF_IMPL], clf_res['X_test'].columns)
+
+            # Fallback on pre-computed importance if present
+            if feat_imp is None and clf_res['feat_imp'] is not None:
+                feat_imp = clf_res['feat_imp']
+
+            # If no feature importance could be found/created, skip this model
+            if feat_imp is None:
                 continue
-            feat_imp = pd.DataFrame(clf_res['feat_imp']).T
+
+            feat_imp = pd.DataFrame(feat_imp).T
             feat_imp['model_name'] = clf_res['model'][CLF_NAME]
             feat_imp['fold_id'] = clf_res['fold']
             imp_res.append(feat_imp)
     if len(imp_res) == 0:
         return None
     res = functools.reduce(pd.DataFrame.append, imp_res)
-    #res.columns.name = 'feature'
     return res.reset_index(drop=True)
 
 

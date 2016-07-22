@@ -34,18 +34,18 @@ shinyUI(navbarPage("WMI - Project Analysis",
         tabsetPanel(
           tabPanel("Distribution Points", 
             fluidRow(column(12, selectInput("wq.dist.map.metric", "Metric", c('')))),
-            fluidRow(column(12, dataTableOutput("wq.dist.dt"), br(), br())), 
+            fluidRow(column(12, DT::dataTableOutput("wq.dist.dt"), br(), br())), 
             fluidRow(column(12, plotlyOutput("wq.dist.box.plot", width="1000px"), br(), br())),
             fluidRow(column(12, plotlyOutput("wq.dist.map.plot", width="1000px", height="400px")))
           ),
           tabPanel("Projects Overall", fluidRow(
             column(12, selectInput("wq.proj.map.metric", "Metric", c(''))),
-            column(12, dataTableOutput("wq.proj.dt"), br(), br()), 
+            column(12, DT::dataTableOutput("wq.proj.dt"), br(), br()), 
             column(12, plotlyOutput("wq.proj.box.plot", width="1000px"), br(), br()), 
             column(12, plotlyOutput("wq.proj.map.plot", width="1000px", height="400px"))
           )),
-          tabPanel("Single Project", plotOutput("wq.dist.plot", height="400px")),
-          tabPanel("Measurement Correlation", plotOutput("wq.corr.plot", height="400px"))
+          tabPanel("Single Project", plotOutput("wq.dist.plot", height="600px")),
+          tabPanel("Measurement Correlation", plotOutput("wq.corr.plot", height="600px"))
         )
       )
     )
@@ -70,7 +70,7 @@ shinyUI(navbarPage("WMI - Project Analysis",
          tabsetPanel(
            tabPanel("Projects", fluidRow(
              column(12, selectInput("fi.proj.map.metric", "Metric", c(''))),
-             column(12, dataTableOutput("fi.proj.dt")), 
+             column(12, DT::dataTableOutput("fi.proj.dt")), 
              column(12, plotlyOutput("fi.proj.box.plot", width="1000px")), 
              column(12, plotOutput("fi.proj.cty.ts.plot", width="1000px")), 
              column(12, plotlyOutput("fi.dproj.map.plot", width="1000px", height="400px"))

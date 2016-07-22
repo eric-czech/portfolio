@@ -6,8 +6,8 @@ import plotly.graph_objs as go
 from plotly import offline
 
 
-def get_partial_dependence_1d(clf, X, features, pred_fun, force_discrete=False, grid_size=100, grid_window=[0, 1],
-                              sample_rate=1, random_state=None):
+def get_partial_dependence_1d(clf, X, features, pred_fun, grid_size=100, grid_window=[0, 1],
+                              sample_rate=1, random_state=None, discrete_thresh_ct=10):
     if isinstance(features, str):
         features = [features]
 
@@ -20,11 +20,16 @@ def get_partial_dependence_1d(clf, X, features, pred_fun, force_discrete=False, 
     res = {}
     for feature in features:
         x = X[feature]
-        if len(x.unique()) <= 10 or force_discrete:
+        if len(x.unique()) <= discrete_thresh_ct:
             grid = x.unique()
         else:
-            xmin = np.percentile(x, grid_window[0] * 100)
-            xmax = np.percentile(x, grid_window[1] * 100)
+            if isinstance(grid_window, dict):
+                assert feature in grid_window
+                gw = grid_window[feature]
+            else:
+                gw = grid_window
+            xmin = np.percentile(x, gw[0] * 100)
+            xmax = np.percentile(x, gw[1] * 100)
             grid = np.linspace(xmin, xmax, grid_size)
 
         X_pd = X.copy()
@@ -36,7 +41,8 @@ def get_partial_dependence_1d(clf, X, features, pred_fun, force_discrete=False, 
     return res
 
 
-def plot_partial_dependence(pdp, n_cols=3, title='Partial Dependence', smooth_window=None):
+def plot_partial_dependence(pdp, n_cols=3, title='Partial Dependence', smooth_window=None,
+                            filename=None, fig_dimension=None, transform=None):
     n_feats = len(pdp)
     if n_feats < n_cols:
         n_cols = n_feats
@@ -50,8 +56,18 @@ def plot_partial_dependence(pdp, n_cols=3, title='Partial Dependence', smooth_wi
             y = pd.rolling_mean(y, min_periods=1, window=smooth_window)
         y = list(y)
         line = dict(color='black')
-        trace = go.Scatter(x=x, y=y, name=feature, fillcolor='blue', line=line)
+        trace = go.Scatter(x=x, y=y, name=feature, line=line)
         fig.append_trace(trace, int(np.floor(i / n_cols) + 1), (i % n_cols) + 1)
 
+        if transform is not None:
+            y_trans = transform['function'](x, y)
+            trace = go.Scatter(x=x, y=y_trans, name=transform['title'], line=dict(color=transform['color']))
+            fig.append_trace(trace, int(np.floor(i / n_cols) + 1), (i % n_cols) + 1)
+
     fig['layout'].update(title=title, showlegend=False)
-    offline.plot(fig, show_link=False, auto_open=True)
+    if fig_dimension is not None:
+        fig['layout'].update(width=fig_dimension[0], height=fig_dimension[1])
+    if filename is None:
+        return offline.iplot(fig, show_link=False)
+    else:
+        return offline.plot(fig, show_link=False, auto_open=True, filename=filename)

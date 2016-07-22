@@ -169,6 +169,7 @@ def get_project_details():
         'AnticipatedHouseholdPenetration': np.float64,
         'AnticipatedIndividualConsumption': np.float64,
         'AnticipatedDailyProduction': np.float64,
+        'AnticipatedExchangeRate': np.float64,
         'AverageHouseholdIncome': np.float64,
         'AverageHouseholdSize': np.float64,
         'ContainerSizeForConsumptionExpenditure': np.float64,
@@ -269,6 +270,13 @@ def get_country_data():
 
 
 def convert_water_quality_units(g):
+
+    g['OriginalUnits'] = g['Units']
+
+    # Special exception for Free Chlorine to deal with likely mistake in reporting
+    param = g['Parameter'].iloc[0]
+    if param.lower() == 'chlorine, free':
+        g['Units'] = np.where(g['Units'].isin(['mg/L', 'CFU/100ml']), 'mg/L', g['Units'])
 
     def validate_units(g, expected, unit_type):
         unit_unique = g['Units'].unique()
@@ -379,7 +387,7 @@ def get_water_quality_data():
 
     # Convert date fields
     def to_monthly_date(x):
-        return pd.to_datetime(x.apply(lambda x: None if pd.isnull(x) else x[:7]))
+        return pd.to_datetime(x.apply(lambda v: None if pd.isnull(v) else v[:7]))
 
     d['Date'] = to_monthly_date(d['SampleDateAndTime'])
     d = d.drop('SampleDateAndTime', axis=1)
