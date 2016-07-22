@@ -6,8 +6,8 @@ import plotly.graph_objs as go
 from plotly import offline
 
 
-def get_partial_dependence_1d(clf, X, features, pred_fun, force_discrete=False, grid_size=100, grid_window=[0, 1],
-                              sample_rate=1, random_state=None):
+def get_partial_dependence_1d(clf, X, features, pred_fun, grid_size=100, grid_window=[0, 1],
+                              sample_rate=1, random_state=None, discrete_thresh_ct=10):
     if isinstance(features, str):
         features = [features]
 
@@ -20,7 +20,7 @@ def get_partial_dependence_1d(clf, X, features, pred_fun, force_discrete=False, 
     res = {}
     for feature in features:
         x = X[feature]
-        if len(x.unique()) <= 10 or force_discrete:
+        if len(x.unique()) <= discrete_thresh_ct:
             grid = x.unique()
         else:
             if isinstance(grid_window, dict):

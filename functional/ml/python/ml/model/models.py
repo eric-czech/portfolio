@@ -211,7 +211,7 @@ def summarize_curve(res, curve_func=roc_curve):
         .reset_index()[['model_name', 'fold_id', 'x', 'y', 'thresh']]
 
 
-def summarize_predictions(res):
+def asummarize_predictions(res):
     pred_res = []
     for fold_res in res:
         for clf_res in fold_res:
@@ -260,9 +260,12 @@ def summarize_importances(res, feat_imp_calc=None):
             if feat_imp_calc is not None and model in feat_imp_calc:
                 feat_imp = feat_imp_calc[model](clf_res['model'][CLF_IMPL], clf_res['X_test'].columns)
 
-            # If no explicit feature importance function was given, skip this model if no
-            # precomputed values exist either
-            if feat_imp is None and clf_res['feat_imp'] is None:
+            # Fallback on pre-computed importance if present
+            if feat_imp is None and clf_res['feat_imp'] is not None:
+                feat_imp = clf_res['feat_imp']
+
+            # If no feature importance could be found/created, skip this model
+            if feat_imp is None:
                 continue
 
             feat_imp = pd.DataFrame(feat_imp).T
