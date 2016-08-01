@@ -30,26 +30,34 @@ class ProjectManager(object):
             if not os.path.exists(path):
                 os.mkdir(path)
 
-    def _get_data_file(self, datatype, dataset, ext):
+    def file(self, datatype, dataset, ext, create_dir=True):
         path = os.path.join(self.data_dir, datatype)
+
+        # Create the parent directory for the file if it does not exist
+        if create_dir and not os.path.exists(path):
+            os.makedirs(path, exist_ok=True)
+
         path = os.path.join(path, '{}.{}'.format(dataset, ext))
         return path
 
     def save(self, datatype, dataset, d):
-        path = self._get_data_file(datatype, dataset, 'pkl')
+        path = self.file(datatype, dataset, 'pkl')
         logger.debug('Saving data to location "{}"'.format(path))
         with open(path, 'wb') as fd:
             pickle.dump(d, fd)
         return path
 
     def exists(self, datatype, dataset):
-        path = self._get_data_file(datatype, dataset, 'pkl')
+        path = self.file(datatype, dataset, 'pkl')
         return os.path.exists(path)
 
-    def load(self, datatype, dataset, raise_on_absent=True):
-        path = self._get_data_file(datatype, dataset, 'pkl')
+    def load(self, datatype, dataset, loader=None):
+        path = self.file(datatype, dataset, 'pkl')
+
+        if loader is not None and not self.exists(datatype, dataset):
+            logger.debug('Generating data to be saved at location "{}"'.format(path))
+            self.save(datatype, dataset, loader())
+
         logger.debug('Loading saved data from location "{}"'.format(path))
-        if not raise_on_absent and not os.path.exists(path):
-            return None
         with open(path, 'rb') as fd:
             return pickle.load(fd)
