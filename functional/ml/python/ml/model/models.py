@@ -211,7 +211,14 @@ def summarize_curve(res, curve_func=roc_curve):
         .reset_index()[['model_name', 'fold_id', 'x', 'y', 'thresh']]
 
 
-def asummarize_predictions(res):
+def summarize_predictions(res, y_names=None):
+    """
+    Returns per-fold predictions from a cross-validation result
+    :param res: Cross validation result
+    :param y_names: Optional list of names to assign to multivariate or univariate outcomes; note
+        that these must be given in the same order as the response fields used in training
+    :return: Data frame containing predictions
+    """
     pred_res = []
     for fold_res in res:
         for clf_res in fold_res:
@@ -232,13 +239,15 @@ def asummarize_predictions(res):
                 pred[pref + 'y_true'] = clf_res['y_test']
             else:
                 for i in range(y_pred.shape[1]):
-                    pred[pref + 'y_pred_{}'.format(i)] = clf_res['y_pred'][:, i]
-                    pred[pref + 'y_true_{}'.format(i)] = clf_res['y_test'][:, i]
+                    outcome = str(i) if y_names is None else y_names[i]
+                    pred[pref + '{}y_pred_{}'.format(pref, outcome)] = clf_res['y_pred'][:, i]
+                    pred[pref + '{}y_true_{}'.format(pref, outcome)] = clf_res['y_test'][:, i]
 
             if 'y_proba' in clf_res:
                 y_proba = clf_res['y_proba']
                 for i in range(y_proba.shape[1]):
-                    pred['{}{}_{}'.format(pref, 'y_proba', i)] = y_proba[:, i]
+                    outcome = str(i) if y_names is None else y_names[i]
+                    pred['{}y_proba_{}'.format(pref, outcome)] = y_proba[:, i]
 
             # Add fold meta data to frame
             pred[pref + 'model_name'] = clf_res['model'][CLF_NAME]
@@ -258,7 +267,7 @@ def summarize_importances(res, feat_imp_calc=None):
             # If a feature importance calculation function has been specified
             # for this model, use it instead of any pre-computed importances
             if feat_imp_calc is not None and model in feat_imp_calc:
-                feat_imp = feat_imp_calc[model](clf_res['model'][CLF_IMPL], clf_res['X_test'].columns)
+                feat_imp = feat_imp_calc[model](clf_res['model'][CLF_IMPL])
 
             # Fallback on pre-computed importance if present
             if feat_imp is None and clf_res['feat_imp'] is not None:
