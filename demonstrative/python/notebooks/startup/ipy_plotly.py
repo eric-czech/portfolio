@@ -4,7 +4,7 @@ import plotly.graph_objs as go
 import cufflinks as cf
 
 # Initialize Jupyter notebook mode
-cf.set_config_file(offline=True, theme='ggplot', offline_link_text=None, offline_show_link=False)
+cf.set_config_file(offline=True, theme='white', offline_link_text=None, offline_show_link=False)
 
 def plotly_clean_html(plotly_filename, auto_open=True):
     """ Strips Save icon from plot.ly html visualizations """
