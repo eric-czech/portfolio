@@ -1,0 +1,215 @@
+---
+title: "CDA"
+author: "Scott D Moore"
+date: "May 14, 2016"
+output: html_document
+#output: ioslides_presentation
+---
+  
+# Basic R Training
+### Session 1
+
+<hr>
+<center><h3>Agenda</h3></center>
+
+
+- About: Scott_R
+- Questions: Why are you here?  What do you think you want to do with R 'Work', 'Play'?
+- Notes: rmarkdown will be made available; good, bad, and ugly:).
+
+## Four things about R:
+
+- VERY case sensitive.
+- It is fun.
+- Somebody has done it or at least thinking about it.
+- Many ways to do it RIGHT.
+
+## Today:
+
+1. Work in 'Chunks'.
+2. Run 'Swirl'.
+3. Get you adjusted to R through self paced.
+4. Familiar with some basics.
+5. Goal: Be familiar enough so you can follow later presentations. You will not become an expert today.
+6. Goal: Be able to navigate so you can start 'producing' today.
+
+**Programming Topics**
+
+- Basic Statistics.
+- Data Frames.
+- Subsetting.
+- Grouping.
+- Visualizations (histogram/boxplot/scatterplot/density estimates).
+- Goal: Be able to analyze a small problem from data to visual.
+
+<hr>
+# Swirl
+
+See the docs here: http://swirlstats.com/students.html
+
+Example:
+
+```
+# Install and load swirl
+install.packages("swirl")
+library(swirl)  
+
+# Install basic programming course
+install_from_swirl("R_Programming")
+
+# Run Swirl
+swirl()  
+```
+
+**"Goodmorning, Wells"**  
+  
+<hr>
+
+# Programming Examples
+
+R has it own data sets.  
+
+```{r}
+data()
+head(iris)
+```
+
+### Loading New Data
+
+Open a File. Set my Working Directory (Session) to where I want to find my data. 'Pane'  
+Read a file. csv is by the far the easist to open strongly recommend this file type for "us".
+Remember the "".  
+
+```{r}
+cda <- read.csv("~/Downloads/Diabetes.csv", header = TRUE, sep = ",")
+head(cda)
+```
+
+
+Alternative table output representations:
+
+<center><strong>Knitr</strong></center>
+```{r}
+library(knitr)
+knitr::kable(head(cda))
+```
+
+<center><strong>Datatable (aka DT)</strong></center>
+```{r}
+library(DT)
+DT::datatable(head(cda))
+```
+
+<hr>
+### Data Summaries and Metadata
+
+Explore the data; object type (character vector), structure, basic statistics.  
+
+You can see what type any symbol is in R with the ```class``` function:
+```{r}
+class(cda)
+```
+
+The ```str``` function will do its best to represent the structure of any object as a string, even complicated multi-dimensional ones with mixed data types:
+```{r}
+str(cda)
+```
+
+Descriptive statistics functions give a quick overview of columns in a data frame (e.g. ```summary```):
+```{r}
+summary(cda)
+```
+
+Other libraries have even more in-depth statistical summaries (e.g. ```psych::describe```):
+```{r}
+library(psych)
+describe(cda)
+detach("package:psych", unload=TRUE)
+```
+
+<hr>
+### Subsetting Data
+
+```{r}
+cda.subset <- subset(cda, chol > 125 & weight > 200)
+head(cda.subset)
+```
+
+Verify that the subset is different from the original:
+
+```{r}
+paste('The original dataset had', nrow(cda), 'rows and the subset has only', nrow(cda.subset))
+```
+
+"Subsets" can also include "projections", or selections of specific fields:
+```{r}
+cda.subset <- subset(cda, chol > 125 & weight > 200, select=c('chol', 'weight'))
+head(cda.subset)
+```
+
+
+<hr>
+### Aggregating Data
+
+"Aggregating" can mean many things, but one simple example would be to group by one variable and create summaries of some kind for another:
+
+```{r}
+# Compute mean "glycosolated hemoglobin" for each gender
+aggregate(list(glyhb=cda$glyhb),  by=list(gender=cda$gender), FUN=mean) 
+```
+
+That didn't work because the variable ```glyhb``` contains NA values (see the summaries above).  To ignore these NA values we can pass ```na.rm=TRUE``` to the aggregate function:
+
+```{r}
+aggregate(list(glyhb=cda$glyhb),  by=list(gender=cda$gender), FUN=mean, na.rm=T) 
+```
+
+Alternatively, a slightly nicer form of syntax for this is:
+
+```{r}
+# Aggregation using R's "formula" operator
+aggregate(glyhb ~ gender, cda, FUN=mean, na.action=na.omit)
+```
+
+<hr>
+### Visualizing Data
+
+<center><em>Univariate Plots</em></center>
+
+Create a Histogram:
+```{r}
+hist(cda$weight)
+```
+
+Similarly, create a density estimate:
+```{r}
+plot(density(cda$weight, na.rm=T), main='Weight Density Estimate')
+```
+
+Create a Boxplot:
+```{r}
+boxplot(cda$weight, main='Weight Distribution')
+```
+
+<center><em>Multivariate Plots</em></center>
+
+Create a Boxplot:
+```{r}
+boxplot(cda$weight ~ cda$frame, main='Weight by Frame')
+```
+
+Create a Scatterplot
+```{r}
+plot(cda$weight, cda$chol, main='Cholesterol vs Weight')
+```
+
+
+<hr>
+# Summary
+
+Your are now able to find your data, create basic statistics, manipulate data, display!
+
+**Homework**: swirl - Basic R Programming.
+
+Thank you. –S
+<br><br>

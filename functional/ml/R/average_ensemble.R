@@ -115,7 +115,6 @@ GetEnsembleQuantileModel <- function(){
 }
 
 GetCaretEnsembleModel <- function(caret.list.args, caret.stack.args){
-  require(caretEnsemble)
   list(
     label = "Caret Ensemble Model",
     library = NULL,
@@ -124,6 +123,7 @@ GetCaretEnsembleModel <- function(caret.list.args, caret.stack.args){
     parameters = data.frame(parameter = "parameter", class = "character", label = "parameter"),
     grid = function(x, y, len = NULL, search = "grid") data.frame(parameter="none"),
     fit = function(x, y, wts, param, lev, last, classProbs, ...) {
+      require(caretEnsemble)
       train.args <- c(list(x, y), caret.list.args)
       cl <- do.call('caretList', train.args)
       

@@ -1,0 +1,180 @@
+---
+title: "MEPS"
+output: html_document
+---
+
+# MEPS Documentation
+
+Notes:
+
+- **Size**
+  - Number of MEPS participants in 2013: 36,940 ([source](http://meps.ahrq.gov/mepsweb/data_stats/download_data/pufs/h163/h163doc.shtml) see "Data File Information")
+- **Design**
+  - Each year, a new "panel" of households is selected for the survey:
+    - The households for each panel are selected from respondents to the National Health Interview Survey
+    - The data collection for each year takes 2 and a half years, and is done in 5 rounds of interviews
+  - See [here] (http://meps.ahrq.gov/survey_comp/hc_data_collection.jsp) for more details
+  
+  - 2004 Design summary ([source](https://apha.confex.com/apha/135am/recordingredirect.cgi/id/18758))
+    - PSU’s grouped into 237 design strata
+    – 358 PSU’s sampled across strata
+    - Second Stage Units (SSU’s)
+      – Clusters of housing units
+      – Oversample of SSU’s with large Black/Hispanic populations
+    - MEPS based on subsample of about 200 PSU’s from NHIS
+    - Person weights account for:
+      - oversampling
+      - nonresponse (unit)
+      - poststratification
+      - they're also trimmed to avoid extremes
+      - weight = 0 for 5% of respondents (people not in scope for survery but living house with someone who is)
+      - distribution of weights:
+        0: 5%
+        425: minimum
+        9000: average 
+        64,000: maximum
+  
+```{r}
+library(survey)
+library(foreign)
+
+meps.to.csv <- function(){
+  dt <- read.xport('/Users/eczech/data/meps/full_year_consolidated/2013/data.ssp')
+  write.csv(dt, file='/Users/eczech/data/meps/full_year_consolidated/2013/data.csv', row.names = F)  
+}
+
+
+d.consol <- read.xport('/Users/eczech/data/meps/full_year_consolidated/2013/data.ssp') %>%
+  # Add computed sum of outpatient visits (see http://meps.ahrq.gov/mepsweb/data_stats/download_data/pufs/h163/h163doc.shtml section on outpatient visits for why this is necessary for number of reported outpatient events to equal count in consolidated file)
+  mutate(OPDRV13_OPOTHV13=OPDRV13 + OPOTHV13) 
+
+d.util.in <- read.xport('/Users/eczech/data/meps/inpatient_stays/2013/data.ssp')
+d.util.er <- read.xport('/Users/eczech/data/meps/er_visits/2013/data.ssp')
+d.util.op <- read.xport('/Users/eczech/data/meps/outpatient_stays/2013/data.ssp')
+d.util.rx <- read.xport('/Users/eczech/data/meps/prescriptions/2013/data.ssp')
+
+
+d.long <- read.xport('/Users/eczech/data/meps/longitudinal/2013/data.ssp')
+#d.long[,c('OPTOTVY1', 'OPTOTVY2')] %>% 
+d.long[,c('RXTOTY1', 'RXTOTY2')] %>% 
+  setNames(c('Y1', 'Y2')) %>%
+  ggplot(aes(x=Y1, y=Y2)) + geom_jitter()
+
+d.long[,c('ERTOTY1', 'ERTOTY2')] %>% 
+  setNames(c('Y1', 'Y2')) %>%
+  group_by(Y1, Y2) %>% tally %>%
+  ggplot(aes(x=Y1, y=Y2, fill=asinh(n))) + geom_tile()
+
+get.counts <- function(d.consol, d.event, c.event){
+  d.consol <- d.consol %>% 
+    mutate(DUPERSID=as.character(DUPERSID)) %>% 
+    select(DUPERSID, one_of(c.event)) %>%
+    rename_('CONSOLIDATED_COUNT'=c.event)
+  d.event %>% 
+    mutate(DUPERSID=as.character(DUPERSID)) %>% 
+    group_by(DUPERSID) %>% tally %>% ungroup %>%
+    right_join(d.consol, by='DUPERSID') %>%
+    mutate(n = ifelse(is.na(n), 0, n)) %>%
+    rename(EVENT_COUNT=n)
+}
+
+# Validate that number of individual events matches count in consolidated file
+dt <- get.counts(d.consol, d.util.er, 'ERTOT13') 
+table(dt$CONSOLIDATED_COUNT == dt$EVENT_COUNT)
+table(dt$CONSOLIDATED_COUNT)
+
+dt <- get.counts(d.consol, d.util.in, 'IPDIS13') 
+table(dt$CONSOLIDATED_COUNT == dt$EVENT_COUNT)
+table(dt$CONSOLIDATED_COUNT)
+
+dt <- get.counts(d.consol, d.util.op, 'OPTOTV13') 
+table(dt$CONSOLIDATED_COUNT == dt$EVENT_COUNT)
+table(dt$CONSOLIDATED_COUNT)
+
+dt <- get.counts(d.consol, d.util.rx, 'RXTOT13') 
+table(dt$CONSOLIDATED_COUNT == dt$EVENT_COUNT)
+table(dt$CONSOLIDATED_COUNT)
+
+
+```
+
+
+```{r}
+d.surv <- d.consol %>% mutate(ONES=1)
+d.des <- svydesign(id=~VARPSU, strata=~VARSTR, weights=~PERWT13F, data=d.surv, nest=T)
+
+svytotal(~ONES, d)
+svytotal(REGION31~., d)
+plot(density(log(d$OBVEXP13 + 1)))a
+
+svytotal(~ONES, subset(d.des, AGELAST < 30))
+table(d.surv$VARSTR) %>% length
+sum(subset(d.surv, AGELAST < 30)$PERWT13F)
+
+```
+
+
+## Domain Analysis
+
+Best explanation of domain analysis and how it relates to variance estimation:
+
+http://meps.ahrq.gov/mepsweb/data_files/publications/mr26/mr26.pdf
+
+
+```{r}
+# Validating survey distributions within subpopulations
+
+
+# Code take from survey package for computing histograms:
+# https://github.com/cran/survey/blob/4c77b55e416fa69d09b8b6f183a26b38cd798bcf/R/svyhist.R
+my.svyhist<-function(formula, design, breaks = "Sturges", 
+                  include.lowest = TRUE, right = TRUE, xlab=NULL,
+                  main=NULL, probability=TRUE,
+                  freq=!probability,...){
+    mf<-model.frame(formula,model.frame(design), na.action=na.pass)
+    if (ncol(mf)>1) stop("Only one variable allowed.")
+    variable<-mf[,1]
+    varname<-names(mf)
+    h <- hist(variable,  plot=FALSE, breaks=breaks,right=right)
+    props <- coef(svymean(~cut(variable, h$breaks,right=right, include.lowest=include.lowest),
+                          design, na.rm=TRUE))
+    h$density<-props/diff(h$breaks)
+    h$counts <- props*sum(weights(design,"sampling"))
+    if (is.null(xlab)) xlab<-varname
+    if (is.null(main)) main<-paste("Histogram of",varname)
+    #plot(h, ..., freq=freq,xlab=xlab,main=main)
+    h
+}
+
+
+library(dplyr)
+options(survey.lonely.psu="adjust") 
+
+# Create overall design for full-years data
+d.surv <- d.consol %>% mutate(ONES=1)
+d.des <- svydesign(id=~VARPSU, strata=~VARSTR, weights=~PERWT13F, data=d.surv, nest=T)
+
+# Manually subset data and create a design based on it
+d.surv.sub <- subset(d.surv, SEX == 1 & AGELAST > 18 & AGELAST <= 25 & REGION13 == 1)
+d.des.sub.manual <- svydesign(id=~VARPSU, strata=~VARSTR, weights=~PERWT13F, data=d.surv.sub, nest=T)
+
+# Subset to the same data using the survey package 
+d.des.sub.true <- subset(d.des, SEX == 1 & AGELAST > 18 & AGELAST <= 25 & REGION13 == 1)
+
+# Compare a histogram computed for both types of subsets
+hist.manual <- my.svyhist(~RXTOT13, d.des.sub.manual)
+hist.true <- my.svyhist(~RXTOT13, d.des.sub.true)
+if (!all.equal(hist.manual, hist.true)) stop('Histograms not equal')
+
+# Attempt to manually generate the same counts present in the survey histograms
+# using nothing other than the weights in the raw data frame
+num.people <- sum(d.surv.sub$PERWT13F)
+prop.counts <- d.surv.sub %>%
+  mutate(GROUP=cut(d.surv.sub$RXTOT13, breaks=hist.manual$breaks, include.lowest=T)) %>%
+  group_by(GROUP) %>% summarize(total=sum(PERWT13F)) %>% ungroup %>%
+  mutate(pct=total/sum(total)) %>%
+  mutate(count=pct * num.people)
+
+# Compare prop.counts to hist.true$counts
+```
+  

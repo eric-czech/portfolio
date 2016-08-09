@@ -106,31 +106,51 @@ Trainer <- setRefClass(
   )
 )
 
-# t <- Trainer(cache.dir='/tmp', cache.project='test')
-
 SimpleTrainer <- setRefClass(
   "SimpleTrainer",
   fields = list(cache='Cache', seed='numeric'),
   methods = list(
-    initialize = function(..., cache.dir, cache.project, seed=1){
+    initialize = function(..., cache.dir=file.path('~', '.Rcache'), cache.project='default', seed=1){
       cache <<- Cache(dir=cache.dir, project=cache.project)
       callSuper(..., cache=cache, seed=seed)
     },
-    cleanModelName = function(model.name){
-      str_replace_all(str_replace_all(model.name, '\\.', '_'), '\\W+', '')
+    getCache = function(){ cache },
+    cleanObjectName = function(obj.name){
+      str_replace_all(str_replace_all(obj.name, '\\.', '_'), '\\W+', '')
+    },
+    getFitModelNames = function(){
+      # Fetch a list of all files stored in cache
+      files <- cache$list()
+      
+      # Filter to only modeling results
+      files <- grep('^model_.*\\.Rdata', files, value=T)
+      
+      # Remove file prefix and suffix to give only model name
+      model.names <- sub('^model_', '', sub('\\.Rdata$', '', files))
+      
+      model.names
+    },
+    getFitModelObject = function(name){
+      loginfo('Loading saved model "%s" from disk', name)
+      model.key <- sprintf('model_%s', cleanObjectName(name))
+      cache$get(model.key)
+    },
+    getModel = function(name, ...){
+      list(name=name, train=function(X, y){trim_model(caret::train(X, y, ...))})
     },
     train = function(model, X, y, enable.cache=T){
-      model.key <- sprintf('model_%s', cleanModelName(model$name))
+      model.key <- sprintf('model_%s', cleanObjectName(model$name))
       loginfo('Beginning training for model "%s" (cache name = "%s")', model$name, model.key)
       
       if (!enable.cache) cache$invalidate(model.key)
       f <- cache$load(model.key, function(){ 
         set.seed(seed)
-        model$train(X, y)
+        list(fit=model$train(X, y))
       })
       
       loginfo('Training complete for model "%s"', model$name)
-      list(fit=f)
+      f
     }
   )
 )
+

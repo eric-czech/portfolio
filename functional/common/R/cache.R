@@ -46,6 +46,11 @@ Cache <- setRefClass("Cache",
         stop(sprintf('Cache model "%s" is not valid'))
       mode <<- x 
     },
+    list = function(){
+      cpath <- file.path(dir, project)
+      if (!file.exists(cpath)) c()
+      else list.files(cpath)
+    },
     getPath = function(key, ext='.Rdata') {
       #' Returns a file path to the object in cache (rooted at dir/project)
       

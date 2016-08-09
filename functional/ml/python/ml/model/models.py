@@ -1,8 +1,5 @@
 __author__ = 'eczech'
 
-import pandas as pd
-import numpy as np
-
 from sklearn.grid_search import Parallel, delayed, BaseSearchCV
 from sklearn.metrics import roc_curve
 from sklearn import base
@@ -32,12 +29,23 @@ def _get_clf_name(clf):
 def run_fold(args):
     i, train, test, clfs, mode, X, y, kwargs = args
     X_train, X_test, y_train, y_test = X.iloc[train], X.iloc[test], y.iloc[train], y.iloc[test]
+
+    if kwargs.get('data_resampler'):
+        X_train, X_test, y_train, y_test = kwargs.get('data_resampler')(X_train, X_test, y_train, y_test)
+
     res = []
 
     for clf in clfs:
         model = base.clone(clf[CLF_IMPL])
-        log('Running model {} ({}) on fold {}'.format(clf[CLF_NAME], _get_clf_name(model), i+1))
-        model.fit(X_train, y_train)
+        log('Running model {} ({}) on fold {} ==> dim(train) = {}, dim(test) = {}'
+            .format(clf[CLF_NAME], _get_clf_name(model), i+1, X_train.shape, X_test.shape))
+
+        # If explicitly provided, use a custom model fitting function
+        if kwargs.get('model_fit_function'):
+            kwargs.get('model_fit_function')(clf[CLF_NAME], model, X_train, y_train, X_test, y_test, i == -1)
+        # Otherwise, run base estimator fit
+        else:
+            model.fit(X_train, y_train)
 
         if kwargs.get('show_best_params') and isinstance(model, BaseSearchCV):
             log('\tBest grid parameters (model = {}, fold = {}): {}'
@@ -53,8 +61,10 @@ def run_fold(args):
             'y_test': y_test.values,
             'feat_imp': feat_imp
         }
-        if kwargs.get('keep_X', False):
+        if kwargs.get('keep_training_data', False):
             fold_res['X_test'] = X_test
+            fold_res['X_train'] = X_train
+            fold_res['y_train'] = y_train
         if mode == MODE_CLASSIFIER and kwargs.get('predict_proba', True):
             fold_res['y_proba'] = model.predict_proba(X_test)
 
@@ -81,15 +91,32 @@ def run_models(X, y, clfs, cv, mode, **kwargs):
     :param cv: Cross validation definition
     :param mode: Either 'classifier' (#MODE_CLASSIFIER) or 'regressor' (#MODE_REGRESSOR)
     :param kwargs:
+        Logging kwargs:
+            log_*: log_file and log_format can be passed to determine logging output location and style
         Joblib kwargs:
             par_*: Arguments, prefixed by 'par_', to be passed to parallel executor (e.g. par_n_jobs, par_backend)
         Other:
-            keep_X: Boolean indicating whether or not test datasets should be preserved in results
-            predict_proba: Boolean indicating whether or not class probability predictions should be made for classifiers;
+            refit: Boolean indicating whether or not the given models should also be trained on the full dataset;
                 defaults to false
+            keep_training_data: Boolean indicating whether or not training/test datasets should be preserved in results
+            predict_proba: Boolean indicating whether or not class probability predictions should be made
+                for classifiers; defaults to false
             show_best_params: Prints BaseSearchCV "best_params_" in cross validation loops
+            data_resampler: Optional function to be passed X_train, X_test, y_train and y_test for each fold.  This
+                function is expected to return a new value for each of those given as a four-value tuple.  This is
+                commonly useful for implementing downsampling/upsampling prior to training, or any other more
+                complicated sort of cross-validation.
+
+                Example: lambda X_train, X_test, y_train, y_test: \
+                    X_train.head(10), X_test.head(10), y_train.head(10), y_test.head(10)
+            model_fit_function: Optional custom fitting function taking a model name, model object,
+                training/testing sets, and a flag indicating whether or not this is a "refit" on whole training set.
+
+                Example: lambda clf_name, clf, X_train, y_train, X_test, y_test, is_refit: clf.fit(X_train, y_train)
     :return: A list of lists where the outer list contains as many entries as there are folds and the inner lists
-        contain per-fold results for each estimator given
+        contain per-fold results for each estimator given.  If "refit=True", then two such lists will be returned as
+        a two value tuple (the first will be the same result as if refit was false, and the second will be results with
+        with nearly the same structure, minus the outer list for each fold)
     """
     validate_mode(mode)
 
@@ -104,10 +131,33 @@ def run_models(X, y, clfs, cv, mode, **kwargs):
     set_logger(log_file, log_kwargs.get('format', DEFAULT_LOG_FORMAT))
 
     print('Beginning cross validation (see {} for progress updates)'.format(log_file))
-    res = Parallel(**par_kwargs)(delayed(run_fold)(args) for args in args_list)
+    cv_res = Parallel(**par_kwargs)(delayed(run_fold)(args) for args in args_list)
     log('CV Complete ({} model(s) run)'.format(len(clfs)))
+
+    # If refitting was not requested, return the cross validation results
+    if not kwargs.get('refit'):
+        log(_HR)
+        return cv_res
+
+    # Otherwise, train models on full dataset and then return both results
+    # separately (for cross validation and full dataset training)
+    idx = np.arange(0, len(y))
+    args = (-1, idx, idx, clfs, mode, X, y, kwargs)
+
+    log('Beginning model refitting')
+    refit_res = run_fold(args)
+    log('Model refitting complete ({} model(s) run)'.format(len(clfs)))
     log(_HR)
-    return res
+    return cv_res, refit_res
+
+
+def extract_model_results(clf_name, cv_res):
+    clf_res = []
+    for fold_res in cv_res:
+        for model_res in fold_res:
+            if model_res['model']['name'] == clf_name:
+                clf_res.append(model_res)
+    return clf_res
 
 
 def summarize_scores(res, score_func, use_proba=False):
@@ -128,9 +178,21 @@ def summarize_scores(res, score_func, use_proba=False):
                 y_pred = clf_res['y_proba']
             else:
                 y_pred = clf_res['y_pred']
+
+            # Compute the score for this fold which may be returned either as a scalar value,
+            # or a dictionary containing several name / scalar value pairs
             score = score_func(clf, y_test, y_pred)
-            score_res.append((fold_id, clf_name, score))
-    return pd.DataFrame(score_res, columns=['fold_id', 'model_name', 'score'])
+
+            # If a scalar was returned, wrap it in a dictionary
+            if not isinstance(score, dict):
+                score = {'score': score}
+
+            # Add the row to the running result
+            row = {'fold_id': fold_id, 'model_name': clf_name}
+            row.update(score)
+
+            score_res.append(row)
+    return pd.DataFrame(score_res)
 
 
 def summarize_curve(res, curve_func=roc_curve):
@@ -149,7 +211,14 @@ def summarize_curve(res, curve_func=roc_curve):
         .reset_index()[['model_name', 'fold_id', 'x', 'y', 'thresh']]
 
 
-def summarize_predictions(res):
+def summarize_predictions(res, y_names=None):
+    """
+    Returns per-fold predictions from a cross-validation result
+    :param res: Cross validation result
+    :param y_names: Optional list of names to assign to multivariate or univariate outcomes; note
+        that these must be given in the same order as the response fields used in training
+    :return: Data frame containing predictions
+    """
     pred_res = []
     for fold_res in res:
         for clf_res in fold_res:
@@ -164,12 +233,21 @@ def summarize_predictions(res):
                 pred = pd.DataFrame()
 
             # Add fold predictions to frame
-            pred[pref + 'y_pred'] = clf_res['y_pred']
-            pred[pref + 'y_true'] = clf_res['y_test']
+            y_pred = clf_res['y_pred']
+            if len(y_pred.shape) == 1 or y_pred.shape[1] == 1:
+                pred[pref + 'y_pred'] = clf_res['y_pred']
+                pred[pref + 'y_true'] = clf_res['y_test']
+            else:
+                for i in range(y_pred.shape[1]):
+                    outcome = str(i) if y_names is None else y_names[i]
+                    pred[pref + '{}y_pred_{}'.format(pref, outcome)] = clf_res['y_pred'][:, i]
+                    pred[pref + '{}y_true_{}'.format(pref, outcome)] = clf_res['y_test'][:, i]
+
             if 'y_proba' in clf_res:
                 y_proba = clf_res['y_proba']
                 for i in range(y_proba.shape[1]):
-                    pred['{}{}_{}'.format(pref, 'y_proba', i)] = y_proba[:, i]
+                    outcome = str(i) if y_names is None else y_names[i]
+                    pred['{}y_proba_{}'.format(pref, outcome)] = y_proba[:, i]
 
             # Add fold meta data to frame
             pred[pref + 'model_name'] = clf_res['model'][CLF_NAME]
@@ -179,20 +257,33 @@ def summarize_predictions(res):
     return functools.reduce(pd.DataFrame.append, pred_res)
 
 
-def summarize_importances(res):
+def summarize_importances(res, feat_imp_calc=None):
     imp_res = []
     for fold_res in res:
         for clf_res in fold_res:
-            if clf_res['feat_imp'] is None:
+            model = clf_res['model'][CLF_NAME]
+            feat_imp = None
+
+            # If a feature importance calculation function has been specified
+            # for this model, use it instead of any pre-computed importances
+            if feat_imp_calc is not None and model in feat_imp_calc:
+                feat_imp = feat_imp_calc[model](clf_res['model'][CLF_IMPL])
+
+            # Fallback on pre-computed importance if present
+            if feat_imp is None and clf_res['feat_imp'] is not None:
+                feat_imp = clf_res['feat_imp']
+
+            # If no feature importance could be found/created, skip this model
+            if feat_imp is None:
                 continue
-            feat_imp = pd.DataFrame(clf_res['feat_imp']).T
+
+            feat_imp = pd.DataFrame(feat_imp).T
             feat_imp['model_name'] = clf_res['model'][CLF_NAME]
             feat_imp['fold_id'] = clf_res['fold']
             imp_res.append(feat_imp)
     if len(imp_res) == 0:
         return None
     res = functools.reduce(pd.DataFrame.append, imp_res)
-    #res.columns.name = 'feature'
     return res.reset_index(drop=True)
 
 

@@ -1,0 +1,41 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+VAGRANTFILE_API_VERSION = "2"
+
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+
+  config.vm.box = "ubuntu/trusty64"
+  config.hostmanager.enabled = true
+  config.hostmanager.manage_host = false
+  config.hostmanager.manage_guest = true
+  config.hostmanager.ignore_private_ip = false
+  config.hostmanager.include_offline = true
+
+  #config.vm.provider :virtualbox do |v|
+  #  v.name = "test1"
+  #  v.memory = 2048
+  #  v.cpus = 1
+  #end
+  #config.vm.hostname = "test1"
+  #config.vm.network :private_network, ip: "192.168.33.27"
+
+  
+  (1..3).each do |i|
+    config.vm.define "rworker#{i}" do |node|
+      node.vm.hostname = "rworker#{i}"
+      node.vm.network :private_network, ip: "192.168.33.#{i}"
+
+      node.vm.provider :virtualbox do |v|
+        v.name = "rworker#{i}"
+        v.memory = 2048
+        v.cpus = 1
+      end
+
+      node.vm.provision "ansible" do |ansible|
+        ansible.playbook = "ansible_research/site.yml"
+        ansible.sudo = true
+      end
+    end
+  end
+end

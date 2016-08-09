@@ -5,7 +5,7 @@
      <key>EnvironmentVariables</key>
      <dict>
         <key>PATH</key>
-        <string>/Users/eczech/anaconda/envs/research3.4/bin/:/Users/eczech/anaconda/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin</string>
+        <string>/Users/eczech/anaconda/envs/research3.5/bin/:/Users/eczech/anaconda/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin</string>
     </dict>
     <key>WorkingDirectory</key>
     <string>/Users/eczech/.jupyter/configs/portfolio</string>
@@ -13,7 +13,7 @@
     <string>jupyter.portfolio</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/eczech/anaconda/envs/research3.4/bin/jupyter</string>
+        <string>/Users/eczech/anaconda/envs/research3.5/bin/jupyter</string>
         <string>notebook</string>
 	<string>--config=/Users/eczech/.jupyter/configs/portfolio/jupyter_notebook_config.py</string>
 	<string>--no-browser</string>

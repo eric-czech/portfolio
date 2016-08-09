@@ -6,6 +6,9 @@ from sklearn.metrics import mean_squared_error
 from matplotlib import pyplot as plt
 from sklearn.ensemble import partial_dependence as ptl_dep
 from sklearn.metrics import roc_curve
+import plotly.graph_objs as go
+from plotly import offline
+
 
 DEFAULT_REGRESSOR_SCORE = lambda clf, y_true, y_pred: mean_squared_error(y_true, y_pred)
 
@@ -17,12 +20,10 @@ def summarize_grid_parameters(res):
     return grid_params.groupby(['model_name', 'variable'])['value'].apply(lambda x: x.value_counts())
 
 
-def plot_model_scores(res, score_func=DEFAULT_REGRESSOR_SCORE, figsize=(12, 6), use_proba=None):
-    roc_scores = models.summarize_scores(res, score_func, use_proba=use_proba)
-    ax = roc_scores.boxplot('score', 'model_name', figsize=figsize)
+def plot_model_scores(res, score_func=DEFAULT_REGRESSOR_SCORE, figsize=(12, 6), use_proba=None, **kwargs):
+    scores = models.summarize_scores(res, score_func, use_proba=use_proba)
+    ax = scores.boxplot('score', 'model_name', figsize=figsize, **kwargs)
     return ax
-
-
 
 INTERPOLATE_FILL = lambda x: x.ffill().bfill()
 INTERPOLATE_LINEAR = lambda x: x.interpolate()
@@ -45,23 +46,53 @@ def plot_curve(res, curve_func=roc_curve, interpolation=INTERPOLATE_LINEAR, plot
         ax.set_title(model)
 
 
-def plot_feature_importance(res, figsize=(12, 4), limit=25):
-    feat_imp = models.summarize_importances(res)
+def plot_feature_importance(res, limit=25, xrot=35, rmargin=100, bmargin=160,
+                            width=1000, height=400, filename=None, normalize=True,
+                            feat_imp_calc=None):
+    feat_imp = models.summarize_importances(res, feat_imp_calc=feat_imp_calc)
     if feat_imp is None:
         return None
 
+    # If requested, make sure all feature importance scores
+    # per model and fold are normalized to [0, 1]
+    if normalize:
+        feat_imp = feat_imp\
+            .set_index(['model_name', 'fold_id'])\
+            .apply(lambda r: r / r.sum(), axis=1)\
+            .reset_index()
+
     feat_means = feat_imp.drop('fold_id', axis=1)
-    feat_error = feat_means.groupby('model_name').aggregate(np.std).T
-    feat_means = feat_means.groupby('model_name').aggregate(np.mean).T
-    feat_means = feat_means.abs()
-    figs = []
+    feat_means = feat_means.groupby('model_name')
+    feat_error = feat_means.std().T
+    top_feats = feat_means.mean().mean().T.abs().sort_values(ascending=False).head(limit).index.values
+    feat_means = feat_means.mean().T.abs()
+
+    traces = []
     for model in feat_means:
-        figs.append(plt.figure())
-        yerr = feat_error[model]
-        ax = feat_means[model].order(ascending=False)\
-            .head(limit).plot(kind='bar', figsize=figsize, yerr=yerr)
-        ax.set_title(model)
-    return figs
+        d = feat_means[model][top_feats]
+        trace = go.Scatter(
+            x=d.index.values,
+            y=d.values,
+            mode='markers',
+            name=model,
+            error_y=dict(
+                type='data',
+                array=feat_error[model][top_feats].values
+            )
+        )
+        traces.append(trace)
+    layout = go.Layout(
+        width=width,
+        height=height,
+        xaxis=dict(tickangle=xrot),
+        margin=dict(b=bmargin, r=rmargin),
+        title='Feature Importances'
+    )
+    fig = go.Figure(data=traces, layout=layout)
+    if filename is None:
+        return offline.iplot(fig, show_link=False)
+    else:
+        return offline.plot(fig, show_link=False, filename=filename)
 
 
 def plot_predictions(res, figsize=(12, 4)):
@@ -74,7 +105,13 @@ def plot_predictions(res, figsize=(12, 4)):
     return figs
 
 
-def plot_partial_dependence(est, X, features, **kwargs):
+def plot_weighted_feature_importances(res, score_func, feat_agg=np.median, score_agg=np.median,
+                                      figsize=(18, 4), limit=25):
+    return models.summarize_weighted_importances(res, score_func, feat_agg=feat_agg, score_agg=score_agg)\
+        .sort_values(ascending=False).head(limit).plot(kind='bar', figsize=figsize)
+
+
+def plot_gbrt_partial_dependence(est, X, features, **kwargs):
     """
     Returns partial dependence plot for the given *trained* estimator
 
@@ -87,8 +124,3 @@ def plot_partial_dependence(est, X, features, **kwargs):
     fig, axs = ptl_dep.plot_partial_dependence(est, X, features, feature_names=X.columns.tolist(), **kwargs)
     return fig, axs
 
-
-def plot_weighted_feature_importances(res, score_func, feat_agg=np.median, score_agg=np.median,
-                                      figsize=(18, 4), limit=25):
-    return models.summarize_weighted_importances(res, score_func, feat_agg=feat_agg, score_agg=score_agg)\
-        .order(ascending=False).head(limit).plot(kind='bar', figsize=figsize)
