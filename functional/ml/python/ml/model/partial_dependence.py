@@ -42,12 +42,16 @@ def get_partial_dependence_1d(clf, X, features, pred_fun, grid_size=100, grid_wi
 
 
 def plot_partial_dependence(pdp, n_cols=3, title='Partial Dependence', smooth_window=None,
-                            filename=None, fig_dimension=None, transform=None):
+                            filename=None, fig_dimension=None, transform=None,
+                            sharex=False, sharey=False):
     n_feats = len(pdp)
     if n_feats < n_cols:
         n_cols = n_feats
     n_rows = int(np.ceil(n_feats/n_cols))
-    fig = tools.make_subplots(rows=n_rows, cols=n_cols, subplot_titles=list(pdp.keys()), print_grid=False)
+    fig = tools.make_subplots(
+        rows=n_rows, cols=n_cols, subplot_titles=list(pdp.keys()), print_grid=False,
+        shared_xaxes=sharex, shared_yaxes=sharey
+    )
     for i, feature in enumerate(pdp):
         pdp_mean = pdp[feature].mean()
         x = list(pdp_mean.index.values)
