@@ -48,7 +48,7 @@ def plot_curve(res, curve_func=roc_curve, interpolation=INTERPOLATE_LINEAR, plot
 
 def plot_feature_importance(res, limit=25, xrot=35, rmargin=100, bmargin=160,
                             width=1000, height=400, filename=None, normalize=True,
-                            feat_imp_calc=None):
+                            feat_imp_calc=None, asFigure=False):
     feat_imp = models.summarize_importances(res, feat_imp_calc=feat_imp_calc)
     if feat_imp is None:
         return None
@@ -89,6 +89,8 @@ def plot_feature_importance(res, limit=25, xrot=35, rmargin=100, bmargin=160,
         title='Feature Importances'
     )
     fig = go.Figure(data=traces, layout=layout)
+    if asFigure:
+        return fig
     if filename is None:
         return offline.iplot(fig, show_link=False)
     else:
