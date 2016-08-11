@@ -20,8 +20,10 @@ from sklearn.pipeline import Pipeline
 
 
 TREE_CLASSIFIERS = [GradientBoostingClassifier, RandomForestClassifier, ExtraTreesClassifier, AdaBoostClassifier]
+TREE_CLASSIFIER_EXT = ['XGBClassifier']
 LOGREG_CLASSIFIERS = [LogisticRegression, LogisticRegressionCV, RandomizedLogisticRegression]
 TREE_REGRESSORS = [GradientBoostingRegressor, RandomForestRegressor, ExtraTreesRegressor, AdaBoostRegressor]
+TREE_REGRESSORS_EXT = ['XGBRegressor']
 LINEAR_REGRESSORS = [
     ElasticNet, ElasticNetCV, LinearRegression, BayesianRidge, Ridge, RidgeCV, Lasso, LassoCV
 ]
@@ -35,6 +37,34 @@ CLF_NAME = 'name'
 
 MODE_CLASSIFIER = 'classifier'
 MODE_REGRESSOR = 'regressor'
+
+
+def is_linear_regressor(clf):
+    return is_instance_of(clf, LINEAR_REGRESSORS)
+
+
+def is_linear_svr(clf):
+    return isinstance(clf, SVR) and clf.get_params()['kernel'] == 'linear'
+
+
+def is_linear_svc_1d(clf):
+    return isinstance(clf, SVC) \
+        and clf.get_params()['kernel'] == 'linear' \
+            and clf.coef_.shape[0] == 1
+
+
+def is_tree_regressor(clf):
+    return is_instance_of(clf, TREE_REGRESSORS) or clf.__class__.__name__ in TREE_REGRESSORS_EXT
+
+
+def is_tree_classifier(clf):
+    return is_instance_of(clf, TREE_CLASSIFIERS) or clf.__class__.__name__ in TREE_CLASSIFIER_EXT
+
+
+def is_logreg_classifier_1d(clf):
+    return is_instance_of(clf, LOGREG_CLASSIFIERS) and clf.coef_.shape[0] == 1
+
+
 
 
 def validate_mode(mode):
