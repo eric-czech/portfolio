@@ -7,7 +7,7 @@ from plotly import offline
 
 
 def get_partial_dependence_1d(clf, X, features, pred_fun, grid_size=100, grid_window=[0, 1],
-                              sample_rate=1, random_state=None, discrete_thresh_ct=10):
+                              sample_rate=1, random_state=None, discrete_thresh_ct=10, print_progress=True):
     if isinstance(features, str):
         features = [features]
 
@@ -18,7 +18,9 @@ def get_partial_dependence_1d(clf, X, features, pred_fun, grid_size=100, grid_wi
         X = X.iloc[idx, :]
 
     res = {}
-    for feature in features:
+    for i, feature in enumerate(features):
+        if print_progress:
+            print('Processing feature {} of {} ...'.format(i+1, len(features)))
         x = X[feature]
         if len(x.unique()) <= discrete_thresh_ct:
             grid = x.unique()

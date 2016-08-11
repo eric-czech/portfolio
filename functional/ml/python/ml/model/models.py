@@ -88,6 +88,8 @@ def run_models(X, y, clfs, cv, mode, **kwargs):
     :param clfs: Estimators to fit (must be a dictionary of 'name': 'value' pairs).  For Example:
         {'logreg': LogisticRegression(),
         'gbr': GridSearchCV(GradientBoostingClassifier(), {'n_estimators': [10, 25, 50, 100]})}
+
+        Note that this dictionary will automatically be sorted by key for the sake of repeatability in modeling runs
     :param cv: Cross validation definition
     :param mode: Either 'classifier' (#MODE_CLASSIFIER) or 'regressor' (#MODE_REGRESSOR)
     :param kwargs:
@@ -120,7 +122,8 @@ def run_models(X, y, clfs, cv, mode, **kwargs):
     """
     validate_mode(mode)
 
-    clfs = [{CLF_NAME: k, CLF_IMPL: v} for k, v in clfs.items()]
+    # Sort models by key/name and place into dictionary with name and value separated
+    clfs = [{CLF_NAME: k, CLF_IMPL: clfs[k]} for k in sorted(list(clfs.keys()))]
 
     par_kwargs, kwargs = parse_kwargs(kwargs, 'par_')
     log_kwargs, kwargs = parse_kwargs(kwargs, 'log_')
