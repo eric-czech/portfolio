@@ -13,8 +13,8 @@ def analyze_sets(s1, s2, names=None, stats=True, items=False):
     """
     s1 = set(s1)
     s2 = set(s2)
-    n1 = names[0] if names else 's1'
-    n2 = names[1] if names else 's2'
+    n1 = names[0] if names else 'Set1'
+    n2 = names[1] if names else 'Set2'
 
     in_both = s1 & s2
     in_one = s1 ^ s2
@@ -29,7 +29,8 @@ def analyze_sets(s1, s2, names=None, stats=True, items=False):
             'InBoth': '{} ({:.2f}%)'.format(len(in_both), 100.*len(in_both)/n),
             'InOnlyOne': '{} ({:.2f}%)'.format(len(in_one), 100.*len(in_one)/n),
             'InOnly{}'.format(n1): '{} ({:.2f}%)'.format(len(in_s1), 100.*len(in_s1)/n),
-            'InOnly{}'.format(n2): '{} ({:.2f}%)'.format(len(in_s2), 100.*len(in_s2)/n)
+            'InOnly{}'.format(n2): '{} ({:.2f}%)'.format(len(in_s2), 100.*len(in_s2)/n),
+            'All': '{} (100%)'.format(n)
         }
     if items:
         res['Items'] = {

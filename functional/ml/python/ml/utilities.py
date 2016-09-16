@@ -79,3 +79,4 @@ def get_percentiles(x):
         return pd.Series()
     ranks = x.rank(method='average')
     return (ranks - ranks.min()) / (ranks.max() - ranks.min())
+

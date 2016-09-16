@@ -2,12 +2,14 @@ __author__ = 'eczech'
 
 from . import models
 import numpy as np
+import pandas as pd
 from sklearn.metrics import mean_squared_error
 from matplotlib import pyplot as plt
 from sklearn.ensemble import partial_dependence as ptl_dep
 from sklearn.metrics import roc_curve
 import plotly.graph_objs as go
 from plotly import offline
+import seaborn as sns
 
 
 DEFAULT_REGRESSOR_SCORE = lambda clf, y_true, y_pred: mean_squared_error(y_true, y_pred)
@@ -49,7 +51,12 @@ def plot_curve(res, curve_func=roc_curve, interpolation=INTERPOLATE_LINEAR, plot
 def plot_feature_importance(res, limit=25, xrot=35, rmargin=100, bmargin=160,
                             width=1000, height=400, filename=None, normalize=True,
                             feat_imp_calc=None, asFigure=False):
-    feat_imp = models.summarize_importances(res, feat_imp_calc=feat_imp_calc)
+
+    if isinstance(res, pd.DataFrame):
+        feat_imp = res
+    else:
+        feat_imp = models.summarize_importances(res, feat_imp_calc=feat_imp_calc)
+
     if feat_imp is None:
         return None
 
@@ -111,6 +118,43 @@ def plot_weighted_feature_importances(res, score_func, feat_agg=np.median, score
                                       figsize=(18, 4), limit=25):
     return models.summarize_weighted_importances(res, score_func, feat_agg=feat_agg, score_agg=score_agg)\
         .sort_values(ascending=False).head(limit).plot(kind='bar', figsize=figsize)
+
+
+def plot_confusion_matrix(d_pred, ignore_fold_id=False, use_pct=False):
+    """
+    Plot confusion matrix for summarized predictions
+
+    :param d_pred: DataFrame from ml.models.summarize_predictions
+    :param ignore_fold_id: If true, CM counts will be aggregated across folds
+    :param use_pct: If true, counts will be shown as percentages instead
+    :return: Seaborn grid containing confusion matrices
+    """
+    d_cm = d_pred.copy()
+
+    # If flag to ignore fold id is true (i.e. CM should aggregate across folds)
+    # set the fold id to the same value for all predictions
+    if ignore_fold_id:
+        d_cm['fold_id'] = 0
+
+    # Get frequency of prediction + actual pairs, per model and fold
+    d_cm = d_cm.groupby(['model_name', 'fold_id', 'y_pred', 'y_true']).size()
+    d_cm.name = 'count'
+    d_cm = d_cm.reset_index()
+
+    # Plot CM heatmaps with model name in rows and fold ids in columns
+    def facet(data, color):
+        data = data.pivot_table(index='y_pred', columns='y_true', values='count')
+        if use_pct:
+            data = data / data.sum().sum()
+            fmt = '.2%'
+        else:
+            fmt = 'd'
+        sns.heatmap(data, cbar=False, annot=True, fmt=fmt)
+
+    g = sns.FacetGrid(d_cm, row='model_name', col='fold_id', margin_titles=True)
+    g = g.map_dataframe(facet)
+    g = g.set_axis_labels(x_var='Actual', y_var='Predicted')
+    return g
 
 
 def plot_gbrt_partial_dependence(est, X, features, **kwargs):

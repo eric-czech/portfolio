@@ -20,10 +20,13 @@ from sklearn.pipeline import Pipeline
 
 
 TREE_CLASSIFIERS = [GradientBoostingClassifier, RandomForestClassifier, ExtraTreesClassifier, AdaBoostClassifier]
-TREE_CLASSIFIER_EXT = ['XGBClassifier']
+# TREE_CLASSIFIER_EXT = ['XGBClassifier']
+TREE_CLASSIFIER_EXT = []  # XGBClassifier has no feature_importances_
+
 LOGREG_CLASSIFIERS = [LogisticRegression, LogisticRegressionCV, RandomizedLogisticRegression]
 TREE_REGRESSORS = [GradientBoostingRegressor, RandomForestRegressor, ExtraTreesRegressor, AdaBoostRegressor]
-TREE_REGRESSORS_EXT = ['XGBRegressor']
+# TREE_REGRESSORS_EXT = ['XGBRegressor']
+TREE_REGRESSORS_EXT = []  # XGBRegressor has no feature_importances_
 LINEAR_REGRESSORS = [
     ElasticNet, ElasticNetCV, LinearRegression, BayesianRidge, Ridge, RidgeCV, Lasso, LassoCV
 ]
@@ -63,8 +66,6 @@ def is_tree_classifier(clf):
 
 def is_logreg_classifier_1d(clf):
     return is_instance_of(clf, LOGREG_CLASSIFIERS) and clf.coef_.shape[0] == 1
-
-
 
 
 def validate_mode(mode):

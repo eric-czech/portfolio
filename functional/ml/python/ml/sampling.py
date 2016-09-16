@@ -1,7 +1,27 @@
 
 import pandas as pd
 import numpy as np
-from unbalanced_dataset import UnderSampler
+from sklearn.utils import check_random_state
+
+
+def get_downsampled_index(y, random_state=None):
+    assert np.all(pd.notnull(y)), 'Values cannot be null for downsampling'
+
+    y = np.array(y)
+    assert len(y.shape) == 1, 'Response vector must be one dimensional'
+    
+    rs = check_random_state(random_state)
+
+    vals, cts = np.unique(y, return_counts=True)
+    min_idx = np.argmin(cts)
+    min_class = vals[min_idx]
+    min_ct = cts[min_idx]
+
+    i = np.arange(len(y))
+    min_y = i[y == min_class]
+    ext_y = rs.choice(i[y != min_class], size=min_ct, replace=False)
+
+    return np.concatenate((min_y, ext_y))
 
 
 def downsample(d, response, random_state=None, preserve_index=False, verbose=True):
@@ -17,6 +37,7 @@ def downsample(d, response, random_state=None, preserve_index=False, verbose=Tru
     :return: Data frame idential to "d" with some rows removed, and the values in "response"
         occurring with an equal frequency
     """
+    from unbalanced_dataset import UnderSampler
     sampler = UnderSampler(random_state=random_state, replacement=False, verbose=verbose)
     idx = None
 
