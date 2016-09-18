@@ -28,6 +28,7 @@ def get_classifier_fi(clf, columns):
         res = np.abs(clf.coef_[0])
 
     # Logreg - univariate importance exists only with 2 classes
+    print(is_logreg_classifier_1d(clf))
     if is_logreg_classifier_1d(clf):
         res = np.abs(clf.coef_[0])
 

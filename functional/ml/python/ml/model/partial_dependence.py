@@ -77,3 +77,5 @@ def plot_partial_dependence(pdp, n_cols=3, title='Partial Dependence', smooth_wi
         return offline.iplot(fig, show_link=False)
     else:
         return offline.plot(fig, show_link=False, auto_open=True, filename=filename)
+
+
