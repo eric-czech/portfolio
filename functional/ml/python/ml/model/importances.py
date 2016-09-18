@@ -28,6 +28,7 @@ def get_classifier_fi(clf, columns):
         res = np.abs(clf.coef_[0])
 
     # Logreg - univariate importance exists only with 2 classes
+    print(is_logreg_classifier_1d(clf))
     if is_logreg_classifier_1d(clf):
         res = np.abs(clf.coef_[0])
 
@@ -55,7 +56,7 @@ def get_regressor_fi(clf, columns):
         res = np.abs(clf.coef_)
 
     # Tree classifiers - univariate importance always exists
-    if is_tree_classifier(clf):
+    if is_tree_regressor(clf):
         res = clf.feature_importances_
 
     # Return nothing if feature importance vector does not
@@ -63,3 +64,11 @@ def get_regressor_fi(clf, columns):
     if res is not None and len(res) != len(columns):
         return None
     return pd.Series(res, index=columns) if res is not None else res
+
+
+def get_xgb_feature_importance_calculator(feature_names):
+    def xgb_imp(clf):
+        imp_vals = clf.booster().get_fscore()
+        r = pd.Series({f: float(imp_vals.get(f, 0.)) for f in feature_names})
+        return pd.Series(r/r.sum(), index=feature_names)
+    return xgb_imp
