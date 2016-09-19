@@ -18,7 +18,7 @@ def plot_ice(
     assert np.all(np.sort(pdp[pdp_vars[0]].index.values) == np.arange(len(X)))
 
     # Restrict number of samples to be no greater than number of records
-    n_sample = len(X) if len(X) > n_sample else n_sample
+    n_sample = len(X) if len(X) < n_sample else n_sample
 
     # Initialize figure
     figsize = figsize if figsize is not None else (20, 7 * len(pdp_vars))
