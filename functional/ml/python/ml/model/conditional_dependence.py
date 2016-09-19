@@ -1,4 +1,4 @@
-from sklearn.cluster import SpectralClustering
+from sklearn.cluster import KMeans
 from sklearn.ensemble import RandomForestClassifier
 import pandas as pd
 import numpy as np
@@ -8,14 +8,22 @@ from matplotlib import gridspec
 
 def plot_ice(
     X, pdp, random_state=None, n_sample=1000,
-    n_cluster=6, cluster_alg=SpectralClustering,
-    n_interaction=1, interaction_alg=RandomForestClassifier):
+    n_cluster=6, cluster_alg=KMeans,
+    n_interaction=1, interaction_alg=RandomForestClassifier,
+    primary_cmap=plt.cm.spectral, interaction_cmap=plt.cm.RdYlGn,
+    figsize=None, alphas=[.3, .75, .5]):
 
     pdp_vars = list(pdp.keys())
     assert len(pdp_vars) > 0, 'No PDP given to plot'
     assert np.all(np.sort(pdp[pdp_vars[0]].index.values) == np.arange(len(X)))
 
-    fig = plt.figure(figsize=(20, 7 * len(pdp_vars)))
+    # Restrict number of samples to be no greater than number of records
+    n_sample = len(X) if len(X) > n_sample else n_sample
+
+    # Initialize figure
+    figsize = figsize if figsize is not None else (20, 7 * len(pdp_vars))
+    fig = plt.figure(figsize=figsize)
+
     gr = 4
     gc = 6 + n_interaction * 6 + 2
     gs = gridspec.GridSpec(gr * len(pdp_vars), gc)
@@ -25,13 +33,10 @@ def plot_ice(
         d_ice = pdp[pdp_var].sample(n=n_sample, random_state=random_state)
 
         # Cluster samples
-        #d_clust = DBSCAN().fit_predict(d_ice)
         d_clust = cluster_alg(n_clusters=n_cluster).fit_predict(d_ice)
 
         v_clust, v_cts = np.unique(d_clust, return_counts=True)
         n_clust = len(v_clust)
-        #a_clust = .2 + .8 * (1 - v_cts / np.sum(v_cts))
-        #a_clust = {v_clust[i]:a_clust[i] for i in range(n_clust)}
 
         cmap = plt.cm.spectral
         cmap = [cmap(i) for i in np.linspace(0.1, 0.8, n_clust)]
@@ -41,15 +46,13 @@ def plot_ice(
         d_ice_mean = d_ice.mean()
         d_plt = d_ice.T
 
-        #ax = axes[2*i, 0]
         axi = gr*i
         ax = plt.subplot(gs[axi:(axi+3), 0:6])
         for c in d_plt:
             v_clust = d_col[c]
-            ax.plot(d_plt.index.values, d_plt[c].values, color=m_col[v_clust], alpha=.3)
-        ax.plot(d_ice_mean.index.values, d_ice_mean.values, color='black', alpha=.75, linewidth=7)
+            ax.plot(d_plt.index.values, d_plt[c].values, color=m_col[v_clust], alpha=alphas[0])
+        ax.plot(d_ice_mean.index.values, d_ice_mean.values, color='black', alpha=alphas[1], linewidth=7)
         ax.set_title('{} (# Clusters = {})'.format(pdp_var, n_clust))
-
 
         X_clust = X.iloc[d_ice.index.values]
         m_clust = interaction_alg().fit(X_clust, d_clust)
@@ -70,9 +73,9 @@ def plot_ice(
             ax = plt.subplot(gs[axi:(axi+3), axj:(axj+6)])
             cmap = plt.cm.RdYlGn
             for c in d_plt:
-                v_clust = d_col[c]
                 color = cmap(v_var.loc[c])
-                ax.plot(d_plt.index.values, d_plt[c].values, color=color, alpha=.5)
+                ax.plot(d_plt.index.values, d_plt[c].values, color=color, alpha=alphas[2])
+                #ax.plot(np.log10(d_plt.index.values), d_plt[c].values, color=color, alpha=.5)
             ax.set_title('{} (vs {})'.format(pdp_var, top_var))
 
             axi = gr*i + 3
@@ -85,12 +88,3 @@ def plot_ice(
         m_clust_imp.tail(10).plot(kind='barh', ax=ax)
 
     plt.tight_layout()
-
-#plot_ice(X, pdp)
-# cols = [
-#     'Opp:Date:Age', 'Contact:All', 'Activity:Event:FIB', 'Opp:Date:TTClose', 'Activity:Task:Call'
-# ]
-# cols = [
-#     'Opp:Date:Age'
-# ]
-#plot_ice(X, {k:v for k, v in pdp.items() if k in cols}, random_state=123, n_sample=2500, n_interaction=2)

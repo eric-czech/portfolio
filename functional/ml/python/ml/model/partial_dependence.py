@@ -5,7 +5,6 @@ from plotly import tools
 import plotly.graph_objs as go
 from plotly import offline
 
-
 def get_partial_dependence_1d(clf, X, features, pred_fun, grid_size=100, grid_window=[0, 1],
                               sample_rate=1, random_state=None, discrete_thresh_ct=10, print_progress=True):
     if isinstance(features, str):
@@ -50,6 +49,13 @@ def plot_partial_dependence(pdp, n_cols=3, title='Partial Dependence', smooth_wi
     if n_feats < n_cols:
         n_cols = n_feats
     n_rows = int(np.ceil(n_feats/n_cols))
+    if sharey and n_feats % n_cols != 0:
+        raise NotImplementedError(
+            'When using shared Y-Axis values, make sure that number of columns ({}) evenly '\
+            'divides number of variables ({}) (i.e. make sure there are no empty subplots) '\
+            'or Plot.ly will not show some plots correctly.'.format(n_cols, n_feats)
+        )
+
     fig = tools.make_subplots(
         rows=n_rows, cols=n_cols, subplot_titles=list(pdp.keys()), print_grid=False,
         shared_xaxes=sharex, shared_yaxes=sharey
