@@ -11,14 +11,37 @@ def plot_ice(
     n_cluster=6, cluster_alg=KMeans,
     n_interaction=1, interaction_alg=RandomForestClassifier,
     primary_cmap=plt.cm.spectral, interaction_cmap=plt.cm.RdYlGn,
+    interaction_color_mode='quantile',
     figsize=None, alphas=[.3, .75, .5]):
+    """
+
+    :param X:
+    :param pdp:
+    :param random_state:
+    :param n_sample:
+    :param n_cluster:
+    :param cluster_alg:
+    :param n_interaction:
+    :param interaction_alg:
+    :param primary_cmap:
+    :param interaction_cmap:
+    :param interaction_color_mode: One of 'quantile' or 'robust_scale' where:
+        quantile - Colors for interaction values are determined by normalized rankings of values
+        robust_scale - Colors are based on min/max scaled values with upper and lower 1% ignored
+    :param figsize:
+    :param alphas:
+    :return:
+    """
 
     pdp_vars = list(pdp.keys())
     assert len(pdp_vars) > 0, 'No PDP given to plot'
     assert np.all(np.sort(pdp[pdp_vars[0]].index.values) == np.arange(len(X)))
+    assert interaction_color_mode in ['quantile', 'robust_scale'], \
+        'Parameter "interaction_color_mode" must be one of ["quantile", "robust_scale"]'
 
     # Restrict number of samples to be no greater than number of records
-    n_sample = len(X) if len(X) < n_sample else n_sample
+    n_all = len(pdp[pdp_vars[0]])
+    n_sample = n_all if n_all < n_sample else n_sample
 
     # Initialize figure
     figsize = figsize if figsize is not None else (20, 7 * len(pdp_vars))
@@ -55,8 +78,8 @@ def plot_ice(
         ax.set_title('{} (# Clusters = {})'.format(pdp_var, n_clust))
 
         X_clust = X.iloc[d_ice.index.values]
-        m_clust = interaction_alg().fit(X_clust, d_clust)
-        m_clust_imp = pd.Series(m_clust.feature_importances_, index=X.columns).sort_values()
+        m_clust = interaction_alg().fit(X_clust.drop(pdp_var, axis=1), d_clust)
+        m_clust_imp = pd.Series(m_clust.feature_importances_, index=X_clust.drop(pdp_var, axis=1).columns).sort_values()
 
         axi = gr*i + 3
         ax = plt.subplot(gs[axi, 0:6])
@@ -65,7 +88,11 @@ def plot_ice(
         for j in range(n_interaction):
             top_var = m_clust_imp.index.values[-(j+1)]
             v_var = pd.Series(X_clust[top_var].values, index=d_ice.index)
-            v_var = (v_var - v_var.quantile(.01)) / (v_var.quantile(.99) - v_var.quantile(.01))
+            if interaction_color_mode == 'robust_scale':
+                v_var = (v_var - v_var.quantile(.01)) / (v_var.quantile(.99) - v_var.quantile(.01))
+            else:
+                v_var = v_var.rank(method='dense')
+                v_var /= v_var.nunique()
             v_var = v_var.clip(0., 1.)
 
             axi = gr*i
@@ -75,7 +102,6 @@ def plot_ice(
             for c in d_plt:
                 color = cmap(v_var.loc[c])
                 ax.plot(d_plt.index.values, d_plt[c].values, color=color, alpha=alphas[2])
-                #ax.plot(np.log10(d_plt.index.values), d_plt[c].values, color=color, alpha=.5)
             ax.set_title('{} (vs {})'.format(pdp_var, top_var))
 
             axi = gr*i + 3

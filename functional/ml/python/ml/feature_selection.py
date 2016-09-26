@@ -6,6 +6,18 @@ from sklearn.utils import check_array
 import numpy as np
 
 
+def get_feature_selector(X, regex, negate=False):
+    from sklearn.preprocessing import FunctionTransformer
+    cols = X.columns.tolist()
+    feats = X.filter(regex=regex).columns.tolist()
+    idx = [cols.index(c) for c in feats]
+    if negate:
+        selector = lambda X: X[:, [i for i in range(X.shape[1]) if i not in idx]]
+    else:
+        selector = lambda X: X[:, idx]
+    return FunctionTransformer(selector)
+
+
 def get_static_feature_selector(all_features, target_features):
     """
     Returns a feature selector that will only choose specific features by name.
@@ -36,7 +48,7 @@ def _identity(X):
     return X
 
 
-class FunctionTransformer(BaseEstimator, TransformerMixin):
+class FnTransformer(BaseEstimator, TransformerMixin):
     """Constructs a transformer from an arbitrary callable.
 
     ** This is class is from scikit-learn 17.1 and is included here for use in previous versions

@@ -28,7 +28,7 @@ def get_entity_cv(d, id_col, id_label_func=None, validate_assignments=True, **cv
 
     # Determine the label for each entity, if an outcome labelling function was given,
     # and either create an arbitrary n_fold split or a stratified one (if outcome labeller given)
-    if id_label_func is None:
+    if id_label_func is not None:
         y = d.groupby(id_col).apply(id_label_func)
         assert np.all(y.notnull()), 'Entity outcome label cannot be null'
         entity_cv = StratifiedKFold(y.values, **cv_kwargs)

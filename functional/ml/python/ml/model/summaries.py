@@ -131,6 +131,12 @@ def plot_confusion_matrix(d_pred, ignore_fold_id=False, use_pct=False):
     """
     d_cm = d_pred.copy()
 
+    # Rename prediction value columns if prefixed by fold indicator string
+    if 'fold:model_name' in d_cm:
+        pred_cols = d_cm.filter(regex='^fold:').columns.tolist()
+        d_cm = d_cm[pred_cols]
+        d_cm = d_cm.rename(columns=lambda c: c.replace('fold:', ''))
+
     # If flag to ignore fold id is true (i.e. CM should aggregate across folds)
     # set the fold id to the same value for all predictions
     if ignore_fold_id:

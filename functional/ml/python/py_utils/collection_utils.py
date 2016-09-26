@@ -33,7 +33,7 @@ def subset(d, subset_func, subset_op=None, log=True):
             .format(
                 '[{}] '.format(subset_op),
                 n_before, n_after, n_diff,
-                100. * n_diff / n_before
+                100. * n_diff / n_before if n_before > 0 else 0.
             )
 
         # Print summary
