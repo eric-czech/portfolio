@@ -2,7 +2,7 @@
 
 import pandas as pd
 from pandas.tseries.frequencies import to_offset
-
+import numpy as np
 
 def anchored_date_rounder(freq):
     """
@@ -38,3 +38,25 @@ def date_rounder(freq):
         freq = to_offset(freq)
     return lambda x: pd.NaT if pd.isnull(x) else pd.Timestamp((x.value // freq.delta.value) * freq.delta.value)
 
+
+def get_delay_between_events(events):
+    """
+    Returns time between events in unit increments.
+
+    :param events: A boolean series with adjacent, evenly incremented index (the time between events returned
+        will be in number of index increments -- not a specific timescale)
+    :return: Integer series with time between events
+    """
+    assert events.dtype == np.bool, 'Event series must be boolean'
+    assert np.all(events.notnull()), 'Event timeline cannot have null values'
+
+    # Find the cumulative sum of the absence of events
+    x1 = (~events).cumsum()
+
+    # Replace the sum above with when not on a positive diff (i.e. when there is not an event),
+    # and then forward fill the cumulative some over those newly introduced na's
+    x2 = x1.where(events, np.nan).ffill()
+
+    # Subtract the cumulative sum of non-events from the cumulative frozen in a point-in-time on each event
+    # to give the correct spacing between events in index increments
+    return x1 - x2
