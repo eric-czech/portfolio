@@ -9,13 +9,22 @@ import os
 
 class LearnClassifier(BaseEstimator, ClassifierMixin):
 
-    def __init__(self, model_fn, model_params=None, model_config=None, model_dir=None):
+    def __init__(self, model_fn, model_params=None, fit_params=None, model_config=None, model_dir=None):
         self.model_fn = model_fn
         self.model_params = model_params
+        self.fit_params = fit_params
         self.model_config = model_config
         self.model_dir = model_dir
 
     def fit(self, X, y, **kwargs):
+        # Merge pre-defined fit params into actual fit params
+        if self.fit_params is not None:
+            for k in self.fit_params:
+                assert k not in kwargs, \
+                    'Fit parameter given that was already defined on construction: {}'.format(k)
+            kwargs.update(self.fit_params)
+
+        # Validate monitors argument
         assert 'monitors' not in kwargs, \
             'Monitors should not be passed directly to the fit function, '\
             'instead a monitor_fn argument should be supplied that takes '\
@@ -34,7 +43,9 @@ class LearnClassifier(BaseEstimator, ClassifierMixin):
         self.classifier_ = learn.Estimator(
                 model_fn=self.model_fn, model_dir=model_dir,
                 params=self.model_params, config=self.model_config)
-        self.classifier_.fit(X, y, monitors=list(self.monitors_.values()), **kwargs)
+
+        monitor_list = [] if self.monitors_ is None else list(self.monitors_.values())
+        self.classifier_.fit(X, y, monitors=monitor_list, **kwargs)
         return self
 
     def predict(self, X):
