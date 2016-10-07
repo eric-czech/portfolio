@@ -33,7 +33,6 @@ def get_univariate_dependence_1d(clf, X, features, pred_fun, feature_grids=None,
 
         Xz = pd.DataFrame(np.zeros((len(grid), len(X.columns))), columns=X.columns)
         Xz[feature] = grid
-        print(Xz)
         res[feature] = pd.Series(pred_fun(clf, Xz), index=grid)
     return res
 

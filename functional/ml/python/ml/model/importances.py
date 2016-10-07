@@ -1,21 +1,6 @@
 __author__ = 'eczech'
 
 from .common import *
-from sklearn.grid_search import BaseSearchCV
-
-
-def resolve_clf(clf):
-    # If model is grid search, fetch underlying, best estimator
-    if isinstance(clf, BaseSearchCV):
-        return clf.best_estimator_
-
-    # If model is pipeline, resolved contained estimator
-    pipe_clf = resolve_estimator_from_pipeline(clf)
-    if pipe_clf is not None:
-        return resolve_clf(pipe_clf)
-
-    # Otherwise, return as is
-    return clf
 
 
 def get_classifier_fi(clf, columns):

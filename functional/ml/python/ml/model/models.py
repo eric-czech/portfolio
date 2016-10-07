@@ -1,6 +1,6 @@
 __author__ = 'eczech'
 
-from sklearn.grid_search import Parallel, delayed, BaseSearchCV
+from sklearn.grid_search import Parallel, delayed
 from sklearn.metrics import roc_curve
 from sklearn import base
 import functools

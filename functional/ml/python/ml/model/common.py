@@ -17,7 +17,7 @@ from sklearn.linear_model import ElasticNet, ElasticNetCV, LinearRegression, Bay
 from sklearn.linear_model import Lasso, LassoCV, MultiTaskElasticNet, MultiTaskElasticNetCV, MultiTaskLasso
 from sklearn.linear_model import MultiTaskLassoCV
 from sklearn.pipeline import Pipeline
-
+from sklearn.grid_search import BaseSearchCV
 
 TREE_CLASSIFIERS = [GradientBoostingClassifier, RandomForestClassifier, ExtraTreesClassifier, AdaBoostClassifier]
 # TREE_CLASSIFIER_EXT = ['XGBClassifier']
@@ -41,6 +41,19 @@ CLF_NAME = 'name'
 MODE_CLASSIFIER = 'classifier'
 MODE_REGRESSOR = 'regressor'
 
+
+def resolve_clf(clf):
+    # If model is grid search, fetch underlying, best estimator
+    if isinstance(clf, BaseSearchCV):
+        return clf.best_estimator_
+
+    # If model is pipeline, resolved contained estimator
+    pipe_clf = resolve_estimator_from_pipeline(clf)
+    if pipe_clf is not None:
+        return resolve_clf(pipe_clf)
+
+    # Otherwise, return as is
+    return clf
 
 def is_linear_regressor(clf):
     return is_instance_of(clf, LINEAR_REGRESSORS)
