@@ -3,6 +3,7 @@ import numpy as np
 import tensorflow.contrib.learn.python.learn as learn
 from sklearn.base import BaseEstimator, ClassifierMixin
 from ml.model.saveable import SaveableMixin
+from ml.model import common
 import uuid
 import os
 
@@ -22,7 +23,8 @@ class LearnClassifier(BaseEstimator, ClassifierMixin, SaveableMixin):
 
     def _init(self, new_model_id=True):
         if new_model_id:
-            self.model_id = str(uuid.uuid4())
+            self.model_id = str(uuid.uuid4()).replace('-', '')
+
         model_dir = None
         if self.model_dir is not None:
             model_dir = os.path.join(self.model_dir, self.model_id)
@@ -50,14 +52,18 @@ class LearnClassifier(BaseEstimator, ClassifierMixin, SaveableMixin):
             'as input the X and y values to fit on and returns a map of '\
             'monitors keyed by name for later reference'
         self.monitors_ = None
-        if 'monitor_fn' in kwargs:
-            self.monitors_ = kwargs['monitor_fn'](X, y)
+        monitor_kwargs, kwargs = common.parse_kwargs(kwargs, 'monitor_')
+        if monitor_kwargs:
+            assert 'fn' in monitor_kwargs, \
+                'Monitor arguments must contain "fn" argument.  Arguments given = {}'.format(monitor_kwargs)
+            monitor_fn = monitor_kwargs['fn']
+            del monitor_kwargs['fn']
+            self.monitors_ = monitor_fn(X, y, **monitor_kwargs)
             assert isinstance(self.monitors_, dict), 'Monitor map must be a dictionary'
-            del kwargs['monitor_fn']
 
         self._init()
 
-        monitor_list = [] if self.monitors_ is None else list(self.monitors_.values())
+        monitor_list = None if self.monitors_ is None else list(self.monitors_.values())
         self.classifier_.fit(X, y, monitors=monitor_list, **kwargs)
         return self
 
