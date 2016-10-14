@@ -6,9 +6,22 @@ import plotly.graph_objs as go
 from plotly import offline
 
 
+def _repeat_mean(X, r):
+    """ Returns mean of given features repeated some specified number of times
+    :param X: Feature DataFrame
+    :param r: Number of times to repeat mean vector as data frame
+    :return: DataFrame
+    """
+    m = len(X.columns)
+    x = X.mean().repeat(r).reshape((m, r)).T
+    return pd.DataFrame(x, columns=X.columns)
+
+
 def get_univariate_dependence_1d(clf, X, features, pred_fun, feature_grids=None,
                               print_progress=True, grid_window=[0, 1], grid_size=50,
-                             discrete_thresh_ct=10):
+                             discrete_thresh_ct=10, fill_mode='mean'):
+
+    assert fill_mode in ['zeros', 'mean'], '"fill_mode" must be either "zeros" or "mean"'
 
     res = {}
     for i, feature in enumerate(features):
@@ -31,7 +44,10 @@ def get_univariate_dependence_1d(clf, X, features, pred_fun, feature_grids=None,
                 xmax = np.percentile(x, gw[1] * 100)
                 grid = np.linspace(xmin, xmax, grid_size)
 
-        Xz = pd.DataFrame(np.zeros((len(grid), len(X.columns))), columns=X.columns)
+        if fill_mode == 'mean':
+            Xz = _repeat_mean(X, len(grid))
+        elif fill_mode == 'zeros':
+            Xz = pd.DataFrame(np.zeros((len(grid), len(X.columns))), columns=X.columns)
         Xz[feature] = grid
         res[feature] = pd.Series(pred_fun(clf, Xz), index=grid)
     return res
