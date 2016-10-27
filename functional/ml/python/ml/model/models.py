@@ -100,6 +100,8 @@ def run_models(X, y, clfs, cv, mode, **kwargs):
         Other:
             refit: Boolean indicating whether or not the given models should also be trained on the full dataset;
                 defaults to false
+            runcv: Boolean indicating whether or not the given models should be run in cross validation or just
+                trained on the training data a single time
             keep_training_data: Boolean indicating whether or not training/test datasets should be preserved in results
             predict_proba: Boolean indicating whether or not class probability predictions should be made
                 for classifiers; defaults to false
@@ -133,23 +135,20 @@ def run_models(X, y, clfs, cv, mode, **kwargs):
     log_file = log_kwargs.get('file', DEFAULT_LOG_FILE)
     set_logger(log_file, log_kwargs.get('format', DEFAULT_LOG_FORMAT))
 
-    print('Beginning cross validation (see {} for progress updates)'.format(log_file))
-    cv_res = Parallel(**par_kwargs)(delayed(run_fold)(args) for args in args_list)
-    log('CV Complete ({} model(s) run)'.format(len(clfs)))
+    cv_res = None
+    if kwargs.get('runcv', True):
+        print('Beginning cross validation (see {} for progress updates)'.format(log_file))
+        cv_res = Parallel(**par_kwargs)(delayed(run_fold)(args) for args in args_list)
+        log('CV Complete ({} model(s) run)'.format(len(clfs)))
 
-    # If refitting was not requested, return the cross validation results
-    if not kwargs.get('refit'):
-        log(_HR)
-        return cv_res
+    refit_res = None
+    if kwargs.get('refit', True):
+        idx = np.arange(0, len(y))
+        args = (-1, idx, idx, clfs, mode, X, y, kwargs)
 
-    # Otherwise, train models on full dataset and then return both results
-    # separately (for cross validation and full dataset training)
-    idx = np.arange(0, len(y))
-    args = (-1, idx, idx, clfs, mode, X, y, kwargs)
-
-    log('Beginning model refitting')
-    refit_res = run_fold(args)
-    log('Model refitting complete ({} model(s) run)'.format(len(clfs)))
+        print('Beginning model refitting')
+        refit_res = run_fold(args)
+        log('Model refitting complete ({} model(s) run)'.format(len(clfs)))
     log(_HR)
     return cv_res, refit_res
 

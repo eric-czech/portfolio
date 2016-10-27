@@ -90,10 +90,9 @@ def plot_univariate_dependence(udp, n_cols=3, title='Univariate Dependence', smo
     fig['layout'].update(title=title, showlegend=False)
     if fig_dimension is not None:
         fig['layout'].update(width=fig_dimension[0], height=fig_dimension[1])
-    if filename is None:
-        return offline.iplot(fig, show_link=False)
-    else:
-        return offline.plot(fig, show_link=False, auto_open=True, filename=filename)
+    if filename is not None:
+        offline.plot(fig, show_link=False, auto_open=False, filename=filename)
+    return offline.iplot(fig, show_link=False)
 
 
 def get_partial_dependence_1d(clf, X, features, pred_fun, grid_size=100, grid_window=[0, 1],
@@ -170,9 +169,8 @@ def plot_partial_dependence(pdp, n_cols=3, title='Partial Dependence', smooth_wi
     fig['layout'].update(title=title, showlegend=False)
     if fig_dimension is not None:
         fig['layout'].update(width=fig_dimension[0], height=fig_dimension[1])
-    if filename is None:
-        return offline.iplot(fig, show_link=False)
-    else:
-        return offline.plot(fig, show_link=False, auto_open=True, filename=filename)
+    if filename is not None:
+        offline.plot(fig, show_link=False, auto_open=False, filename=filename)
+    return offline.iplot(fig, show_link=False)
 
 

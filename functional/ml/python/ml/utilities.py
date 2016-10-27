@@ -80,3 +80,4 @@ def get_percentiles(x):
     ranks = x.rank(method='average')
     return (ranks - ranks.min()) / (ranks.max() - ranks.min())
 
+
