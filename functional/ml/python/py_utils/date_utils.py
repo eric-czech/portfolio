@@ -4,6 +4,7 @@ import pandas as pd
 from pandas.tseries.frequencies import to_offset
 import numpy as np
 
+
 def anchored_date_rounder(freq):
     """
     Returns function for rounding ANCHORED dates using semantics like "Weeks beginning on X" or "Business Days".

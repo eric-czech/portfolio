@@ -66,3 +66,10 @@ def get_logistic_feature_importance_calculator(feature_names, class_index):
         r = pd.Series(imp_vals, index=feature_names).abs()
         return r/r.sum()
     return logit_imp
+
+
+def get_classifier_feat_imp_calculator(feature_names):
+    def get_imp(clf):
+        feat_imp = get_classifier_fi(clf, feature_names)
+        return feat_imp/feat_imp.sum()
+    return get_imp

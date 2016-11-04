@@ -26,13 +26,6 @@ class BayesClassifier(BaseEstimator, ClassifierMixin):
             self.model.set_log_dir(model_dir)
 
     def fit(self, X, y, **kwargs):
-        # # Merge pre-defined fit params into actual fit params
-        # if self.fit_params is not None:
-        #     for k in self.fit_params:
-        #         assert k not in kwargs, \
-        #             'Fit parameter given that was already defined on construction: {}'.format(k)
-        #     kwargs.update(self.fit_params)
-
         if isinstance(X, pd.DataFrame):
             X = X.values
         if isinstance(y, pd.Series):

@@ -4,6 +4,7 @@ import pandas as pd
 from plotly import tools
 import plotly.graph_objs as go
 from plotly import offline
+from collections import OrderedDict
 
 
 def _repeat_mean(X, r):
@@ -23,7 +24,7 @@ def get_univariate_dependence_1d(clf, X, features, pred_fun, feature_grids=None,
 
     assert fill_mode in ['zeros', 'mean'], '"fill_mode" must be either "zeros" or "mean"'
 
-    res = {}
+    res = OrderedDict()
     for i, feature in enumerate(features):
         if print_progress:
             print('Processing feature {} of {} ...'.format(i+1, len(features)))
@@ -106,7 +107,7 @@ def get_partial_dependence_1d(clf, X, features, pred_fun, grid_size=100, grid_wi
         idx = np.random.choice(np.arange(0, len(X)), size=int(sample_rate*len(X)), replace=False)
         X = X.iloc[idx, :]
 
-    res = {}
+    res = OrderedDict()
     for i, feature in enumerate(features):
         if print_progress:
             print('Processing feature {} of {} ...'.format(i+1, len(features)))

@@ -4,7 +4,7 @@ import edward as ed
 import numpy as np
 import tensorflow as tf
 from tensorflow.python.ops import logging_ops
-from edward.models import Normal
+from edward.models import Normal, PointMass
 from edward.stats import bernoulli
 from py_utils import math as py_math
 import logging
@@ -48,7 +48,9 @@ class FeatureGroupModel(object):
 
     def __init__(self, feature_map):
         self.feature_map = feature_map
+        self.use_point_mass = False
         self.name = None
+        self.group_config = None
 
     def get_feature_index(self):
         return self.feature_map['index']
@@ -68,7 +70,34 @@ class FeatureGroupModel(object):
         :param X: Observed data *array* (not a tensor yet)
         :param Y: Observed responses
         """
-        pass
+        # If a "grouping" configuration is present, create a vector containing
+        # indexes corresponding to which group is associated with each observation
+        # as well as how many groups there are expected to be (this may not always be
+        # equal to the number of unique groups present in this particular dataset)
+        if 'group_config' in self.feature_map:
+            g_idx = self.feature_map['group_config']['index']
+            g_vec = X[:, g_idx]
+            assert g_vec.dtype == np.int64, 'Grouping vector must be an integer containing group indices'
+            self.group_config = {
+                'grp_idx': g_vec,
+                'grp_n': self.feature_map['group_config']['count'],
+                'grp_params': self.feature_map['group_config']['params']
+            }
+
+    def _has_group_config(self):
+        return self.group_config is not None
+
+    def _get_grp_idx(self):
+        assert self._has_group_config(), 'No grouping configuration present'
+        return self.group_config['grp_idx']
+
+    def _get_grp_n(self):
+        assert self._has_group_config(), 'No grouping configuration present'
+        return self.group_config['grp_n']
+
+    def _get_grp_params(self):
+        assert self._has_group_config(), 'No grouping configuration present'
+        return self.group_config['grp_params']
 
     def get_parameter_map(self, X, Y):
         """Get sampling distribution tensors for latent variables
@@ -118,6 +147,9 @@ class FeatureGroupModel(object):
     def set_name(self, name):
         self.name = name
 
+    def set_use_point_mass(self, use_point_mass):
+        self.use_point_mass = use_point_mass
+
     def get_name(self):
         assert self.name, 'Name has not been set yet'
         return self.name
@@ -130,11 +162,14 @@ class LinearGroupModel(FeatureGroupModel):
         super(LinearGroupModel, self).__init__(feature_map)
 
     def get_parameter_map(self, X, Y):
-        D = len(self.feature_map['index'])
-        w = Normal(
-            mu=tf.Variable(self.priors['params']['mu']),
-            sigma=tf.nn.softplus(tf.Variable(self.priors['params']['sigma']))
-        )
+        if self.use_point_mass:
+            w = PointMass(params=tf.Variable(self.priors['params']['mu']))
+        else:
+            w = Normal(
+                mu=tf.Variable(self.priors['params']['mu']),
+                sigma=tf.nn.softplus(tf.Variable(tf.random_normal([len(self.priors['params']['sigma'])])))
+                # sigma=tf.nn.softplus(tf.Variable(self.priors['params']['sigma']))
+            )
         return {'w': w}
 
     def get_prior_log_proba(self, X, Y, Z):
@@ -146,12 +181,20 @@ class LinearGroupModel(FeatureGroupModel):
 
     def get_parameter_values(self, sess, Z):
         w = Z['w']
-        w_mu, w_sigma = sess.run([w.mu, w.sigma])
+
+        if self.use_point_mass:
+            w_mu = sess.run([w.params])[0]
+            w_sigma = np.repeat(0., len(w_mu))
+        else:
+            w_mu, w_sigma = sess.run([w.mu, w.sigma])
+
         names = self.feature_map['names']
         w_mu = dict(zip(['l:{}:mu'.format(n) for n in names], list(w_mu)))
         w_sigma = dict(zip(['l:{}:sigma'.format(n) for n in names], list(w_sigma)))
-        w_mu.update(w_sigma)
-        return w_mu
+        p = {}
+        p.update(w_mu)
+        p.update(w_sigma)
+        return p
 
     def get_prediction_tf(self, X, Z):
         return ed.dot(X, Z['w'])
@@ -170,15 +213,20 @@ class SquareGroupModel(FeatureGroupModel):
         super(SquareGroupModel, self).__init__(feature_map)
 
     def get_parameter_map(self, X, Y):
-        D = len(self.feature_map['index'])
-        w1 = Normal(
-            mu=tf.Variable(self.linear_prior['params']['mu']),
-            sigma=tf.nn.softplus(tf.Variable(self.linear_prior['params']['sigma']))
-        )
-        w2 = Normal(
-            mu=tf.Variable(self.square_prior['params']['mu']),
-            sigma=tf.nn.softplus(tf.Variable(self.square_prior['params']['sigma']))
-        )
+        if self.use_point_mass:
+            w1 = PointMass(params=tf.Variable(self.linear_prior['params']['mu']))
+            w2 = PointMass(params=tf.Variable(self.square_prior['params']['mu']))
+        else:
+            w1 = Normal(
+                mu=tf.Variable(self.linear_prior['params']['mu']),
+                sigma=tf.nn.softplus(tf.Variable(tf.random_normal([len(self.linear_prior['params']['sigma'])])))
+                # sigma=tf.nn.softplus(tf.Variable(self.linear_prior['params']['sigma']))
+            )
+            w2 = Normal(
+                mu=tf.Variable(self.square_prior['params']['mu']),
+                sigma=tf.nn.softplus(tf.Variable(tf.random_normal([len(self.square_prior['params']['sigma'])])))
+                # sigma=tf.nn.softplus(tf.Variable(self.square_prior['params']['sigma']))
+            )
         return {'w1': w1, 'w2': w2}
 
     def get_prior_log_proba(self, X, Y, Z):
@@ -189,8 +237,15 @@ class SquareGroupModel(FeatureGroupModel):
 
     def get_parameter_values(self, sess, Z):
         w1, w2 = Z['w1'], Z['w2']
-        w1_mu, w1_sigma = sess.run([w1.mu, w1.sigma])
-        w2_mu, w2_sigma = sess.run([w2.mu, w2.sigma])
+
+        if self.use_point_mass:
+            w1_mu = sess.run([w1.params])[0]
+            w1_sigma = np.repeat(0., len(w1_mu))
+            w2_mu = sess.run([w2.params])[0]
+            w2_sigma = np.repeat(0., len(w2_mu))
+        else:
+            w1_mu, w1_sigma = sess.run([w1.mu, w1.sigma])
+            w2_mu, w2_sigma = sess.run([w2.mu, w2.sigma])
         names = self.feature_map['names']
         p = {}
         p.update(dict(zip(['l:{}:mu'.format(n) for n in names], list(w1_mu))))
@@ -219,19 +274,26 @@ class SigmoidGroupModel(FeatureGroupModel):
         super(SigmoidGroupModel, self).__init__(feature_map)
 
     def get_parameter_map(self, X, Y):
-        D = len(self.feature_map['index'])
-        w = Normal(
-            mu=tf.Variable(self.linear_priors['params']['mu']),
-            sigma=tf.nn.softplus(tf.Variable(self.linear_priors['params']['sigma']))
-        )
-        b = Normal(
-            mu=tf.Variable(self.bias_prior['params']['mu']),
-            sigma=tf.nn.softplus(tf.Variable(self.bias_prior['params']['sigma']))
-        )
-        s = Normal(
-            mu=tf.Variable(self.sigmoid_prior['params']['mu']),
-            sigma=tf.nn.softplus(tf.Variable(self.sigmoid_prior['params']['sigma']))
-        )
+        if self.use_point_mass:
+            w = PointMass(params=tf.Variable(self.linear_priors['params']['mu']))
+            b = PointMass(params=tf.Variable(self.bias_prior['params']['mu']))
+            s = PointMass(params=tf.Variable(self.sigmoid_prior['params']['mu']))
+        else:
+            w = Normal(
+                mu=tf.Variable(self.linear_priors['params']['mu']),
+                sigma=tf.nn.softplus(tf.Variable(tf.random_normal([len(self.linear_priors['params']['sigma'])])))
+                # sigma=tf.nn.softplus(tf.Variable(self.linear_priors['params']['sigma']))
+            )
+            b = Normal(
+                mu=tf.Variable(self.bias_prior['params']['mu']),
+                sigma=tf.nn.softplus(tf.Variable(tf.random_normal([])))
+                # sigma=tf.nn.softplus(tf.Variable(self.bias_prior['params']['sigma']))
+            )
+            s = Normal(
+                mu=tf.Variable(self.sigmoid_prior['params']['mu']),
+                sigma=tf.nn.softplus(tf.Variable(tf.random_normal([])))
+                # sigma=tf.nn.softplus(tf.Variable(self.sigmoid_prior['params']['sigma']))
+            )
         return {'w': w, 's': s, 'b': b}
 
     def get_prior_log_proba(self, X, Y, Z):
@@ -243,9 +305,18 @@ class SigmoidGroupModel(FeatureGroupModel):
 
     def get_parameter_values(self, sess, Z):
         w, s, b = Z['w'], Z['s'], Z['b']
-        w_mu, w_sigma = sess.run([w.mu, w.sigma])
-        s_mu, s_sigma = sess.run([s.mu, s.sigma])
-        b_mu, b_sigma = sess.run([b.mu, b.sigma])
+
+        if self.use_point_mass:
+            w_mu = sess.run([w.params])[0]
+            w_sigma = np.repeat(0., len(w_mu))
+            b_mu = sess.run([b.params])[0]
+            b_sigma = 0.
+            s_mu = sess.run([s.params])[0]
+            s_sigma = 0.
+        else:
+            w_mu, w_sigma = sess.run([w.mu, w.sigma])
+            s_mu, s_sigma = sess.run([s.mu, s.sigma])
+            b_mu, b_sigma = sess.run([b.mu, b.sigma])
         names = self.feature_map['names']
 
         p = {}
@@ -279,11 +350,27 @@ class InterceptGroupModel(FeatureGroupModel):
         return []
 
     def get_parameter_map(self, X, Y):
-        b = Normal(
-            mu=tf.Variable(self.prior['params']['mu']),
-            sigma=tf.nn.softplus(tf.Variable(self.prior['params']['sigma']))
-        )
-        return {'b': b}
+        if self._has_group_config():
+            if self.use_point_mass:
+                b0 = PointMass(params=tf.Variable(self.prior['params']['mu']))
+                b1 = PointMass(params=b0, sigma=self._get_grp_params()['sigma'])
+            else:
+                b0 = Normal(
+                    mu=tf.Variable(self.prior['params']['mu']),
+                    sigma=tf.nn.softplus(tf.Variable(tf.random_normal([])))
+                )
+                b1 = Normal(mu=b0, sigma=self._get_grp_params()['sigma'])
+            return {'b0': b0, 'b1': b1}
+        else:
+            if self.use_point_mass:
+                b = PointMass(params=tf.Variable(self.prior['params']['mu']))
+            else:
+                b = Normal(
+                    mu=tf.Variable(self.prior['params']['mu']),
+                    sigma=tf.nn.softplus(tf.Variable(tf.random_normal([])))
+                    # sigma=tf.nn.softplus(tf.Variable(self.prior['params']['sigma']))
+                )
+            return {'b': b}
 
     def get_prior_log_proba(self, X, Y, Z):
         # b = tf_print(Z['b'], lambda x: 'Intercept: {}'.format(x))
@@ -296,7 +383,11 @@ class InterceptGroupModel(FeatureGroupModel):
 
     def get_parameter_values(self, sess, Z):
         b = Z['b']
-        b_mu, b_sigma = sess.run([b.mu, b.sigma])
+        if self.use_point_mass:
+            b_mu = sess.run([b.params])[0]
+            b_sigma = 0.
+        else:
+            b_mu, b_sigma = sess.run([b.mu, b.sigma])
         return {'b:mu': b_mu, 'b:sigma': b_sigma}
 
     def get_prediction_py(self, X, Z):
@@ -312,7 +403,8 @@ class BayesianModel(object):
     def __init__(self, model_config, optimizer_fn=None, n_collect=1,
                  n_print_progress=None, max_steps=1000, tol=1e-1,
                  random_state=None, fail_if_not_converged=True,
-                 n_samples=1, n_loss_buffer=10, save_tf_model=True):
+                 n_samples=1, n_loss_buffer=10, save_tf_model=True,
+                 inference_fn=ed.MFVI):
 
         self.max_steps = max_steps
         self.tol = tol
@@ -328,6 +420,7 @@ class BayesianModel(object):
         self.n_print_progress = n_print_progress
         self.optimizer_fn = optimizer_fn
         self.random_state = random_state
+        self.inference_fn = inference_fn
         self.log_dir = None
 
         self.params_ = None
@@ -386,11 +479,17 @@ class BayesianModel(object):
         self._init()
         ed.set_seed(self.random_state)
 
+        use_map = self.inference_fn == ed.MAP
+
         model = {}
         for g, m in self.model_config.items():
             # Set the name associated with this group
             # (this is useful for naming tensors and should only be done once)
             m.set_name(g)
+
+            # Configure models to use point mass distributions if MAP
+            # inference is being run
+            m.set_use_point_mass(use_map)
 
             # Slice observed data to only fields relevant to this group
             x = X[:, m.get_feature_index()]
@@ -405,9 +504,12 @@ class BayesianModel(object):
         data = {'X': X, 'Y': y}
 
         # Initialize inference engine
-        inference = ed.MFVI(_flatten_map(model, sep=':'), data, self)
+        inference = self.inference_fn(_flatten_map(model, sep=':'), data, self)
         optimizer = self.optimizer_fn() if self.optimizer_fn else None
-        inference.initialize(optimizer=optimizer, n_print=self.n_print_progress, n_samples=self.n_samples)
+        if use_map:
+            inference.initialize(optimizer=optimizer, n_print=self.n_print_progress)
+        else:
+            inference.initialize(optimizer=optimizer, n_print=self.n_print_progress, n_samples=self.n_samples)
 
         # It would be much better if inference instances exposed the ability to set the log dir
         # directly but at the moment it's only set in inference.run, and this is how it's used:
