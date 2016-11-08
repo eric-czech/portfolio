@@ -1,0 +1,426 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r init, results='hide', warning=F, message=F, error=F, echo=F}
+source('common.R')
+library(ggplot2)
+library(corrplot)
+library(stringr)
+library(reshape2)
+library(plotly)
+library(knitr)
+layout <- plotly::layout
+
+# Paper on data:
+# Multiplexed Immunoassay Panel Identifies Novel CSF Biomarkers for Alzheimer's Disease Diagnosis and Prognosis
+# library(AppliedPredictiveModeling)
+# ?diagnosis
+```
+
+```{r}
+# Load in the whole Alzheimers data file
+data <- read.csv('~/repos/portfolio/demonstrative/R/datasets/alzheimers/alzheimers.csv')
+
+# Remove this field ... I forgot to do that when creating the dataset
+data <- data %>% select(-male)
+
+# Normalize gender labels
+stopifnot(all(!is.na(data$gender)))
+normalize.gender <- function(x) {
+  is.male <- x %>% tolower %>% str_detect('^m')
+  ifelse(is.male, 'Male', 'Female') %>% factor
+}
+data <- data %>% mutate(gender=normalize.gender(gender))
+
+# Convert integer fields to numeric for the sake of consistency
+data <- data %>% mutate_each_(funs(as.numeric), c('Betacellulin', 'Eotaxin_3'))
+
+head(data)
+```
+
+
+```{r}
+X <- data %>% select(-response)
+y <- data[,'response']
+table(y)
+```
+
+```{r}
+table(y) / length(y)
+```
+
+```{r}
+names(X)
+```
+
+```{r}
+# Base R to accomplish the same:
+# table(sapply(X, class))
+
+X %>% sapply(class) %>% table
+```
+
+```{r}
+# Pipeline to accomplish the same:
+# X %>% sapply(class) %>% .[. == 'factor']
+
+names(X)[sapply(X, class) == 'factor']
+```
+
+# Partial Analysis
+
+We could start by looking at the relationship between some of the more intuitive variables like Age, Gender, and Genotype and impairment, to see if there are any obvious relationships.
+
+## Age vs Impairment
+
+```{r}
+data %>% 
+  mutate(age_range=cut(age, breaks=5)) %>%
+  group_by(age_range, response) %>% tally %>% 
+  plot_ly(x=~age_range, y=~n, color=~response, type='bar') %>%
+  plotly::layout(hovermode='closest', title='Age vs Impairment')
+```
+
+
+## Genotype vs Impairment
+
+```{r}
+data %>% 
+  group_by(Genotype, response) %>% tally %>% 
+  plot_ly(x=~Genotype, y=~n, color=~response, type='bar') %>%
+  plotly::layout(hovermode='closest', title='Genotype vs Impairment')
+```
+
+
+## Gender vs Impairment
+
+```{r}
+data %>% 
+  group_by(gender, response) %>% tally %>% 
+  plot_ly(x=~gender, y=~n, color=~response, type='bar') %>%
+  layout(hovermode='closest', title='Gender vs Impairment')
+```
+
+
+### Protein Analysis
+
+Now what about the other ~125 variables?  We can't look at them all one at a time so perhaps there is a way to "condense" them into something more manageable:
+
+
+```{r, fig.width=10, fig.height=10}
+library(corrplot)
+d.pca <- X %>% select(-gender, -Genotype)
+cor.mat <- corrplot(cor(d.pca), order='hclust', tl.col='black', tl.cex=.5)
+
+# Extract the variable names from the figure below since they will be useful
+# for creating similar plots for comparison (and it's easier to compare in the same order)
+cor.var <- rownames(cor.mat)
+```
+
+
+```{r}
+#d.pca <- X %>% select(-gender, -Genotype)
+pca <- prcomp(d.pca, scale=T)
+```
+
+
+
+
+```{r}
+data.frame(Cumulative.Variance=summary(pca)$importance[3,]) %>% mutate(PC.Number=1:n()) %>%
+  plot_ly(x=~PC.Number, y=~Cumulative.Variance, mode='lines', type='scatter') %>%
+  layout(title='Cumulative Variance Explained by Principal Components')
+```
+
+
+```{r, fig.width=4, fig.height=10}
+corrplot(cor(d.pca[,cor.var], pca$x[,1:25]), tl.col='black', tl.cex=.5)
+```
+
+
+# Regression Models
+
+```{r}
+#registerCores(1)
+
+
+tr <- proj$getTrainer()
+tc <- trainControl(
+  classProbs=T, method='cv', number=10,
+  summaryFunction = function(...)c(twoClassSummary(...), defaultSummary(...)),
+  verboseIter=F, savePredictions='final', returnResamp='final', allowParallel=T
+)
+
+get.ensemble.model <- function(tuneList){
+  caret.list.args <- list(
+    trControl=trainControl(
+      method='cv', number=5, classProbs=T, 
+      returnData=F, savePredictions='final',
+      allowParallel=T, verboseIter=F
+    ),
+    tuneList=tuneList
+  )
+  caret.stack.args <- list(
+    method=GetEnsembleAveragingModel(),
+    trControl=trainControl(method='none', savePredictions = 'final')
+  )
+  GetCaretEnsembleModel(caret.list.args, caret.stack.args)
+}
+
+X.m <- predict(dummyVars(~., X), X) %>% as.data.frame
+
+non.pca.vars <- X.m %>% select(starts_with('gender'), starts_with('Genotype'), starts_with('age')) %>% names
+
+pca.split <- function(X) {
+  list(
+    var=X %>% dplyr::select(one_of(non.pca.vars)),
+    pca=X %>% dplyr::select(-one_of(non.pca.vars))
+  )
+}
+
+pca.combine <- function(pp, X) {
+  X <- pca.split(X)
+  cbind(X$var, predict(pp, newdata=X$pca))
+}
+
+get.model <- function(model.name){
+  model <- getModelInfo()[[model.name]]
+  m <- model
+  
+  m$fit <- function(x, y, wts, param, lev, last, classProbs, ...){
+    X <- pca.split(x)
+    pp <- preProcess(X$pca, method=c('center', 'scale', 'pca'), pcaComp = 40)
+    X.train <- cbind(X$var, predict(pp, newdata=X$pca))
+    modelFit <- model$fit(X.train, y, wts, param, lev, last, classProbs, ...)
+    modelFit$pp <- pp
+    modelFit$feature.names <- names(X.train)
+    modelFit
+  }
+  m$predict <- function (modelFit, newdata, submodels = NULL) {
+    X.test <- pca.combine(modelFit$pp, newdata)
+    model$predict(modelFit, X.test, submodels)
+  }
+  m$prob <- function (modelFit, newdata, submodels = NULL){
+    X.test <- pca.combine(modelFit$pp, newdata)
+    model$prob(modelFit, X.test, submodels)
+  }
+  if (model.name == 'xgbTree'){
+    m$varImp = function(object, numTrees = NULL, ...) {
+      imp <- xgb.importance(object$feature.names, model = object)
+      imp <- as.data.frame(imp)[, 1:2]
+      rownames(imp) <- as.character(imp[,1])
+      imp <- imp[,2,drop = FALSE]
+      colnames(imp) <- "Overall"
+      imp   
+    }
+  }
+  m
+}
+```
+
+
+```{r}
+models <- list(
+  tr$getModel('pca_glm', method=get.model('glm'), trControl=tc),
+  tr$getModel('pca_glmnet', method=get.model('glmnet'), trControl=tc, tuneLength=5),
+  tr$getModel('pca_rf', method=get.model('rf'), trControl=tc, tuneGrid=expand.grid(.mtry = c(2,4,8))),
+  tr$getModel('pca_rpart', method=get.model('rpart'), tuneLength=10, trControl=tc),
+  tr$getModel('pca_gbm', method=get.model('gbm'), tuneLength=5, trControl=tc, verbose=F),
+  tr$getModel('pca_xgb', method=get.model('xgbTree'), tuneLength=5, trControl=tc),
+  tr$getModel('pca_spline', method=get.model('earth'), preProcess=pre.proc, trControl=tc, tuneLength=5),
+  tr$getModel('pca_nnet', method=get.model('nnet'), preProcess=pre.proc, trControl=tc, tuneLength=5, trace=F)
+)
+names(models) <- sapply(models, function(m) m$name)
+
+pca.results <- lapply(models, function(m) tr$train(m, X.m, y, enable.cache=T)) %>% setNames(names(models))
+```
+
+```{r}
+library(caretEnsemble)
+pre.proc <- c('center', 'scale')
+
+ens.model <- list(
+  glmnet=caretModelSpec(method='glmnet', preProcess=pre.proc, tuneLength=5),
+  gbm=caretModelSpec(method='gbm', tuneLength=5, verbose=F),
+  spline=caretModelSpec(method='earth', tuneLength=5, preProcess=pre.proc)
+)
+models <- list(
+  tr$getModel('glm', method='glm', preProcess=pre.proc, trControl=tc),
+  tr$getModel('glmnet', method='glmnet', preProcess=pre.proc, trControl=tc, tuneLength=5),
+  tr$getModel('nnet', method='nnet', preProcess=pre.proc, trControl=tc, tuneLength=5, trace=F),
+  tr$getModel('rpart', method='rpart', tuneLength=10, trControl=tc),
+  tr$getModel('gbm', method='gbm', tuneLength=5, trControl=tc, verbose=F),
+  tr$getModel('xgb', method='xgbTree', tuneLength=5, trControl=tc),
+  tr$getModel('spline', method='earth', preProcess=pre.proc, trControl=tc, tuneLength=5),
+  tr$getModel('rf', method='rf', trControl=tc, tuneLength=5),
+  tr$getModel('ensemble', method=get.ensemble.model(ens.model), trControl=tc, tuneLength=5)
+)
+names(models) <- sapply(models, function(m) m$name)
+
+all.results <- lapply(models, function(m) tr$train(m, X.m, y, enable.cache=T)) %>% setNames(names(models))
+```
+
+
+```{r}
+rbind(GetResampleData(pca.results), GetResampleData(all.results)) %>%
+  mutate(model=reorder(model, accuracy, median)) %>%
+  plot_ly(x=~model, y=~accuracy, type='box') %>%
+  layout(margin=list(b=100))
+```
+
+
+```{r}
+var.imp <- GetVarImp(all.results)
+var.imp %>%
+  mutate(feature=reorder(var.imp$feature, var.imp$score, mean)) %>%
+  plot_ly(x=~feature, y=~score, color=~model, mode='markers', type='scatter') %>%
+  layout(margin=list(b=200))
+```
+
+
+
+```{r}
+var.model.names <- names(pca.results)[!str_detect(names(pca.results), 'nnet')]
+var.imp <- GetVarImp(pca.results[var.model.names])
+var.imp %>%
+  mutate(feature=reorder(var.imp$feature, var.imp$score, mean)) %>%
+  plot_ly(x=~feature, y=~score, color=~model, mode='markers', type='scatter') %>%
+  layout(margin=list(b=200))
+```
+
+
+<!-- {r} -->
+<!-- #pc3 <- results$pca_xgb$fit$finalModel$pp$rotation[,3]  -->
+<!-- scale_vec <- function(x) (x - median(x)) / IQR(x) -->
+<!-- results$pca_xgb$fit$finalModel$pp$rotation %>% t %>% apply(2, scale_vec) %>%  -->
+<!--   as.data.frame %>% add_rownames(var='PC') %>%  -->
+<!--   plot_ly(x=~tau, y=~Ab_42, text=~PC, type='scatter', mode='markers') -->
+
+
+```{r}
+
+pd.vars <- c('tau', 'p_tau', 'Ab_42', 'age', 'gender.Male', 'gender.Female')
+pd.models <- c('xgb', 'gbm', 'glmnet', 'spline', 'ensemble')
+#pd.models <- c('ensemble')
+
+pred.fun <- function(object, newdata) {
+  if ('caretStack' %in% class(object$finalModel)){
+    pred <- predict(object$finalModel, newdata=newdata, type='prob')
+  } else {
+    pred <- predict(object, newdata=newdata, type='prob')
+  }
+  if (is.vector(pred)) pred
+  else pred[,1] 
+}
+options(error=recover)
+#registerCores(1) # Increase this to make PD calcs faster
+pd.data <- GetPartialDependence(
+  all.results[pd.models], pd.vars, pred.fun, 
+  X=X.m, # This can come from model objects but only if returnData=T in trainControl
+  grid.size=50, grid.window=c(0, 1), # Resize these to better fit range of data
+  sample.rate=1, # Decrease this if PD calculations take too long
+  verbose=F, seed=SEED
+)
+
+```
+
+
+```{r, fig.width=6, fig.height=3}
+pd.mean <- foreach(pd=pd.data, .combine=rbind)%do%
+  { pd$pd %>% dplyr::mutate(predictor=pd$predictor, model=pd$model) } %>%
+  dplyr::group_by(predictor, model, x) %>% 
+  dplyr::summarise(y.mid=mean(y)) %>% ungroup 
+
+pd.mean %>% ggplot(aes(x=x, y=y.mid, color=model)) + geom_line() + facet_wrap(~predictor, scale='free') +
+  theme_bw() + 
+  ylab('Predicted Probability') + xlab('Predictor Value')
+```
+
+
+```{r}
+glmnet.model <- all.results$glmnet$fit$finalModel
+glmnet.coef <- predict(glmnet.model, s=all.results$glmnet$fit$bestTune$lambda, type='coefficients')
+glmnet.coef <- glmnet.coef[,1]
+glmnet.coef %>% data.frame %>% setNames('Coefficient') %>% add_rownames(var='Feature') %>%
+  filter(abs(Coefficient) > 0) %>%
+  mutate(Feature=reorder(Feature, Coefficient, mean)) %>%
+  plot_ly(x=~Feature, y=~Coefficient, type='bar') %>%
+  layout(margin=list(b=200), title='Glmnet Coefficients')
+```
+
+<!-- Graveyard -->
+
+
+<!-- # The code below will plot the PCA loadings (ie pca$rotation) matrix -->
+<!-- # directly rather than looking at correlations between original and transformed variables -->
+<!-- # (though these show about the same thing) -->
+
+<!--
+{r, fig.height=10, fig.width=6}
+library(reshape2)
+dp <- pca$rotation[,1:25][cor.var,] %>% as.data.frame %>%
+  add_rownames(var='feature') %>%
+  melt(id.vars='feature', variable.name='pc')
+dp$feature <- factor(dp$feature, levels=rev(cor.var))
+dp %>% ggplot(aes(x=pc, y=feature, fill=value)) + geom_tile() +
+  scale_fill_gradient2(low='red', high='blue', mid='white')
+-->
+
+<!-- PCA + Data Projections -->
+<!-- {r, fig.width=10, fig.height=10} -->
+<!-- i.pca <- c(1,2) -->
+<!-- d.pca.pred <- as.data.frame(predict(pca, d.pca)[,i.pca]) %>% setNames(., c('PC1', 'PC2')) -->
+<!-- d.pca.pred$response <- y -->
+
+<!-- # d.pca.pred %>% plot_ly(x=~PC1, y=~PC2, color=~response, type='scatter', mode='markers') -->
+
+<!-- # Parameters for axis with no grid lines, ticks or labels -->
+<!-- empty.axis <- list( -->
+<!--   title = '', -->
+<!--   zeroline = FALSE, -->
+<!--   showline = FALSE, -->
+<!--   showticklabels = FALSE, -->
+<!--   ticklen = 0, -->
+<!--   showgrid = FALSE -->
+<!-- ) -->
+
+<!-- # Create a line plot of each variable showing which direction it moves within our 2D space -->
+<!-- p1 <- plot_ly( -->
+<!--     d.pca.pred, x=~PC2, y=~PC1, type='scatter', color=~response,  -->
+<!--     mode='markers', opacity=1 -->
+<!--   ) %>%  -->
+<!--   layout( -->
+<!--     xaxis=list(showgrid=F, zeroline=T), -->
+<!--     yaxis=list(showgrid=F, zeroline=T) -->
+<!--   ) -->
+
+<!-- # Create a heatmap of impairment incidence rate across our 2D space -->
+<!-- d.hm <- d.pca.pred %>%  -->
+<!--   mutate(PC1=as.character(cut(PC1, breaks=3)), PC2=as.character(cut(PC2, breaks=3))) %>% -->
+<!--   group_by(PC1, PC2) %>% summarise(PCT=100*sum(response == 'Impaired')/n()) %>% -->
+<!--   acast(PC1 ~ PC2, value.var='PCT') -->
+<!-- p2 <- plot_ly(z=d.hm[c(3,2,1),], type='heatmap', reversescale=F) #%>% -->
+<!--   #layout(xaxis=empty.axis, yaxis=empty.axis) -->
+
+<!-- # Overlay the above plots on top of one another -->
+<!-- subplot(p2, p1, margin=-1) %>%  -->
+<!--   layout( -->
+<!--     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',  -->
+<!--     width=750, height=500, -->
+<!--     title='2D Projection of Correlated Features Overlayed w/ Impairment Rates' -->
+<!--   ) -->
+
+
+
+<!-- TSNE projections -->
+<!-- {r} -->
+<!-- library(tsne) -->
+<!-- d.tsne <- X %>% select(-gender, -Genotype) -->
+<!-- scale_vec <- function(x) (x - mean(x)) / sd(x) -->
+<!-- d.tsne <- d.tsne %>% mutate_each(funs(scale_vec)) -->
+<!-- m.tsne <- tsne(d.tsne) -->
+<!-- m.tsne %>% as.data.frame %>% ggplot(aes(x=V1, y=V2)) + geom_point() -->
+

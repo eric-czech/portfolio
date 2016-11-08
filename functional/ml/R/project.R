@@ -3,7 +3,7 @@ source('~/repos/portfolio/functional/ml/R/trainer.R')
 
 MLProject <- setRefClass(
   "MLProject",
-  fields = list(trainer='SimpleTrainer', seed='numeric', proj.dir='character', res.cache='Cache'),
+  fields = list(trainer='SimpleTrainer', advanced.trainer='Trainer', seed='numeric', proj.dir='character', res.cache='Cache'),
   methods = list(
 
     #' @title Constructor for project
@@ -14,10 +14,12 @@ MLProject <- setRefClass(
      
       res.cache <<- Cache(dir=file.path(proj.dir, 'cache'), project='results')
       trainer <<- SimpleTrainer(cache.dir=file.path(proj.dir, 'cache'), cache.project='models', seed=seed)
+      advanced.trainer <<- Trainer(cache.dir=file.path(proj.dir, 'cache'), cache.project='models', seed=seed)
      
-      callSuper(..., trainer=trainer, seed=seed, proj.dir=proj.dir, res.cache=res.cache)
+      callSuper(..., trainer=trainer, advanced.trainer=advanced.trainer, seed=seed, proj.dir=proj.dir, res.cache=res.cache)
     },
     getTrainer = function(){ trainer },
+    getAdvancedTrainer = function(){ advanced.trainer },
     getDataDir = function(){
       file.path(proj.dir, 'data')
     },

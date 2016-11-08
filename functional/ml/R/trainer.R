@@ -8,7 +8,7 @@ Trainer <- setRefClass(
   "Trainer",
   fields = list(cache='Cache', seed='numeric', fold.data='list', fold.index='list'),
   methods = list(
-    initialize = function(..., cache.dir, cache.project, seed=1){
+    initialize = function(..., cache.dir=file.path('~', '.Rcache'), cache.project='default', seed=1){
       cache <<- Cache(dir=cache.dir, project=cache.project)
       callSuper(..., cache=cache, seed=seed, fold.data=list(), fold.index=list())
     },
@@ -43,6 +43,17 @@ Trainer <- setRefClass(
         list(key=fold.key, id=i, data=d, index=inner.fold.index)
       })
       loginfo('Fold data generation complete')
+    },
+    getModel = function(name, ...){
+      list(
+        name=name, 
+        train=function(d, idx, i){trim_model(caret::train(d$X.train, d$y.train, ...))},
+        predict=function(fit, d, i){list(
+          prob=predict(fit, d$X.test, type='prob')[,1],
+          class=predict(fit, d$X.test, type='raw')
+        )},
+        test=function(d) d$y.test
+      )
     },
     getFoldData = function(){
       fold.data
