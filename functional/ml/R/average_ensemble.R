@@ -31,7 +31,7 @@ GetEnsembleAveragingModel <- function(
       
       if (all.factors) p <- apply(newdata, 1, class.to.class, modelFit$lev)
       else p <- apply(newdata, 1, prob.to.class, modelFit$lev)
-
+      
       factor(p, levels=modelFit$lev)
     },
     prob = function(modelFit, newdata, submodels = NULL) {
@@ -51,7 +51,8 @@ GetEnsembleAveragingModel <- function(
     },
     varImp = NULL,
     predictors = function(x, ...) NULL,
-    levels = function(x) if(any(names(x) == "obsLevels")) x$obsLevels else NULL,
+    #levels = function(x) {if(any(names(x) == "obsLevels")) x$obsLevels else NULL},
+    levels = function(x) x$obsLevels,
     sort = NULL
   )
 }
@@ -89,7 +90,6 @@ GetEnsembleQuantileModel <- function(){
       
       if (all.factors) p <- apply(newdata, 1, class.to.class, modelFit$lev)
       else p <- apply(newdata, 1, prob.to.class, modelFit$lev, modelFit$quantile)
-      
       factor(p, levels=modelFit$lev)
     },
     prob = function(modelFit, newdata, submodels = NULL) {
@@ -109,7 +109,7 @@ GetEnsembleQuantileModel <- function(){
     },
     varImp = NULL,
     predictors = function(x, ...) NULL,
-    levels = function(x) if(any(names(x) == "obsLevels")) x$obsLevels else NULL,
+    levels = function(x) x$obsLevels,
     sort = function(x) x[order(x$quantile),]
   )
 }
@@ -139,7 +139,7 @@ GetCaretEnsembleModel <- function(caret.list.args, caret.stack.args){
     },
     varImp = NULL,
     predictors = function(x, ...) NULL,
-    levels = function(x) if(any(names(x) == "obsLevels")) x$obsLevels else NULL,
+    levels = function(x) x$obsLevels,
     sort = NULL
   )
 }

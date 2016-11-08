@@ -1,7 +1,19 @@
 ---
-title: "R Notebook"
+title: "R Notebook for Alzheimers Analysis"
+author: Eric Czech
 output: html_notebook
 ---
+
+This doc will cover some applications of simple and complex models to our Alzheimer's dataset, and talk about how the results could be applied or interpereted much like the work originally done in the paper ["Multiplexed immunoassay panel identifies novel CSF biomarkers for Alzheimer's disease diagnosis and prognosis"](https://www.ncbi.nlm.nih.gov/pubmed/21526197]).
+
+Some of the topics covered:
+
+- How to make custom Caret models (and why this is usually the best route to go for anything non-standard)
+- A little bit on classifier performance metrics when [Facing Imbalanced Data](http://www.pitt.edu/~jeffcohn/biblio/Jeni_Metrics.pdf) (figure 1 on page 5 of this paper is the most informative thing I have ever seen on this topic)
+- A little bit more on plot.ly and its awesomeness
+- Understanding what black-box ML models learn with partial dependence, and where [PDP can fail](https://arxiv.org/pdf/1309.6392v2.pdf) (the figure on page 5 is a great example)
+- Modeling philosophies w.r.t. linear vs non-linear models
+- How to find a middle ground between dumb, linear statistical models that generalize (i.e. make predictions) poorly and ML algos that generalize well but make you feel dumb
 
 
 ```{r init, results='hide', warning=F, message=F, error=F, echo=F}
@@ -19,6 +31,10 @@ layout <- plotly::layout
 # library(AppliedPredictiveModeling)
 # ?diagnosis
 ```
+
+# Refresher on Our AD Data
+
+Load in the same data as before and run some basic analysis to get back in the munging mood:
 
 ```{r}
 # Load in the whole Alzheimers data file
@@ -43,6 +59,8 @@ head(data)
 
 
 ```{r}
+# Parse our data into predictors and a binary response 
+# (Impaired vs Not Impaired) and check response frequency
 X <- data %>% select(-response)
 y <- data[,'response']
 table(y)
@@ -53,6 +71,7 @@ table(y) / length(y)
 ```
 
 ```{r}
+# Check out the names of the predictors we have:
 names(X)
 ```
 
@@ -60,6 +79,7 @@ names(X)
 # Base R to accomplish the same:
 # table(sapply(X, class))
 
+# Look at what class each predictor has:
 X %>% sapply(class) %>% table
 ```
 
@@ -67,12 +87,13 @@ X %>% sapply(class) %>% table
 # Pipeline to accomplish the same:
 # X %>% sapply(class) %>% .[. == 'factor']
 
+# Identify the factor variables, since they also need special attention:
 names(X)[sapply(X, class) == 'factor']
 ```
 
 # Partial Analysis
 
-We could start by looking at the relationship between some of the more intuitive variables like Age, Gender, and Genotype and impairment, to see if there are any obvious relationships.
+We can start by looking at the relationship between some of the more intuitive variables like Age, Gender, and Genotype and impairment, to see if there are any obvious relationships.
 
 ## Age vs Impairment
 
@@ -120,14 +141,15 @@ cor.mat <- corrplot(cor(d.pca), order='hclust', tl.col='black', tl.cex=.5)
 cor.var <- rownames(cor.mat)
 ```
 
+## PCA 
 
 ```{r}
-#d.pca <- X %>% select(-gender, -Genotype)
+# Run PCA, and make sure scaling is on since we didn't do that manually
 pca <- prcomp(d.pca, scale=T)
 ```
 
 
-
+Check how well the Principal Components capture the correlated groups of variables:
 
 ```{r}
 data.frame(Cumulative.Variance=summary(pca)$importance[3,]) %>% mutate(PC.Number=1:n()) %>%
@@ -136,28 +158,73 @@ data.frame(Cumulative.Variance=summary(pca)$importance[3,]) %>% mutate(PC.Number
 ```
 
 
+## Projections of Features onto PCs
+
+One way to look at how much each PC is related to a feature is to look at the correlation between the feature itself and it's transformed version in the new Principal Compenent space .. err a simpler way to put that is to say we have some "transformation" (which could be from PCA or anything else), which will assign a new value to every feature for each observation.  Then we can just look at how the original values correlate with the transformed ones to see what the transformation is actually doing:
+
 ```{r, fig.width=4, fig.height=10}
-corrplot(cor(d.pca[,cor.var], pca$x[,1:25]), tl.col='black', tl.cex=.5)
+original.data <- d.pca[,cor.var]
+pca.data <- pca$x[,1:25] # Using the first 25 PCs only, for brevity
+corrplot(cor(original.data, pca.data), tl.col='black', tl.cex=.5)
 ```
 
 
-# Regression Models
+# Applying and Analyzing Predictive Models
+
+## Modeling Data Prep
+
+First we have to do a little better of extra massaging of the predictor data to make sure that all the different model types within caret will be able to use it (namely, encoding factors in some numeric way).
 
 ```{r}
-#registerCores(1)
+# We currently have factors like this:
+X %>% select(starts_with('gender'), starts_with('Genotype')) %>% head
+```
+
+We don't want these to remain factors or a lot of different caret models will choke.  Luckily there's a caret function that makes that pretty easy:
+
+```{r}
+# Here, the dummyVars function will automatically detect and turn factor values into separate columns
+X.m <- predict(dummyVars(~., X), X) %>% as.data.frame
+X.m %>% select(starts_with('gender'), starts_with('Genotype')) %>% head
+```
 
 
+### Model Helper Functions
+
+These can be ignored for now but are good to come back to for reference on specific configurations and such:
+
+```{r}
+# These functions are mostly just precursors to the following training commands, and
+# serve to do things like specify cross validation, how performance measures are 
+# calculated, create ensemble models, apply PCA to data subsets, etc.
+#
+# This isn't a caret thing, it's just my own thing I use to help 
+# make it more convenient to save model results on disk in a more 
+# convenient way
 tr <- proj$getTrainer()
+#
+# This function with define how performance measures are calculated for each "fold"
+summary.function <- function(...){
+  arg.list <- list(...)
+  if (!('Impaired' %in% names(arg.list[[1]])))
+    arg.list[[1]]$Impaired <- arg.list[[1]]$classProb
+  c(do.call(twoClassSummary, arg.list), do.call(defaultSummary, arg.list))
+}
+#
+# Training control -- standard caret stuff
 tc <- trainControl(
   classProbs=T, method='cv', number=10,
-  summaryFunction = function(...)c(twoClassSummary(...), defaultSummary(...)),
+  summaryFunction = summary.function,
   verboseIter=F, savePredictions='final', returnResamp='final', allowParallel=T
 )
-
+#
+# This is an ensemble specification that will average predictions from 
+# multiple models together
 get.ensemble.model <- function(tuneList){
   caret.list.args <- list(
     trControl=trainControl(
-      method='cv', number=5, classProbs=T, 
+      method='cv', number=5, classProbs=T,
+      summaryFunction = function(...) c(twoClassSummary(...), defaultSummary(...)),
       returnData=F, savePredictions='final',
       allowParallel=T, verboseIter=F
     ),
@@ -165,31 +232,58 @@ get.ensemble.model <- function(tuneList){
   )
   caret.stack.args <- list(
     method=GetEnsembleAveragingModel(),
-    trControl=trainControl(method='none', savePredictions = 'final')
+    trControl=trainControl(method='none', savePredictions = 'final', classProbs=T,
+                           summaryFunction = function(...) c(twoClassSummary(...), defaultSummary(...)),
+                           returnResamp='final')
   )
   GetCaretEnsembleModel(caret.list.args, caret.stack.args)
 }
-
-X.m <- predict(dummyVars(~., X), X) %>% as.data.frame
-
-non.pca.vars <- X.m %>% select(starts_with('gender'), starts_with('Genotype'), starts_with('age')) %>% names
-
+#
+# Two utility functions for splitting predictor data into separate data frames as well
+# as merging them back together before fitting models with the result
 pca.split <- function(X) {
   list(
     var=X %>% dplyr::select(one_of(non.pca.vars)),
     pca=X %>% dplyr::select(-one_of(non.pca.vars))
   )
 }
-
 pca.combine <- function(pp, X) {
   X <- pca.split(X)
   cbind(X$var, predict(pp, newdata=X$pca))
 }
+```
 
+# Custom Caret Model Spec
+
+In order to use PCA within the caret modeling framework, you have 3 main options:
+
+1. Using it's built in support for preprocessing data with PCA, which is great, but does not at all support only applying PCA to some of the data
+2. Ignore caret, write your own CV loops and results aggregation stuff
+3. Wrap caret model implementations with some functions that do the application of PCA for you
+
+Option 3 is likely the best choice and caret makes it easy to override any part of its built in models (though understanding the consequences of overriding things is sometimes tough).  Here is an example of this below:
+
+```{r}
+# Example Caret custom model specification
+
+# PCA preprocessing model wrapper 
+# 
+# This function will take any valid caret "method" name
+# and wrap its fit/predict/prob functions with necessary logic to
+# apply PCA to data subsets
 get.model <- function(model.name){
+  # All Caret models are represented as lists, retrievable using "getModelInfo"
+  # Each of these lists has a variety of functions keyed by names like:
+  # "fit" - This function takes in data to fit the model on and should return a fit model object
+  # "prob" - This function in the list should return predicted probabilities
+  # "grid" - This function is responsible for creating hyperparameter grids to train over
+  # And several more ...
   model <- getModelInfo()[[model.name]]
   m <- model
   
+  # In this case, we're overriding the standard "fit" function with a new function
+  # that will split the input data, apply PCA to some of it, and then fit a model
+  # on the resulting, smaller dataset
   m$fit <- function(x, y, wts, param, lev, last, classProbs, ...){
     X <- pca.split(x)
     pp <- preProcess(X$pca, method=c('center', 'scale', 'pca'), pcaComp = 40)
@@ -199,6 +293,9 @@ get.model <- function(model.name){
     modelFit$feature.names <- names(X.train)
     modelFit
   }
+  
+  # The "predict" and "prob" methods must be overriden as well to apply PCA
+  # to any new data given to make predictions on
   m$predict <- function (modelFit, newdata, submodels = NULL) {
     X.test <- pca.combine(modelFit$pp, newdata)
     model$predict(modelFit, X.test, submodels)
@@ -207,6 +304,12 @@ get.model <- function(model.name){
     X.test <- pca.combine(modelFit$pp, newdata)
     model$prob(modelFit, X.test, submodels)
   }
+  
+  # And as is par for the course with Caret, there are always a couple
+  # of model types that don't always work as expected when you do custom
+  # things like this.  In this case, xgbTree models were using the original
+  # feature names to get "importances" of each so that must be overriden
+  # here to use the reduced feature list instead
   if (model.name == 'xgbTree'){
     m$varImp = function(object, numTrees = NULL, ...) {
       imp <- xgb.importance(object$feature.names, model = object)
@@ -221,6 +324,9 @@ get.model <- function(model.name){
 }
 ```
 
+## Model Training
+
+With all the precursor stuff in place, the caret models can be called with different tuning settings and in this case, the wrapper function above will also make sure PCA is applied to protein features:
 
 ```{r}
 models <- list(
@@ -235,13 +341,19 @@ models <- list(
 )
 names(models) <- sapply(models, function(m) m$name)
 
+# Loop through the models and call "train" on each
 pca.results <- lapply(models, function(m) tr$train(m, X.m, y, enable.cache=T)) %>% setNames(names(models))
 ```
+
+## Non-PCA Model Training
+
+For comparison, also train a bunch of models on the entire dataset:
 
 ```{r}
 library(caretEnsemble)
 pre.proc <- c('center', 'scale')
 
+# This "ensemble" model will combine predictions from 3 separate other models
 ens.model <- list(
   glmnet=caretModelSpec(method='glmnet', preProcess=pre.proc, tuneLength=5),
   gbm=caretModelSpec(method='gbm', tuneLength=5, verbose=F),
@@ -256,28 +368,60 @@ models <- list(
   tr$getModel('xgb', method='xgbTree', tuneLength=5, trControl=tc),
   tr$getModel('spline', method='earth', preProcess=pre.proc, trControl=tc, tuneLength=5),
   tr$getModel('rf', method='rf', trControl=tc, tuneLength=5),
-  tr$getModel('ensemble', method=get.ensemble.model(ens.model), trControl=tc, tuneLength=5)
+  tr$getModel('ensemble', method=get.ensemble.model(ens.model), trControl=tc)
 )
 names(models) <- sapply(models, function(m) m$name)
 
+# Again, loop through the models and run the training process
 all.results <- lapply(models, function(m) tr$train(m, X.m, y, enable.cache=T)) %>% setNames(names(models))
+```
+
+## Raw Results
+
+Caret attaches a ton of information to each fit model object:
+
+```{r}
+# The "model" object itself
+pca.results[['pca_glm']]$fit$finalModel
 ```
 
 
 ```{r}
-rbind(GetResampleData(pca.results), GetResampleData(all.results)) %>%
-  mutate(model=reorder(model, accuracy, median)) %>%
-  plot_ly(x=~model, y=~accuracy, type='box') %>%
-  layout(margin=list(b=100))
+# Resampling results for every hyperparameter combination
+all.results[['xgb']]$fit$results %>% head
 ```
 
+
+## Model Performance
+
+```{r}
+rbind(GetResampleData(pca.results), GetResampleData(all.results)) %>%
+  mutate(model=reorder(model, kappa, median)) %>%
+  plot_ly(x=~model, y=~kappa, type='box') %>%
+  layout(margin=list(b=100), title='Model Performance')
+```
+
+```{r}
+dt <- rbind(GetResampleData(pca.results), GetResampleData(all.results)) 
+dt.ens <- dt %>% filter(model == 'ensemble') %>% .[,'kappa']
+dt %>% group_by(model) %>% do({
+  d <- .
+  r <- t.test(dt.ens, d$kappa)
+  data.frame(p=r$p.value)
+}) %>% ungroup %>% arrange(p) %>% 
+  mutate(model=reorder(model, p, max)) %>%
+  plot_ly(x=~model, y=~p, type='scatter', mode='lines') %>%
+  layout(margin=list(b=100,r=100), title='T-Test Statistics')
+```
+
+## Feature Importance
 
 ```{r}
 var.imp <- GetVarImp(all.results)
 var.imp %>%
   mutate(feature=reorder(var.imp$feature, var.imp$score, mean)) %>%
   plot_ly(x=~feature, y=~score, color=~model, mode='markers', type='scatter') %>%
-  layout(margin=list(b=200))
+  layout(margin=list(b=200), title='Feature Importance (no PCA Features)')
 ```
 
 
@@ -288,7 +432,7 @@ var.imp <- GetVarImp(pca.results[var.model.names])
 var.imp %>%
   mutate(feature=reorder(var.imp$feature, var.imp$score, mean)) %>%
   plot_ly(x=~feature, y=~score, color=~model, mode='markers', type='scatter') %>%
-  layout(margin=list(b=200))
+  layout(margin=list(b=200), title='Feature Importance (w/ PCA Features)')
 ```
 
 
@@ -299,12 +443,16 @@ var.imp %>%
 <!--   as.data.frame %>% add_rownames(var='PC') %>%  -->
 <!--   plot_ly(x=~tau, y=~Ab_42, text=~PC, type='scatter', mode='markers') -->
 
+## Partial Dependence Calculation
 
 ```{r}
 
-pd.vars <- c('tau', 'p_tau', 'Ab_42', 'age', 'gender.Male', 'gender.Female')
+pd.vars <- c(
+  'age', 'gender.Male', 'gender.Female', 'tau', 
+  'Cystatin_C', 'Ab_42', 'Cortisol', 'VEGF',
+  'NT_proBNP'
+)
 pd.models <- c('xgb', 'gbm', 'glmnet', 'spline', 'ensemble')
-#pd.models <- c('ensemble')
 
 pred.fun <- function(object, newdata) {
   if ('caretStack' %in% class(object$finalModel)){
@@ -316,7 +464,7 @@ pred.fun <- function(object, newdata) {
   else pred[,1] 
 }
 options(error=recover)
-#registerCores(1) # Increase this to make PD calcs faster
+registerCores(1) # Increase this to make PD calcs faster
 pd.data <- GetPartialDependence(
   all.results[pd.models], pd.vars, pred.fun, 
   X=X.m, # This can come from model objects but only if returnData=T in trainControl
@@ -328,6 +476,8 @@ pd.data <- GetPartialDependence(
 ```
 
 
+## Partial Dependence Plotting
+
 ```{r, fig.width=6, fig.height=3}
 pd.mean <- foreach(pd=pd.data, .combine=rbind)%do%
   { pd$pd %>% dplyr::mutate(predictor=pd$predictor, model=pd$model) } %>%
@@ -336,9 +486,18 @@ pd.mean <- foreach(pd=pd.data, .combine=rbind)%do%
 
 pd.mean %>% ggplot(aes(x=x, y=y.mid, color=model)) + geom_line() + facet_wrap(~predictor, scale='free') +
   theme_bw() + 
-  ylab('Predicted Probability') + xlab('Predictor Value')
+  ylab('Predicted Probability') + xlab('Predictor Value') + 
+  ggtitle('Partial Dependence by Model (free Y scale)')
 ```
 
+```{r, fig.width=6, fig.height=3}
+pd.mean %>% ggplot(aes(x=x, y=y.mid, color=model)) + geom_line() + facet_wrap(~predictor, scale='free_x') +
+  theme_bw() + 
+  ylab('Predicted Probability') + xlab('Predictor Value') +
+  ggtitle('Partial Dependence by Model (fixed Y scale)')
+```
+
+## Model Coefficients
 
 ```{r}
 glmnet.model <- all.results$glmnet$fit$finalModel
@@ -350,6 +509,14 @@ glmnet.coef %>% data.frame %>% setNames('Coefficient') %>% add_rownames(var='Fea
   plot_ly(x=~Feature, y=~Coefficient, type='bar') %>%
   layout(margin=list(b=200), title='Glmnet Coefficients')
 ```
+
+# Conclusion
+
+What we've done here comes close to inferring similar conclusions as those in the paper that first used the same data (mentioned in the intro).  But, taking a lot of the same approaches into the world of business data leaves a lot to be desired IMO.  ML models certainly surface useful signals for making predictive conclusions, but the way they do so without any prior knowledge of the problem or the inputs really limits how realistic they can ever be (e.g. the step functions or unbounded relationships are never really true).
+
+A good middle ground is likely frameworks for building models, rather than applying predefined ones (e.g. caret), and hopefully we make such things a topic for another meetup?  These kinds of frameworks make it possible to build models that generalize well but also learn realistic relationships, or at least in so far as they could ever be pre-determined.
+
+
 
 <!-- Graveyard -->
 
