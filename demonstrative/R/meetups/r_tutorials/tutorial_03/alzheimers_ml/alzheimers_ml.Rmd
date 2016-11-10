@@ -9,6 +9,7 @@ This doc will cover some applications of simple and complex models to our Alzhei
 Some of the topics covered:
 
 - How to make custom Caret models (and why this is usually the best route to go for anything non-standard)
+- Building ensemble models with [caretEnsemble](https://cran.r-project.org/web/packages/caretEnsemble/vignettes/caretEnsemble-intro.html)
 - A little bit on classifier performance metrics when [Facing Imbalanced Data](http://www.pitt.edu/~jeffcohn/biblio/Jeni_Metrics.pdf) (figure 1 on page 5 of this paper is the most informative thing I have ever seen on this topic)
 - A little bit more on plot.ly and its awesomeness
 - Understanding what black-box ML models learn with partial dependence, and where [PDP can fail](https://arxiv.org/pdf/1309.6392v2.pdf) (the figure on page 5 is a great example)
@@ -239,6 +240,9 @@ get.ensemble.model <- function(tuneList){
   GetCaretEnsembleModel(caret.list.args, caret.stack.args)
 }
 #
+# Create a vector containing the names of features we do NOT want to preprocess with PCA
+non.pca.vars <- X.m %>% select(starts_with('Gender'), starts_with('Genotype'), age) %>% names
+#
 # Two utility functions for splitting predictor data into separate data frames as well
 # as merging them back together before fitting models with the result
 pca.split <- function(X) {
@@ -401,13 +405,25 @@ rbind(GetResampleData(pca.results), GetResampleData(all.results)) %>%
   layout(margin=list(b=100), title='Model Performance')
 ```
 
+
 ```{r}
+rbind(GetResampleData(pca.results), GetResampleData(all.results)) %>% head
+```
+
+```{r}
+metric <- 'kappa'
 dt <- rbind(GetResampleData(pca.results), GetResampleData(all.results)) 
-dt.ens <- dt %>% filter(model == 'ensemble') %>% .[,'kappa']
+dt.ens <- dt %>% filter(model == 'ensemble') %>% arrange(resample) %>% .[,metric]
 dt %>% group_by(model) %>% do({
   d <- .
-  r <- t.test(dt.ens, d$kappa)
-  data.frame(p=r$p.value)
+  d <- d %>% arrange(resample)
+  # print(d)
+  if (d$model[1] == 'ensemble'){
+    data.frame(p=1)
+  } else {
+    r <- t.test(dt.ens, data.frame(d)[,metric], paired=T, alternative='greater')
+    data.frame(p=r$p.value)
+  }
 }) %>% ungroup %>% arrange(p) %>% 
   mutate(model=reorder(model, p, max)) %>%
   plot_ly(x=~model, y=~p, type='scatter', mode='lines') %>%
@@ -478,22 +494,55 @@ pd.data <- GetPartialDependence(
 
 ## Partial Dependence Plotting
 
+First, to help understand where partial dependence comes from it's helpful to look at the "ICE" (Individual Conditional Expectation) curves.  This is a much simpler process than the name makes it sound .. computing these involves nothing more than picking an observation, altering the value of one predictor for that observation, and seeing how the predicted probability from a model changes as that predictor changes:
+
+```{r, fig.width=8, fig.height=10}
+pd.all <- foreach(pd=pd.data, .combine=rbind)%do%
+{ pd$pd %>% dplyr::mutate(predictor=pd$predictor, model=pd$model) }
+
+# Plot the ICE curves for every observation in our dataset (each line represents one observation)
+pd.all %>% 
+  mutate(i=as.numeric(i)) %>%
+  ggplot(aes(x=x, y=y, group=i)) + 
+  geom_line(show.legend=F, alpha=.1) + 
+  theme_bw() +
+  facet_wrap(predictor~model, scales='free', ncol = length(pd.models)) +
+  ggtitle('Individual Conditional Expectation Curves (i.e. "Disaggregated" Partial Dependence)')
+```
+
+To make this simpler then, we could simply take the average predicted value across all the observations (i.e. individual lines) to give a single average predicted value for each feature value.  This is what partial dependence is:
+
 ```{r, fig.width=6, fig.height=3}
+pd.hist.model <- pd.data[[1]]$model
+pd.hist <- lapply(pd.data, function(pd){
+  if (pd$model != pd.hist.model) return(NULL)
+  else data.frame(pd$x) %>% setNames(pd$predictor)
+}) %>% .[!sapply(., is.null)] %>% do.call('cbind', .) %>%
+  melt(id.vars=NULL, variable.name='predictor')
+
 pd.mean <- foreach(pd=pd.data, .combine=rbind)%do%
   { pd$pd %>% dplyr::mutate(predictor=pd$predictor, model=pd$model) } %>%
   dplyr::group_by(predictor, model, x) %>% 
   dplyr::summarise(y.mid=mean(y)) %>% ungroup 
 
-pd.mean %>% ggplot(aes(x=x, y=y.mid, color=model)) + geom_line() + facet_wrap(~predictor, scale='free') +
+ggplot(NULL) + 
+  geom_rug(aes(x=value), size=2, alpha=.1, data=pd.hist) +
+  geom_line(aes(x=x, y=y.mid, color=model), data=pd.mean) + 
+  facet_wrap(~predictor, scale='free') +
   theme_bw() + 
   ylab('Predicted Probability') + xlab('Predictor Value') + 
   ggtitle('Partial Dependence by Model (free Y scale)')
 ```
 
+The y-scales above vary widely, so fixing them to be the same gives a much clearer picture of what features are affecting predictions the most:
+
 ```{r, fig.width=6, fig.height=3}
-pd.mean %>% ggplot(aes(x=x, y=y.mid, color=model)) + geom_line() + facet_wrap(~predictor, scale='free_x') +
+ggplot(NULL) + 
+  geom_rug(aes(x=value), size=2, alpha=.1, data=pd.hist) +
+  geom_line(aes(x=x, y=y.mid, color=model), data=pd.mean) + 
+  facet_wrap(~predictor, scale='free_x') +
   theme_bw() + 
-  ylab('Predicted Probability') + xlab('Predictor Value') +
+  ylab('Predicted Probability') + xlab('Predictor Value') + 
   ggtitle('Partial Dependence by Model (fixed Y scale)')
 ```
 
