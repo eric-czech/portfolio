@@ -384,6 +384,11 @@ all.results <- lapply(models, function(m) tr$train(m, X.m, y, enable.cache=T)) %
 
 Caret attaches a ton of information to each fit model object:
 
+
+```{r}
+all.results[['ensemble']]$fit$resample
+```
+
 ```{r}
 # The "model" object itself
 pca.results[['pca_glm']]$fit$finalModel

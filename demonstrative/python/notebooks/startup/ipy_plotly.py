@@ -3,6 +3,16 @@ import plotly as plty
 import plotly.graph_objs as go
 import cufflinks as cf
 
+# Before using this, the following changes should be made to the offline.py file in the environment's plotly installation:
+# * To get to plotly offline install, eg /Users/eczech/anaconda/envs/research3.5/lib/python3.5/site-packages/plotly/offline
+# - Add the following lines to offline.py in _plot_html after the line "config = {}":
+#   config['modeBarButtonsToRemove'] = ['sendDataToCloud'] # Added manually to remove save icon
+#   config['displaylogo'] = False # Added manually to remove plotly icon
+#
+# After doing this, the extra cleaning logic in "plotly_clean_html" is no longer necessary but it is still left
+# here because it is harmless otherwise and at least strips save icons from serialized plots if the manual edits
+# above have not been made.
+
 # Initialize Jupyter notebook mode
 cf.set_config_file(offline=True, theme='white', offline_link_text=None, offline_show_link=False)
 
