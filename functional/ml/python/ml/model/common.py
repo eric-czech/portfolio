@@ -55,6 +55,7 @@ def resolve_clf(clf):
     # Otherwise, return as is
     return clf
 
+
 def is_linear_regressor(clf):
     return is_instance_of(clf, LINEAR_REGRESSORS)
 

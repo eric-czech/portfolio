@@ -30,5 +30,5 @@ def log_hr():
 
 def log(msg, level=logging.INFO):
     _LOG_LOCK.acquire()
-    LOGGER.log(level, msg)
+    LOGGER.log(msg, level)
     _LOG_LOCK.release()

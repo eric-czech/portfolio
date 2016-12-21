@@ -42,3 +42,10 @@ def assert_object_types(d, m_type=None, na_ok=True):
             msg = 'Found at least one value for field "{}" not matching type filter "{}".  '\
                 'First 10 offending values:\n{}'.format(c, typ, pd.concat([d_ex_v, d_ex_t], axis=1))
             raise AssertionError(msg)
+
+
+def assert_true(condition, msg):
+    if not condition:
+        if not isinstance(msg, str):
+            msg = msg()
+        raise AssertionError(msg)
