@@ -2,6 +2,7 @@
 import pandas as pd
 import numpy as np
 from ml.api.constants import *
+from ml.api.results import properties
 
 import logging
 logger = logging.getLogger(__name__)
@@ -11,6 +12,8 @@ FEATURE_PANEL = 'Features'
 META_PANEL = 'Metadata'
 FOLD_PROPERTY = 'Fold'
 MODEL_PROPERTY = 'Model'
+CATEGORY_PROPERTY = 'Category'
+TASK_PROPERTY = 'Task'
 CLASS_PRED_PREFIX = 'Class:Predicted'
 CLASS_TRUE_PREFIX = 'Class:Actual'
 CLASS_PROB_PREFIX = 'Class:Probability'
@@ -111,8 +114,34 @@ def extract(train_res, proba_fn=None):
     d_pred = pd.concat(d_pred).sort_index(axis=1)
 
     # Name margins
-    d_pred.columns.names = ['Category', 'Task']
+    d_pred.columns.names = [CATEGORY_PROPERTY, TASK_PROPERTY]
     return d_pred
 
 
+def plot_predictions(train_res, predictions):
 
+    mode = train_res.mode
+    if mode != MODE_REGRESSOR:
+        raise NotImplementedError('Prediction visualization not implemented for "{}" training mode'.format(mode))
+        # TODO: Implement confusion matrix viz for classification
+
+    tasks = properties.get_prediction_tasks(train_res)
+
+    d_pred = predictions[[META_PANEL, PREDICTION_PANEL]]
+
+    if mode == MODE_REGRESSOR:
+        d = []
+        for task in tasks:
+            y_pred = d_pred[(PREDICTION_PANEL, '{}:{}'.format(VALUE_PRED_PREFIX, task))]
+            y_true = d_pred[(PREDICTION_PANEL, '{}:{}'.format(VALUE_TRUE_PREFIX, task))]
+            d.append(pd.DataFrame({
+                'Predicted': y_pred,
+                'Actual': y_true,
+                'Task': task,
+                'Model': d_pred[(META_PANEL, MODEL_PROPERTY)],
+                'Fold': d_pred[(META_PANEL, FOLD_PROPERTY)]
+            }))
+        d = pd.concat(d)
+        return d
+
+    return None

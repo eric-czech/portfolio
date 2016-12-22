@@ -3,13 +3,12 @@ import pandas as pd
 from ml.api.results.predictions import PREDICTION_PANEL, META_PANEL
 from ml.api.results.predictions import MODEL_PROPERTY, FOLD_PROPERTY
 from ml.api.results.predictions import VALUE_PRED_PREFIX, CLASS_PRED_PREFIX, CLASS_PROB_PREFIX, \
-    VALUE_TRUE_PREFIX, CLASS_TRUE_PREFIX
+    VALUE_TRUE_PREFIX, CLASS_TRUE_PREFIX, TASK_PROPERTY
 from ml.api.results.predictions import extract
 from ml.api.results import properties
 from ml.api.constants import MODE_CLASSIFIER, MODE_REGRESSOR
 
 METRIC_PROPERTY = 'Metric'
-TASK_PROPERTY = 'Task'
 
 
 def compute_scores(train_res, score_fn, predictions=None):
