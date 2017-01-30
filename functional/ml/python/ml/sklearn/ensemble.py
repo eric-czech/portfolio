@@ -13,6 +13,8 @@ import operator
 from sklearn.base import BaseEstimator, ClassifierMixin, TransformerMixin
 
 # Taken from http://sebastianraschka.com/Articles/2014_ensemble_classifier.html
+
+
 class EnsembleClassifier(BaseEstimator, ClassifierMixin, TransformerMixin):
     """ Soft Voting/Majority Rule classifier for unfitted clfs.
 
@@ -66,12 +68,10 @@ class EnsembleClassifier(BaseEstimator, ClassifierMixin, TransformerMixin):
     >>>
     """
     def __init__(self, clfs, voting='hard', weights=None):
-
         self.clfs = clfs
-        self.named_clfs = {key:value for key,value in _name_estimators(clfs)}
+        self.named_clfs = {key: value for key, value in _name_estimators(clfs)}
         self.voting = voting
         self.weights = weights
-
 
     def fit(self, X, y):
         """ Fit the clfs.
@@ -125,7 +125,6 @@ class EnsembleClassifier(BaseEstimator, ClassifierMixin, TransformerMixin):
             Predicted class labels.
         """
         if self.voting == 'soft':
-
             maj = np.argmax(self.predict_proba(X), axis=1)
 
         else:  # 'hard' voting
@@ -201,8 +200,6 @@ class EnsembleClassifier(BaseEstimator, ClassifierMixin, TransformerMixin):
         return np.asarray([clf.predict_proba(X) for clf in self.clfs_])
 
 
-
-
 class EnsembleRegressor(BaseEstimator):
     """ Averaging ensemble regressor
 
@@ -232,9 +229,8 @@ class EnsembleRegressor(BaseEstimator):
 
     """
     def __init__(self, clfs, voting='hard', weights=None):
-
         self.clfs = clfs
-        self.named_clfs = {key:value for key, value in _name_estimators(clfs)}
+        self.named_clfs = {key: value for key, value in _name_estimators(clfs)}
         self.voting = voting
         self.weights = weights
 
@@ -264,7 +260,6 @@ class EnsembleRegressor(BaseEstimator):
             raise ValueError('Number of classifiers and weights must be equal'
                              '; got %d weights, %d clfs'
                              % (len(self.weights), len(self.clfs)))
-
         self.clfs_ = []
         for clf in self.clfs:
             fitted_clf = clone(clf).fit(X, y)
@@ -307,7 +302,6 @@ class EnsembleRegressor(BaseEstimator):
             Class labels predicted by each classifier.
         """
         self._predict(X)
-
 
     def get_params(self, deep=True):
         """ Return estimator parameter names for GridSearch support"""

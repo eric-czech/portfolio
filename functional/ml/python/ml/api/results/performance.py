@@ -53,8 +53,8 @@ def compute_scores(train_res, score_fn, predictions=None):
 
 
 def sample_tasks(scores, limit=10, random_state=None):
-    return pd.Series(scores.columns.get_level_values(TASK_PROPERTY))\
-        .drop_duplicates().sample(n=limit, random_state=random_state)
+    tasks = pd.Series(scores.columns.get_level_values(TASK_PROPERTY)).drop_duplicates()
+    return tasks.sample(n=min(limit, len(tasks)), random_state=random_state)
 
 
 def plot_scores(scores, metrics=None, tasks=None, figsize=2, figaspect=5, legend_margin=(1.13, 1)):

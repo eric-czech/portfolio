@@ -10,7 +10,6 @@ from ml.api.array_utils import to_data_frame
 from ml.api.constants import *
 
 
-
 def _get_clf_name(clf):
     if hasattr(clf, 'estimator'):
         return clf.estimator.__class__.__name__
@@ -104,7 +103,14 @@ def run_fold(args):
     res = []
 
     for clf in clfs:
-        est = base.clone(clf[CLF_IMPL])
+
+        # If the estimator "implementation" is callable, assume it is a factory method for vanilla instances
+        if callable(clf[CLF_IMPL]):
+            est = clf[CLF_IMPL]()
+        # Otherwise, clone the presumably cloneable estimator instance
+        else:
+            est = base.clone(clf[CLF_IMPL])
+
         log(
             'Running model {} ({}) on fold {} ==> dim(X_train) = {}, dim(X_test) = {}, '
             'dim(Y_train) = {}, dim(Y_test) = {}'

@@ -118,7 +118,9 @@ def extract(train_res, proba_fn=None):
     return d_pred
 
 
-def plot_predictions(train_res, predictions):
+def plot_predictions(train_res, predictions, share_axes=True):
+    import seaborn as sns
+    from matplotlib import pyplot as plt
 
     mode = train_res.mode
     if mode != MODE_REGRESSOR:
@@ -142,6 +144,10 @@ def plot_predictions(train_res, predictions):
                 'Fold': d_pred[(META_PANEL, FOLD_PROPERTY)]
             }))
         d = pd.concat(d)
-        return d
+        g = sns.FacetGrid(
+                d, row='Model', col='Task', hue='Fold', margin_titles=True, size=5, aspect=1,
+                sharex=share_axes, sharey=share_axes)
+        g.map(plt.scatter, 'Predicted', 'Actual')
+        return g, d
 
     return None

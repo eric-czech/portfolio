@@ -43,3 +43,17 @@ def subset(d, subset_func, subset_op=None, log=True):
             log.info(msg)
 
     return d
+
+
+def nested_dictionary():
+    """ Get empty dictionary with values that default to new dictionaries if keys are absent
+
+    :examples:
+    d = nested_dictionary()
+    d[3]['z'][9] = ('a', 'b', 'c')
+
+    :return: Empty dictionary
+    """
+    import collections
+    nested_dict = lambda: collections.defaultdict(nested_dict)
+    return nested_dict()
