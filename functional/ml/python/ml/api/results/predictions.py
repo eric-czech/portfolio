@@ -93,7 +93,7 @@ def extract(train_res, proba_fn=None):
 
                 # Add predicted and actual class labels
                 for i, task_name in enumerate(model_res.Y_names):
-                    append('{}:{}'.format(CLASS_PRED_PREFIX , task_name), Y_pred.iloc[:, i])
+                    append('{}:{}'.format(CLASS_PRED_PREFIX, task_name), Y_pred.iloc[:, i])
                     append('{}:{}'.format(CLASS_TRUE_PREFIX, task_name), Y_true.iloc[:, i])
 
             elif train_res.mode == MODE_REGRESSOR:
@@ -118,18 +118,19 @@ def extract(train_res, proba_fn=None):
     return d_pred
 
 
-def plot_predictions(train_res, predictions, share_axes=True):
-    import seaborn as sns
-    from matplotlib import pyplot as plt
+def melt(train_res, d_pred):
+    """
+    Melt predictions from columns into rows with Task, Model, Fold, Actual and Predicted values
 
+    * Currently only supports regression
+
+    :param train_res: Training results
+    :param d_pred: DataFrame from `predictions.extract`
+    :return: Flattened data from with individual data points in rows (one per model + fold + task)
+    """
     mode = train_res.mode
-    if mode != MODE_REGRESSOR:
-        raise NotImplementedError('Prediction visualization not implemented for "{}" training mode'.format(mode))
-        # TODO: Implement confusion matrix viz for classification
-
     tasks = properties.get_prediction_tasks(train_res)
-
-    d_pred = predictions[[META_PANEL, PREDICTION_PANEL]]
+    d_pred = d_pred[[META_PANEL, PREDICTION_PANEL]]
 
     if mode == MODE_REGRESSOR:
         d = []
@@ -144,10 +145,68 @@ def plot_predictions(train_res, predictions, share_axes=True):
                 'Fold': d_pred[(META_PANEL, FOLD_PROPERTY)]
             }))
         d = pd.concat(d)
+        return d
+    else:
+        raise NotImplementedError('Prediction melting not implemented for "{}" training mode'.format(mode))
+
+
+def visualize_seaborn(d_pred, mode, share_axes=True, figaspect=1, figsize=5):
+    """
+    Generates seaborn scatterplot of predictions by task and model
+
+    :param d_pred: DataFrame from `predictions.melt`
+    :param mode: Prediction source type; one of ['classifier', 'regressor']
+    :param figsize: Seaborn FacetGrid size
+    :param figaspect: Seaborn FacetGrid aspect
+    :param share_axes: Seaborn FacetGrid share axes flag
+    :return: Seaborn FacetGrid
+    """
+    import seaborn as sns
+    from matplotlib import pyplot as plt
+
+    if mode == MODE_REGRESSOR:
         g = sns.FacetGrid(
-                d, row='Model', col='Task', hue='Fold', margin_titles=True, size=5, aspect=1,
-                sharex=share_axes, sharey=share_axes)
+            d_pred, row='Model', col='Task', hue='Fold',
+            margin_titles=True, size=figsize, aspect=figaspect,
+            sharex=share_axes, sharey=share_axes
+        )
         g.map(plt.scatter, 'Predicted', 'Actual')
-        return g, d
+        return g
+    else:
+        raise NotImplementedError('Prediction visualization not implemented for "{}" training mode'.format(mode))
+        # TODO: Implement confusion matrix viz for classification
+
+
+def _visualize(d_pred, mode, backend='seaborn', **kwargs):
+    """
+    Generates visualization of predictions from fit models
+
+    See individual backend plotting functions below for more options/details:
+    1. `visualize_seaborn`
+
+    :param d_pred: DataFrame from `predictions.melt`
+    :param mode: Prediction source type; one of ['classifier', 'regressor']
+    :param backend: Backend to use for plotting; one of ['seaborn']
+    :return: plot objects [varies based on backend]
+    """
+    assert backend in ['seaborn'], 'Backend can currently only be "seaborn"'
+
+    if backend == 'seaborn':
+        return visualize_seaborn(d_pred, mode, **kwargs)
 
     return None
+
+
+def visualize(train_res, d_pred, backend='seaborn', **kwargs):
+    """
+    Generates visualization of predictions from fit models
+
+    See individual backend plotting functions below for more options/details:
+    1. `visualize_seaborn`
+
+    :param train_res: Training results
+    :param d_pred: DataFrame from `predictions.melt`
+    :param backend: Backend to use for plotting; one of ['seaborn']
+    :return: plot objects [varies based on backend]
+    """
+    return _visualize(d_pred, train_res.mode, backend, **kwargs)

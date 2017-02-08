@@ -1,20 +1,20 @@
-
 import numpy as np
 import pandas as pd
-from py_utils import arg_utils, io_utils
-from py_utils.assertion_utils import assert_true
 from sklearn import base
 from sklearn.externals.joblib import Parallel, delayed
-from ml.model.log import log, log_hr, DEFAULT_LOG_FORMAT, DEFAULT_LOG_FILE, set_logger
-from ml.api.array_utils import to_data_frame
+
 from ml.api.constants import *
+from ml.api.utils.array_utils import to_data_frame
+from ml.model.log import log, log_hr, DEFAULT_LOG_FORMAT, DEFAULT_LOG_FILE, set_logger
+from py_utils import arg_utils, io_utils
+from py_utils.assertion_utils import assert_true
 
 
 def _get_clf_name(clf):
     if hasattr(clf, 'estimator'):
         return clf.estimator.__class__.__name__
-    if hasattr(clf, 'base_estimator'):
-        return clf.estimator.__class__.__name__
+    # if hasattr(clf, 'base_estimator'):
+        # return clf.base_estimator.__class__.__name__
     return clf.__class__.__name__
 
 
@@ -61,7 +61,7 @@ class TrainingResult(object):
 
 def _convert_to_data_frames(Y_pred, Y_test, Y_train):
 
-    # Extract the name associated with response values
+    # Extract the name(s) associated with response values
     Y_names = Y_train.columns.tolist() if isinstance(Y_train, pd.DataFrame) else [Y_train.name]
 
     # Convert predicted values to a data frame (should be from either 1D or 2D numpy array)
@@ -128,7 +128,7 @@ def run_fold(args):
         Y_pred = est.predict(X_test)
 
         # Convert true response values as well as predictions to data frames
-        Y_pred, Y_test, Y_train = _convert_to_data_frames(Y_pred, Y_test, Y_train)
+        Y_pred, Y_test_df, Y_train_df = _convert_to_data_frames(Y_pred, Y_test, Y_train)
 
         # Initialize result for model + fold using the minimal amount of information required
         # *Note: all X_* and Y_* values should be data frames at this point
@@ -138,16 +138,16 @@ def run_fold(args):
             clf=est,
             mode=mode,
             Y_pred=Y_pred,
-            Y_test=Y_test,
+            Y_test=Y_test_df,
             X_names=X_train.columns.tolist(),
-            Y_names=Y_train.columns.tolist()
+            Y_names=Y_train_df.columns.tolist()
         )
 
         # If configured to do so, add extra data associated with the results, which are often
         # expensive in terms of storage space so these things must be explicitly enabled
         if config.keep_training_data:
             fold_res.X_train = X_train
-            fold_res.Y_train = Y_train
+            fold_res.Y_train = Y_train_df
         if config.keep_test_data:
             fold_res.X_test = X_test
         if mode == MODE_CLASSIFIER and config.predict_proba:
@@ -239,7 +239,7 @@ class Trainer(object):
         Trainer._validate_mode(mode)
         if not isinstance(X, pd.DataFrame):
             raise ValueError('Feature data (X) must be a DataFrame')
-        if not isinstance(Y, pd.DataFrame) or isinstance(Y, pd.Series):
+        if not isinstance(Y, pd.DataFrame) and not isinstance(Y, pd.Series):
             raise ValueError('Response data (Y) must be a DataFrame or Series')
 
         if config is None:

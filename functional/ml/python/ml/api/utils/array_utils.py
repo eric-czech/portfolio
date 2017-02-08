@@ -2,6 +2,7 @@
 import numpy as np
 import pandas as pd
 
+import numpy as np
 
 def to_data_frame(v, index=None, columns=None):
     """ Converts a given vector or matrix into a DataFrame
@@ -37,3 +38,20 @@ def to_data_frame(v, index=None, columns=None):
         return v
     else:
         raise ValueError('Expected numpy array or pandas object, but was given "{}" instead'.format(type(v)))
+
+
+def to_tabular_array(v):
+    """
+    Conform array to 2D structure (if already 1 or 2 dimensional)
+
+    This is useful when dealing with arrays that may be 1 or 2 dimensional and it is more desirable
+    to work with the array as either a 2D array (if already 2 dimensional) or a Nx1 2D array if 1 dimensional
+
+    :param v: Array to convert
+    :return: Array with 2 dimensions
+    """
+    # If the array is 1D, convert to 2D
+    if len(v.shape) == 1:
+        return np.reshape(v, (-1, 1))
+    assert len(v.shape) == 2, 'Array should not have more than 2 dimensions'
+    return np.array(v)

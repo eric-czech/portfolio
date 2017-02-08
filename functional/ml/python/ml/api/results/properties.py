@@ -10,7 +10,17 @@ def has_test_feature_data(train_res):
     return train_res.trainer_config.keep_test_data
 
 
-def extract_model_results(train_res):
+def extract_resample_model_list(train_res):
+    """
+    Return list of all modeling results generated via resampling
+
+    This is similar to `extract_refit_model_map` except that it returns model results from cross-validation/resampling,
+    and not from refitting on the entire training set (note these are also returned as a list because there are
+    multiple instances of the same model (per resample) and this is generally easier to work with as a list).
+
+    :param train_res: Training Result
+    :return: List of TrainingModelResult instances
+    """
     res = []
     for resample_res in train_res.resample_results:
         for model_res in resample_res.model_results:
@@ -18,11 +28,27 @@ def extract_model_results(train_res):
     return res
 
 
+def extract_refit_model_map(train_res):
+    """
+    Return a dictionary of refit models on training data
+
+    This is similar to `extract_resample_model_list` except that it is for refit models (on entire
+    training set) and is returned as a dict because there are not multiple instances of the same models, per-resample
+
+    :param train_res: Training Result
+    :return: Dict with key as string name of model and value of TrainingModelResult
+    """
+    m = {}
+    for model_res in train_res.refit_result.model_results:
+        m[model_res.clf_name] = model_res
+    return m
+
+
 def extract_property_by_consensus(train_res, prop_fn, prop_name):
     d = []
     last = None
     all_equal = True
-    for model_result in extract_model_results(train_res):
+    for model_result in extract_resample_model_list(train_res):
         value = prop_fn(model_result)
         if last is not None and all_equal:
             all_equal = value == last

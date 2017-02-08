@@ -2,7 +2,6 @@ __author__ = 'eczech'
 
 from .common import *
 
-
 def get_classifier_fi(clf, columns):
     res = None
     clf = resolve_clf(clf)
