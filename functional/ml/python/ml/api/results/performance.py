@@ -4,7 +4,6 @@ from ml.api.results.predictions import PREDICTION_PANEL, META_PANEL
 from ml.api.results.predictions import MODEL_PROPERTY, FOLD_PROPERTY
 from ml.api.results.predictions import VALUE_PRED_PREFIX, CLASS_PRED_PREFIX, CLASS_PROB_PREFIX, \
     VALUE_TRUE_PREFIX, CLASS_TRUE_PREFIX, TASK_PROPERTY
-from ml.api.results.predictions import extract
 from ml.api.results import properties
 from ml.api.constants import MODE_CLASSIFIER, MODE_REGRESSOR
 
@@ -18,7 +17,8 @@ def extract(train_res, d_pred, score_fn):
     :param train_res: Training results
     :param d_pred: DataFrame from `predictions.extract`
     :param score_fn: Function with signature fn(y_true, y_class[, y_proba]) to return dict with keys equal
-        to performance metric name and values equal to the numeric value of that metric
+        to performance metric name and values equal to the numeric value of that metric (note that this
+        function must always return a value for each metric)
     :return: DataFrame containing performance metrics for each task and model
     """
 
@@ -47,7 +47,9 @@ def extract(train_res, d_pred, score_fn):
             res.update({(k, task): scores[k] for k in scores})
         res = pd.Series(res)
         res.index = pd.MultiIndex.from_tuples(res.index.values)
+        res.index.names = [METRIC_PROPERTY, TASK_PROPERTY]
         return res
+
     # Group by model name and fold id, and compute scores for each task
     d = d.groupby([(META_PANEL, MODEL_PROPERTY), (META_PANEL, FOLD_PROPERTY)]).apply(get_scores)
 
@@ -78,6 +80,74 @@ def melt(d_score):
     return d_score
 
 
+def visualize_plotly(d_score, kind='box', aggfunc=None, auto_plot=True, layout_kwargs={}):
+    """
+    Generate Plot.ly boxplot or scatterplot of model performance scores
+
+    :param d_score: DataFrame from `performance.melt`
+    :param kind: One of 'scatter' or 'box'
+    :param aggfunc: Function to use to aggregate (e.g. 'mean', 'median') feature importance values
+        across folds; if left as None, all values will be plotted rather than being aggregated first
+    :param auto_plot: Whether or not to plot figures immediately or just return them
+    :param layout_kwargs: Optional extra parameters for Plotly Layout objects
+    :return: Plotly Figure instance dict keyed by task name
+    """
+    import plotly.graph_objs as go
+
+    figs = {}
+
+    # Apply aggregation across folds, if configured to do so
+    if aggfunc is not None:
+        d_score = (
+            d_score.groupby(['Task', 'Model', 'Metric'])
+            .agg({'Value': aggfunc})
+            .reset_index()
+            .assign(Fold=0)
+        )
+
+    # Loop through tasks, and create a new figure for each one
+    for task, g_task in d_score.groupby('Task'):
+        traces = []
+
+        # Determine the sort order for the plot based on the mean importance value across
+        # models for each feature
+        o = g_task.groupby('Model')['Value'].mean().sort_values().index.values
+
+        # Loop through metrics and generate a trace for each
+        for k, g in g_task.groupby('Metric'):
+
+            # Apply sort order
+            g = g.set_index('Model').loc[o].reset_index()
+
+            # Generate specified type of trace
+            if kind == 'box':
+                traces.append(go.Box(
+                    x=g['Model'], y=g['Value'],
+                    name=k
+                ))
+            elif kind == 'scatter':
+                traces.append(go.Scatter(
+                    x=g['Model'], y=g['Value'], name=k, mode='markers',
+                    text=g['Fold'].apply(lambda v: 'Fold {}'.format(v))
+                ))
+            else:
+                raise ValueError('Plot type (i.e. "kind" argument) "{}" is not valid'.format(kind))
+
+        # Add figure to rolling result
+        layout_args = dict(layout_kwargs)
+        if 'title' not in layout_args:
+            layout_args['title'] = task
+        fig = go.Figure(data=traces, layout=go.Layout(**layout_args))
+        figs[task] = fig
+
+    # Plot figures immediately, if configured to do so
+    if auto_plot:
+        from py_utils import plotly_utils
+        return [plotly_utils.iplot(fig) for fig in figs.values()]
+    else:
+        return figs
+
+
 def visualize_seaborn(d_score, figsize=2, figaspect=5, legend_margin=(1.13, 1)):
     """
     Generates seaborn boxplot of performance metrics
@@ -104,15 +174,16 @@ def visualize_seaborn(d_score, figsize=2, figaspect=5, legend_margin=(1.13, 1)):
     return g
 
 
-def visualize(d_score, backend='seaborn', metrics=None, tasks=None, **kwargs):
+def visualize(d_score, backend='plotly', metrics=None, tasks=None, **kwargs):
     """
     Generates visualization of performance metrics
 
     See individual backend plotting functions below for more options/details:
     1. `visualize_seaborn`
+    2. `visualize_plotly`
 
     :param d_score: DataFrame from `performance.melt`
-    :param backend: Backend to use for plotting; one of ['seaborn']
+    :param backend: Backend to use for plotting; one of ['seaborn', 'plotly']
     :param metrics: Optional performance metrics to include (if None all will be used)
     :param tasks: Optional outcome tasks to include (if None all will be used)
     :return: plot objects [varies based on backend]
@@ -126,9 +197,12 @@ def visualize(d_score, backend='seaborn', metrics=None, tasks=None, **kwargs):
     if tasks is not None:
         d_score = d_score[d_score[TASK_PROPERTY].isin(tasks)]
 
-    assert backend in ['seaborn'], 'Backend can currently only be "seaborn"'
+    backends = ['seaborn', 'plotly']
+    assert backend in backends, 'Backend can currently only be one of {}'.format(backends)
 
     if backend == 'seaborn':
         return visualize_seaborn(d_score, **kwargs)
+    if backend == 'plotly':
+        return visualize_plotly(d_score, **kwargs)
 
     return None

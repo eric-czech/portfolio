@@ -30,6 +30,7 @@ SINGLE_TASK_LINEAR_CLASSIFIERS = [
 ]
 
 TREE_REGRESSORS = [
+    'XGBRegressor',
     'ExtraTreesRegressor',
     'RandomForestRegressor',
     'GradientBoostingRegressor',
@@ -37,10 +38,16 @@ TREE_REGRESSORS = [
 ]
 
 TREE_CLASSIFIERS = [
+    'XGBClassifier',
     'ExtraTreesClassifier',
     'RandomForestClassifier',
     'GradientBoostingClassifier',
     'DecisionTreeClassifier'
+]
+
+DUMMY_MODEL = [
+    'DummyRegressor',
+    'DummyClassifier'
 ]
 
 
@@ -225,6 +232,10 @@ def get_estimator_feature_importance(clf, X_names, Y_names, clf_name=None):
     # Default estimator name to class name if not given
     if clf_name is None:
         clf_name = clf_class
+
+    # Ignore dummy models
+    if clf_class in DUMMY_MODEL:
+        return None
 
     try:
         d = _get_importance(clf, clf_class, X_names, Y_names)

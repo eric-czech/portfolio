@@ -15,6 +15,8 @@ def plot_ice(
     figsize=None, alphas=[.3, .75, .5]):
     """
 
+    Note that in interaction color, red is for a low value and green is for a high value
+
     :param X:
     :param pdp:
     :param random_state:
@@ -35,9 +37,13 @@ def plot_ice(
 
     pdp_vars = list(pdp.keys())
     assert len(pdp_vars) > 0, 'No PDP given to plot'
-    assert np.all(np.sort(pdp[pdp_vars[0]].index.values) == np.arange(len(X)))
     assert interaction_color_mode in ['quantile', 'robust_scale'], \
         'Parameter "interaction_color_mode" must be one of ["quantile", "robust_scale"]'
+
+    # Select from X only the records used in PDP calculations
+    sample_idx = pdp[pdp_vars[0]].index
+    X = X.loc[sample_idx]
+    assert len(X) == len(sample_idx)
 
     # Restrict number of samples to be no greater than number of records
     n_all = len(pdp[pdp_vars[0]])
@@ -77,7 +83,7 @@ def plot_ice(
         ax.plot(d_ice_mean.index.values, d_ice_mean.values, color='black', alpha=alphas[1], linewidth=7)
         ax.set_title('{} (# Clusters = {})'.format(pdp_var, n_clust))
 
-        X_clust = X.iloc[d_ice.index.values]
+        X_clust = X.loc[d_ice.index]
         m_clust = interaction_alg().fit(X_clust.drop(pdp_var, axis=1), d_clust)
         m_clust_imp = pd.Series(m_clust.feature_importances_, index=X_clust.drop(pdp_var, axis=1).columns).sort_values()
 

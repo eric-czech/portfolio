@@ -177,22 +177,104 @@ def visualize_seaborn(d_pred, mode, share_axes=True, figaspect=1, figsize=5):
         # TODO: Implement confusion matrix viz for classification
 
 
+def visualize_plotly(d_pred, mode, bin_cols=None, bin_label_fn=None, count_transform_fn=None,
+                     heatmap_kwargs={}, layout_kwargs={}, auto_plot=True):
+    """
+    Generates Plotly prediction heatmaps
+
+    :param d_pred: DataFrame from `predictions.melt`
+    :param mode: Prediction source type; one of ['classifier', 'regressor']
+    :param bin_cols: Optional 2-item tuple with name of columns containing binned actual values and binned
+        predictions (in that order); if not given then for regression for example, the predicted and actuals will
+        be binned automatically
+    :param bin_label_fn: Optional function that will take a bin name and return a string label for axes labels
+    :param count_transform_fn: Function to apply to counts associated with bins in heatmap (np.log10 for example)
+    :param auto_plot: Whether or not to plot figures immediately or just return them
+    :param heatmap_kwargs: Optional extra parameters for Plotly Heatmap
+    :param layout_kwargs: Optional extra parameters for Plotly Layout objects
+    :return: Plotly Figure instance dict keyed by task and model name
+    """
+    import plotly.graph_objs as go
+
+    figs = {}
+    if mode == MODE_REGRESSOR:
+
+        # Create binned prediction + actual values if not already present
+        if bin_cols is None:
+            d_pred['PredictedRange'] = pd.cut(d_pred['Predicted'], bins=12)
+            d_pred['ActualRange'] = pd.cut(d_pred['Actual'], bins=12)
+            bin_cols = ['ActualRange', 'PredictedRange']
+
+        # Default bin label function to string conversion
+        if bin_label_fn is None:
+            bin_label_fn = str
+
+        # Loop through each model + task combination and generate a heatmap of predicted vs actual frequencies
+        for k, g in d_pred.groupby(['Model', 'Task']):
+            model, task = k
+            key = '{} ({})'.format(model, task)
+
+            # Group by predicted and actual bin names and determine frequency of each
+            d = g.groupby([bin_cols[0], bin_cols[1]]).size().unstack()
+
+            # Apply overall count transformation if given
+            if count_transform_fn is not None:
+                d = d.applymap(count_transform_fn)
+
+            # Relabel the bin names (or at least convert them to string)
+            d.columns = [bin_label_fn(c) for c in d]      # Predictions
+            d.index = [bin_label_fn(c) for c in d.index]  # Actuals
+            assert np.all([type(v) == str for v in d]), 'Bin labels (for columns) must be strings'
+            assert np.all([type(v) == str for v in d.index]), 'Bin labels (for index) must be strings'
+
+            # Generate heatmap and layout arguments
+            heatmap_args = dict(heatmap_kwargs)
+            if 'colorscale' not in heatmap_args:
+                heatmap_args['colorscale'] = 'Viridis'
+
+            layout_args = dict(layout_kwargs)
+            if 'xaxis' not in layout_args:
+                layout_args['xaxis'] = dict(title='Predicted Range')
+            if 'yaxis' not in layout_args:
+                layout_args['yaxis'] = dict(title='Actual Range')
+            if 'title' not in layout_args:
+                layout_args['title'] = key
+
+            # Create heatmap and note that reversal of x and y to index and columns here is intentional
+            trace = go.Heatmap(z=d.values, y=d.index.values, x=d.columns.values, **heatmap_args)
+            fig = go.Figure(data=[trace], layout=go.Layout(**layout_args))
+            figs[key] = fig
+    else:
+        raise NotImplementedError('Prediction visualization not implemented for "{}" training mode'.format(mode))
+
+    # Plot figures immediately, if configured to do so
+    if auto_plot:
+        from py_utils import plotly_utils
+        return [plotly_utils.iplot(fig) for fig in figs.values()]
+    else:
+        return figs
+
+
 def _visualize(d_pred, mode, backend='seaborn', **kwargs):
     """
     Generates visualization of predictions from fit models
 
     See individual backend plotting functions below for more options/details:
     1. `visualize_seaborn`
+    2. `visualize_plotly`
 
     :param d_pred: DataFrame from `predictions.melt`
     :param mode: Prediction source type; one of ['classifier', 'regressor']
-    :param backend: Backend to use for plotting; one of ['seaborn']
+    :param backend: Backend to use for plotting; one of ['seaborn', 'plotly']
     :return: plot objects [varies based on backend]
     """
-    assert backend in ['seaborn'], 'Backend can currently only be "seaborn"'
+    backends = ['seaborn', 'plotly']
+    assert backend in backends, 'Backend can currently only be one of {}'.format(backends)
 
     if backend == 'seaborn':
         return visualize_seaborn(d_pred, mode, **kwargs)
+    if backend == 'plotly':
+        return visualize_plotly(d_pred, mode, **kwargs)
 
     return None
 

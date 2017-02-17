@@ -62,7 +62,7 @@ def visualize_plotly(d_imp, kind='box', aggfunc=None, auto_plot=True, layout_kwa
         across folds; if left as None, all values will be plotted rather than being aggregated first
     :param auto_plot: Whether or not to plot figures immediately or just return them
     :param layout_kwargs: Optional extra parameters for Plotly Layout objects
-    :return: Plotly Figure instace dict keyed by task name
+    :return: Plotly Figure instance dict keyed by task name
     """
     import plotly.graph_objs as go
 
@@ -85,7 +85,7 @@ def visualize_plotly(d_imp, kind='box', aggfunc=None, auto_plot=True, layout_kwa
         # models for each feature
         o = g_task.groupby('Feature')['Value'].mean().sort_values().index.values
 
-        # Loop through models and generating a trace for each
+        # Loop through models and generate a trace for each
         for k, g in g_task.groupby('Model'):
 
             # Apply sort order

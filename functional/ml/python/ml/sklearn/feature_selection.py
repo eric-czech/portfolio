@@ -63,7 +63,7 @@ class MultiOutputSelect(BaseEstimator, SelectorMixin):
             raise ValueError('Support resolution strategy "{}" is not valid '
                              '(should be one of ["any", "all"])'.format(self.strategy))
 
-    def fit(self, X, y):
+    def fit(self, X, y, **kwargs):
         """Run score function on (X, y) and get the appropriate features.
 
         Parameters
@@ -80,7 +80,8 @@ class MultiOutputSelect(BaseEstimator, SelectorMixin):
         self : object
             Returns self.
         """
-        X, y = check_X_y(X, y, ['csr', 'csc'], multi_output=True)
+        # print('MultiOutputSelect: ', type(y))
+        # X, y = check_X_y(X, y, ['csr', 'csc'], multi_output=True)
         self._check_params(X, y)
         n_cols = y.shape[1]
 
@@ -89,7 +90,6 @@ class MultiOutputSelect(BaseEstimator, SelectorMixin):
         #              Feat 1  Feat 2  Feat 3  Feat 4
         # response 1   True    False   False   True
         # response 2   False   True    False   True
-        # print('MultiOutputSelector: ', X.shape, y.shape)
         self.support_matrix_ = np.array([self.selector.fit(X, y[:, j]).get_support() for j in range(n_cols)])
 
         return self
