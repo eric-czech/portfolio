@@ -3,6 +3,7 @@
 import pickle
 import os
 import logging
+from py_utils import io_utils
 logger = logging.getLogger(__name__)
 
 
@@ -16,19 +17,21 @@ class ProjectManager(object):
      This class refers to them as the "data" directory and "project" directories, respectively
     """
 
-    def __init__(self, data_dir, proj_dir):
+    def __init__(self, data_dir, proj_dir, mkdirs=True):
         """
         Initialize Data Manager
         :param data_dir: Location of data files for project on disk
         :param proj_dir: Location of project files on disk
+        :param mkdirs: Create project and data directories if they do not exist
         """
         self.data_dir = data_dir
         self.proj_dir = proj_dir
 
         # Create directories (not recursively though) if they do not already exist
-        for path in [data_dir, proj_dir]:
-            if not os.path.exists(path):
-                os.mkdir(path)
+        if mkdirs:
+            for path in [data_dir, proj_dir]:
+                if not os.path.exists(path):
+                    os.mkdir(path)
 
     def file(self, datatype, dataset, ext, create_dir=True):
         path = os.path.join(self.data_dir, datatype)
@@ -37,15 +40,17 @@ class ProjectManager(object):
         if create_dir and not os.path.exists(path):
             os.makedirs(path, exist_ok=True)
 
-        path = os.path.join(path, '{}.{}'.format(dataset, ext))
+        if ext is not None:
+            path = os.path.join(path, '{}.{}'.format(dataset, ext))
+        else:
+            path = os.path.join(path, dataset)
+
         return path
 
     def save(self, datatype, dataset, d):
         path = self.file(datatype, dataset, 'pkl')
-        logger.debug('Saving data to location "{}"'.format(path))
-        with open(path, 'wb') as fd:
-            pickle.dump(d, fd)
-        return path
+        # logger.debug('Saving data to location "{}"'.format(path))
+        return io_utils.to_pickle(d, path)
 
     def exists(self, datatype, dataset):
         path = self.file(datatype, dataset, 'pkl')
@@ -58,6 +63,5 @@ class ProjectManager(object):
             logger.debug('Generating data to be saved at location "{}"'.format(path))
             self.save(datatype, dataset, loader())
 
-        logger.debug('Loading saved data from location "{}"'.format(path))
-        with open(path, 'rb') as fd:
-            return pickle.load(fd)
+        # logger.debug('Loading saved data from location "{}"'.format(path))
+        return io_utils.from_pickle(path)

@@ -54,3 +54,33 @@ def get_normal_gamma_posterior_predictive(x, u0, k0, a0, b0):
     # print(u, k, a, b, (b * (k + 1))/(a * k))
     predictive_dist = stats.t(df=2*a, loc=u, scale=(b * (k + 1))/(a * k))
     return predictive_dist
+
+
+def get_dirichlet_mle(x):
+    """
+    Get maximum likelihood estimation for dirichlet concentration parameters
+
+    :param x: Data array of size nxp where n is the number of observations and p is the dimensionality of the
+        dirichlet distribution to estimate
+    :return: Dirichlet distribution (with `alpha` parameter set to MLE inferred from given data)
+    """
+    assert len(x.shape) == 2, 'Data array must be two dimensional'
+    assert np.allclose(x.sum(axis=1), 1), 'Sum of observations across rows must equal 1'
+    from ml.bayesian.dirichlet import dirichlet
+    alpha = dirichlet.mle(x)
+    return stats.dirichlet(alpha)
+
+
+def get_dirichlet_multinomial_posterior(x, alpha):
+    """
+    Return posterior dirichlet distribution with dirichlet prior and multinomial likelihood
+
+    Posterior for dirichlet distribution with parameters equal to (alpha1 + x1, alpha2 + x2, ..., alphap + xp)
+    where p is the number of categories (i.e. number of columns in x)
+
+    :param x: Integer array where index indicates category (must have length > 1)
+    :param alpha: Concentration parameter for dirichlet prior; can be scalar or array of size len(x)
+    :return: Dirichlet distribution
+    """
+    assert len(x) > 1, 'Number of categories for dirichlet/multinomial model must be > 1'
+    return stats.dirichlet(x + alpha)

@@ -20,3 +20,9 @@ def tf_print(t, transform=None):
     with tf.control_dependencies([log_op]):
         r = tf.identity(t)
     return r
+
+
+def tf_devices():
+    """ Returns devices available for computations """
+    from tensorflow.python.client import device_lib
+    return device_lib.list_local_devices()

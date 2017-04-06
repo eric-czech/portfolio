@@ -1,6 +1,7 @@
 import logging
 from multiprocessing import Lock
 
+_HR = '-' * 80
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.INFO)
 
@@ -23,7 +24,11 @@ def set_logger(log_file, log_format=DEFAULT_LOG_FORMAT):
     LOGGER.addHandler(LOG_FILE_HANDLER)
 
 
-def log(msg):
+def log_hr():
+    log(_HR)
+
+
+def log(msg, level=logging.INFO):
     _LOG_LOCK.acquire()
-    LOGGER.info(msg)
+    LOGGER.log(level, msg)
     _LOG_LOCK.release()

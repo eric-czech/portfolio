@@ -129,7 +129,7 @@ def get_partial_dependence_1d(clf, X, features, pred_fun, grid_size=100, grid_wi
         for p in grid:
             X_pd[feature] = p
             pdp[p] = pred_fun(clf, X_pd)
-        res[feature] = pd.DataFrame(pdp)
+        res[feature] = pd.DataFrame(pdp, index=X.index)
     return res
 
 

@@ -43,3 +43,40 @@ def subset(d, subset_func, subset_op=None, log=True):
             log.info(msg)
 
     return d
+
+
+def nested_dictionary():
+    """ Get empty dictionary with values that default to new dictionaries if keys are absent
+
+    :examples:
+    d = nested_dictionary()
+    d[3]['z'][9] = ('a', 'b', 'c')
+
+    :return: Empty dictionary
+    """
+    import collections
+    nested_dict = lambda: collections.defaultdict(nested_dict)
+    return nested_dict()
+
+
+def cross_product(x, y):
+    """
+    Return cross product of 1D item collection as 2 column numpy array
+
+    :param x: First sequence of items
+    :param y: Second sequence of items
+    :return: 2-D numpy array with two columns and len(x) * len(y) rows (every combination of x and y values); x values
+        will be in first column and y values in second
+    """
+    import numpy as np
+    if not isinstance(x, np.array):
+        x = np.array(x)
+    if not isinstance(y, np.array):
+        y = np.array(y)
+    assert x.ndim == 1, 'x values must be one dimensional'
+    assert y.ndim == 1, 'y values must be one dimensional'
+    r = np.hstack([np.expand_dims(x.ravel(), 1) for x in np.meshgrid(x, y)])
+    assert r.shape[0] == len(x) * len(y), \
+        'Number of cross product combinations found ({}) did not match the number expected ({})'\
+        .format(r.shape[0], len(x) * len(y))
+    return r
