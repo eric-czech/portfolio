@@ -10,7 +10,7 @@ from ml.api.constants import MODE_CLASSIFIER, MODE_REGRESSOR
 METRIC_PROPERTY = 'Metric'
 
 
-def extract(train_res, d_pred, score_fn):
+def extract(train_res, d_pred, score_fn, by_fold=True):
     """
     Compute performance metrics based on training results and prediction data
 
@@ -19,10 +19,12 @@ def extract(train_res, d_pred, score_fn):
     :param score_fn: Function with signature fn(y_true, y_class[, y_proba]) to return dict with keys equal
         to performance metric name and values equal to the numeric value of that metric (note that this
         function must always return a value for each metric)
+    :param by_fold: Flag indicating whether or not scores should be computed for each fold or across
+        all out-of-sample predictions a single time
     :return: DataFrame containing performance metrics for each task and model
     """
 
-    d = d_pred[[PREDICTION_PANEL, META_PANEL]]
+    d = d_pred[[PREDICTION_PANEL, META_PANEL]].copy()
 
     tasks = properties.get_prediction_tasks(train_res)
 
@@ -50,7 +52,9 @@ def extract(train_res, d_pred, score_fn):
         res.index.names = [METRIC_PROPERTY, TASK_PROPERTY]
         return res
 
-    # Group by model name and fold id, and compute scores for each task
+    # If not scoring by fold, pretend all the folds were the same for the sake of scoring
+    if not by_fold:
+        d[(META_PANEL, FOLD_PROPERTY)] = 'All'
     d = d.groupby([(META_PANEL, MODEL_PROPERTY), (META_PANEL, FOLD_PROPERTY)]).apply(get_scores)
 
     # Cleanup margin names
@@ -58,11 +62,6 @@ def extract(train_res, d_pred, score_fn):
     d.columns.names = [METRIC_PROPERTY, TASK_PROPERTY]
 
     return d
-
-
-def sample_tasks(d_score, limit=10, random_state=None):
-    tasks = pd.Series(d_score.columns.get_level_values(TASK_PROPERTY)).drop_duplicates()
-    return tasks.sample(n=min(limit, len(tasks)), random_state=random_state)
 
 
 def melt(d_score):
@@ -80,7 +79,7 @@ def melt(d_score):
     return d_score
 
 
-def visualize_plotly(d_score, kind='box', aggfunc=None, auto_plot=True, layout_kwargs={}):
+def visualize_plotly(d_score, kind='box', aggfunc=None, auto_plot=True, layout_kwargs={}, separate_by='Task'):
     """
     Generate Plot.ly boxplot or scatterplot of model performance scores
 
@@ -90,6 +89,7 @@ def visualize_plotly(d_score, kind='box', aggfunc=None, auto_plot=True, layout_k
         across folds; if left as None, all values will be plotted rather than being aggregated first
     :param auto_plot: Whether or not to plot figures immediately or just return them
     :param layout_kwargs: Optional extra parameters for Plotly Layout objects
+    :param separate_by: Field for which a separate plot will be created (one of None, 'Task' or 'Metric')
     :return: Plotly Figure instance dict keyed by task name
     """
     import plotly.graph_objs as go
@@ -105,40 +105,75 @@ def visualize_plotly(d_score, kind='box', aggfunc=None, auto_plot=True, layout_k
             .assign(Fold=0)
         )
 
-    # Loop through tasks, and create a new figure for each one
-    for task, g_task in d_score.groupby('Task'):
+    if separate_by == 'Task':
+        c_outer = 'Task'
+        c_inner = 'Metric'
+    elif separate_by == 'Metric':
+        c_outer = 'Metric'
+        c_inner = 'Task'
+    elif separate_by is None:
+        c_outer, c_inner = None, None
+    else:
+        raise ValueError('Plot separation field "{}" is not valid'.format(separate_by))
+
+    if separate_by is None:
         traces = []
 
         # Determine the sort order for the plot based on the mean importance value across
         # models for each feature
-        o = g_task.groupby('Model')['Value'].mean().sort_values().index.values
+        o = d_score.groupby('Model')['Value'].mean().sort_values().index.values
 
-        # Loop through metrics and generate a trace for each
-        for k, g in g_task.groupby('Metric'):
+        for k, g in d_score.groupby('Metric'):
 
             # Apply sort order
             g = g.set_index('Model').loc[o].reset_index()
 
-            # Generate specified type of trace
-            if kind == 'box':
-                traces.append(go.Box(
-                    x=g['Model'], y=g['Value'],
-                    name=k
-                ))
-            elif kind == 'scatter':
-                traces.append(go.Scatter(
-                    x=g['Model'], y=g['Value'], name=k, mode='markers',
-                    text=g['Fold'].apply(lambda v: 'Fold {}'.format(v))
-                ))
-            else:
-                raise ValueError('Plot type (i.e. "kind" argument) "{}" is not valid'.format(kind))
+            trace = go.Box(x=g['Model'], y=g['Value'], boxmean='sd', boxpoints='all', name=k)
+            traces.append(trace)
 
-        # Add figure to rolling result
         layout_args = dict(layout_kwargs)
+        layout_args['boxmode'] = 'group'
+        layout_args['hovermode'] = 'closest'
         if 'title' not in layout_args:
-            layout_args['title'] = task
+            layout_args['title'] = 'Performance Scores by Model'
+
         fig = go.Figure(data=traces, layout=go.Layout(**layout_args))
-        figs[task] = fig
+        figs['All'] = fig
+    else:
+        # Loop through outer separating field, and create a new figure for each one
+        for k_outer, g_outer in d_score.groupby(c_outer):
+            traces = []
+
+            # Determine the sort order for the plot based on the mean importance value across
+            # models for each feature
+            o = g_outer.groupby('Model')['Value'].mean().sort_values().index.values
+
+            # Loop through inner field and generate a trace for each
+            for k_inner, g_inner in g_outer.groupby(c_inner):
+
+                # Apply sort order
+                g = g_inner.set_index('Model').loc[o].reset_index()
+
+                # Generate specified type of trace
+                if kind == 'box':
+                    traces.append(go.Box(
+                        x=g['Model'], y=g['Value'],
+                        name=k_inner
+                    ))
+                elif kind == 'scatter':
+                    traces.append(go.Scatter(
+                        x=g['Model'], y=g['Value'], name=k_inner, mode='markers',
+                        text=g['Fold'].apply(lambda v: 'Fold {}'.format(v))
+                    ))
+                else:
+                    raise ValueError('Plot type (i.e. "kind" argument) "{}" is not valid'.format(kind))
+
+            # Add figure to rolling result
+            layout_args = dict(layout_kwargs)
+            if 'title' not in layout_args:
+                layout_args['title'] = k_outer
+            fig = go.Figure(data=traces, layout=go.Layout(**layout_args))
+            figs[k_outer] = fig
 
     # Plot figures immediately, if configured to do so
     if auto_plot:
@@ -188,6 +223,9 @@ def visualize(d_score, backend='plotly', metrics=None, tasks=None, **kwargs):
     :param tasks: Optional outcome tasks to include (if None all will be used)
     :return: plot objects [varies based on backend]
     """
+
+    if TASK_PROPERTY not in d_score:
+        raise ValueError('Required field "{}" not found .. did you call performance.melt first?'.format(TASK_PROPERTY))
 
     # Filter to only the given metrics, if any were provided
     if metrics is not None:

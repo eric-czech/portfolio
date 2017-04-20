@@ -106,7 +106,7 @@ def run_fold(args):
 
         # If the estimator "implementation" is callable, assume it is a factory method for vanilla instances
         if callable(clf[CLF_IMPL]):
-            est = clf[CLF_IMPL]()
+            est = clf[CLF_IMPL](i)
         # Otherwise, clone the presumably cloneable estimator instance
         else:
             est = base.clone(clf[CLF_IMPL])

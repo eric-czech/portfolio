@@ -38,3 +38,23 @@ def plot(figure_or_data, filename='temp-plot.html', show_link=False,
 def iplot(figure_or_data, show_link=False, link_text='', **kwargs):
     """ Overload function for inline, offline plotting to strip out links to external services by default"""
     return plty.offline.iplot(figure_or_data, show_link=show_link, link_text=link_text, **kwargs)
+
+
+def plot_color(color):
+    import plotly.graph_objs as go
+    from plotly import offline
+
+    layout = go.Layout(width=50, height=50, margin=dict(l=0, r=0, t=0, b=0))
+    fig = go.Figure(
+        data=[go.Scatter(x=[1, 2], y=[2, 2], marker=dict(color=color), fill='tozeroy')],
+        layout=layout
+    )
+    offline.iplot(fig, link_text='', show_link=False)
+
+
+def plot_plotly_default_colors():
+    """ Print all default plotly colors (helpful for selecting rgba codes in a notebook) """
+    from plotly import colors
+    for c in colors.DEFAULT_PLOTLY_COLORS:
+        print('Color: {}'.format(c))
+        plot_color(c)

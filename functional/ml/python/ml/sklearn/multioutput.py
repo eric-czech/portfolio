@@ -45,6 +45,7 @@ class MultiRegressor(six.with_metaclass(ABCMeta, BaseEstimator)):
 
         # Ignore this because it chokes on nas
         # X, y = check_X_y(X, y, multi_output=True, accept_sparse=True)
+        X, y = np.array(X), np.array(y)
 
         if y.ndim == 1:
             raise ValueError("y must have at least two dimensions for "

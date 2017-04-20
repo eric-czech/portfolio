@@ -29,6 +29,25 @@ class DummyBinaryFeatureClassifier(BaseEstimator, ClassifierMixin):
         return np.transpose(np.vstack((1-p, p)))
 
 
+class ConstantFeatureRegressor(BaseEstimator, RegressorMixin):
+    """
+    Makes predictions using a feature given in the dataset.
+
+    This is useful when benchmarking against a known predictive quantity
+    """
+
+    def __init__(self, feature_index):
+        assert isinstance(feature_index, int), 'Feature index must be an integer'
+        self.feature_index = feature_index
+
+    def fit(self, X, y, sample_weight=None):
+        assert self.feature_index < X.shape[1]
+        return self
+
+    def predict(self, X):
+        return np.array(X)[:, self.feature_index]
+
+
 class AverageRegressor(BaseEstimator, RegressorMixin):
     """
     Makes predictions using the average value of all given features
