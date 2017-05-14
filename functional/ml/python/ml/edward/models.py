@@ -5,7 +5,42 @@ import numpy as np
 import tensorflow as tf
 import logging
 from sklearn.base import BaseEstimator
+from edward.util import graphs
 logger = logging.getLogger(__name__)
+
+
+# Notes on session configuration for Edward:
+# At TOW, the following changes were necessary in edward.util.graphs to set default session configurations -
+# def set_default_config(config):
+#   global _ED_SESSION_CONFIG
+#   _ED_SESSION_CONFIG = config
+#
+# def get_default_config():
+#   global _ED_SESSION_CONFIG
+#   return _ED_SESSION_CONFIG
+#
+#
+# def get_session():
+#   """Get the globally defined TensorFlow session.
+#
+#   If the session is not already defined, then the function will create
+#   a global session.
+#
+#   Returns
+#   -------
+#   _ED_SESSION : tf.InteractiveSession
+#   """
+#   global _ED_SESSION
+#   if tf.get_default_session() is None:
+#     config = get_default_config()
+#     _ED_SESSION = tf.InteractiveSession(config=config)
+#   else:
+#     _ED_SESSION = tf.get_default_session()
+#
+#   if have_keras:
+#     K.set_session(_ED_SESSION)
+#
+#   return _ED_SESSION
 
 
 class ConvergenceError(Exception):
@@ -19,6 +54,26 @@ class BayesianModel(object):
 
     def criticism_args(self, sess, var_map):
         raise NotImplementedError('Method should be implemented by subclass')
+
+    def prediction_fn_key(self):
+        return 'pred_fn'
+
+
+def set_default_gpu_config(device_count=1, memory_fraction=.8):
+    """ Convenience method for configuring gpu usage
+    :param device_count: Set to 0 to disable GPU training
+    :param memory_fraction: Fraction of GPU memory to use for Tensorflow
+    """
+    config = tf.ConfigProto(device_count={'GPU': device_count})
+    config.gpu_options.per_process_gpu_memory_fraction = memory_fraction
+    set_default_tf_sess_config(config)
+
+
+def set_default_tf_sess_config(config):
+    """ Proxy method to set default configuration used for interactive Edward sessions
+    :param config: None or tf.ConfigProto
+    """
+    graphs.set_default_config(config)
 
 
 class BayesianModelEstimator(BaseEstimator):
@@ -73,11 +128,15 @@ class BayesianModelEstimator(BaseEstimator):
 
         sess = ed.get_session()
 
-        input_fn, latent_vars, self.tensor_map_ = self.model.inference_args(data)
+        input_fn, latent_vars, self.tensor_map_ = self.model.inference_args(data, **kwargs)
 
         # Initialize inference engine
         inference = self.inference_fn(latent_vars, data=input_fn(data))
-        inference.initialize(logdir=self.log_dir, n_print=self.n_print_progress, optimizer=self.optimizer)
+        inference_kwargs = {} if self.inference_fn == ed.MAP else {'n_samples': self.n_samples}
+        inference.initialize(
+                logdir=self.log_dir, n_print=self.n_print_progress,
+                optimizer=self.optimizer, **inference_kwargs
+        )
         tf.global_variables_initializer().run()
 
         self.losses_ = []
@@ -87,6 +146,7 @@ class BayesianModelEstimator(BaseEstimator):
         for t in range(self.max_steps):
             info_dict = inference.update()
             loss = info_dict['loss']
+            # tf.summary.scalar('Loss', )
 
             if self.n_print_progress and t % self.n_print_progress == 0:
                 logging.info(
@@ -155,5 +215,5 @@ class BayesianModelEstimator(BaseEstimator):
         return tensor_values
 
     def predict(self, X, **kwargs):
-        return self.criticism_args_[0](X)
+        return self.criticism_args_[self.model.prediction_fn_key()](X)
 
