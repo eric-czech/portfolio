@@ -6,10 +6,13 @@ from sklearn.utils import check_array
 import numpy as np
 
 
-def get_feature_selector(X, regex, negate=False):
+def get_feature_selector(X, regex, negate=False, n_feat_expected=None):
     from sklearn.preprocessing import FunctionTransformer
     cols = X.columns.tolist()
     feats = X.filter(regex=regex).columns.tolist()
+    if n_feat_expected is not None:
+        assert len(feats) == n_feat_expected, \
+            'Expected {} features to match regex "{}", but found {} instead'.format(n_feat_expected, regex, len(feats))
     idx = [cols.index(c) for c in feats]
     if negate:
         selector = lambda X: X[:, [i for i in range(X.shape[1]) if i not in idx]]

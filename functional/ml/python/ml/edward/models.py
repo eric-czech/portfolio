@@ -6,6 +6,7 @@ import tensorflow as tf
 import logging
 from sklearn.base import BaseEstimator
 from edward.util import graphs
+from collections import OrderedDict
 from edward.models import Normal, Laplace, PointMass
 logger = logging.getLogger(__name__)
 
@@ -81,8 +82,8 @@ class ModelBuilder(object):
 
     def __init__(self, inference_fn, add_summaries=True):
         self.map = inference_fn == ed.MAP
-        self.latent_map = {}
-        self.tensor_map = {}
+        self.latent_map = OrderedDict()
+        self.tensor_map = OrderedDict()
         self.add_summaries = add_summaries
 
     def add(self, dist, loc, scale, name,
