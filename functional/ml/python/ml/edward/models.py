@@ -6,6 +6,8 @@ import tensorflow as tf
 import logging
 from sklearn.base import BaseEstimator
 from edward.util import graphs
+from collections import OrderedDict
+from edward.models import Normal, Laplace, PointMass
 logger = logging.getLogger(__name__)
 
 
@@ -74,6 +76,50 @@ def set_default_tf_sess_config(config):
     :param config: None or tf.ConfigProto
     """
     graphs.set_default_config(config)
+
+
+class ModelBuilder(object):
+
+    def __init__(self, inference_fn, add_summaries=True):
+        self.map = inference_fn == ed.MAP
+        self.latent_map = OrderedDict()
+        self.tensor_map = OrderedDict()
+        self.add_summaries = add_summaries
+
+    def add(self, dist, loc, scale, name,
+            loc_transform=tf.identity, scale_transform=tf.nn.softplus,
+            scale_coef=.1):
+
+        shape = loc.get_shape().as_list()
+
+        # Parameter prior distribution (eg Normal(0, 1))
+        model = dist(loc, scale * tf.ones_like(loc))
+
+        if self.map:
+            # Add point mass model for MAP estimation
+            q = PointMass(params=loc_transform(tf.Variable(tf.random_normal(shape, stddev=scale * scale_coef))))
+            self.latent_map[model] = q
+            self.tensor_map[name] = model
+            self.tensor_map[name + '.q'] = q.params
+            if self.add_summaries:
+                tf.summary.histogram(name + '.q', self.tensor_map[name + '.q'])
+        else:
+            # Add inference model for all other estimations
+            q = dist(
+                loc_transform(tf.Variable(tf.random_normal(shape, stddev=scale*scale_coef))),
+                scale_transform(tf.Variable(tf.random_normal(shape, stddev=scale*scale_coef)))
+            )
+            self.latent_map[model] = q
+            self.tensor_map[name] = model
+            if dist in [Normal, Laplace]:
+                self.tensor_map[name + '.q'] = q.loc
+                self.tensor_map[name + '.s'] = q.scale
+            else:
+                raise ValueError('Distribution "{}" not yet supported'.format(dist))
+
+            if self.add_summaries:
+                tf.summary.histogram(name + '.q', self.tensor_map[name + '.q'])
+                tf.summary.histogram(name + '.s', self.tensor_map[name + '.s'])
 
 
 class BayesianModelEstimator(BaseEstimator):
