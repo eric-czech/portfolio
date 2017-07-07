@@ -14,13 +14,30 @@ def _repeat_mean(X, r):
     :return: DataFrame
     """
     m = len(X.columns)
-    x = X.mean().repeat(r).reshape((m, r)).T
+    x = X.mean().repeat(r).values.reshape((m, r)).T
     return pd.DataFrame(x, columns=X.columns)
 
 
 def get_univariate_dependence_1d(clf, X, features, pred_fun, feature_grids=None,
                               print_progress=True, grid_window=[0, 1], grid_size=50,
                              discrete_thresh_ct=10, fill_mode='mean'):
+    """
+    Get univariate effect across training data
+
+    :param clf: Fit regressor or classifier
+    :param X: Training data frame
+    :param features: Features to get dependence for
+    :param pred_fun: Function to make predictions; signature fn(clf, X) -> array of length len(X)
+    :param feature_grids: Custom grid window sizes (dict of feature names to two-item list or tuple)
+    :param print_progress: Flag for printing calculation progress
+    :param grid_window: Two-item tuple containing percentiles of values to use as max and min; will be overriden
+        by feature_grids for a particular feature if present
+    :param grid_size: Number of grid points to calculate dependence for
+    :param discrete_thresh_ct: Number of distinct values present below which to consider a variable discrete rather
+        than continuous
+    :param fill_mode: Either 'mean' or 'zeros' indicating how non-target features should be set
+    :return:
+    """
 
     assert fill_mode in ['zeros', 'mean'], '"fill_mode" must be either "zeros" or "mean"'
 

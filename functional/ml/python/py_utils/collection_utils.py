@@ -17,7 +17,7 @@ def subset(d, subset_func, subset_op=None, log=True):
         - True/False - If boolean, then summary will be logged to stdout if True
         - logging.Logger - Logger to use for summary
         - None - No summary will be printed/logged
-    :return:
+    :return: Original data structure
     """
 
     # Apply subset function and record size before and after
@@ -34,6 +34,60 @@ def subset(d, subset_func, subset_op=None, log=True):
                 '[{}] '.format(subset_op),
                 n_before, n_after, n_diff,
                 100. * n_diff / n_before if n_before > 0 else 0.
+            )
+
+        # Print summary
+        if isinstance(log, bool):
+            print(msg)
+        else:
+            log.info(msg)
+
+    return d
+
+
+def transform(d, field, mask, value, trans_op=None, log=True, target_field=None, log_no_change=False):
+    """
+    Applies a conditional transformation and logs number of records affected
+
+    Equivalent to: d[target_field] = np.where(mask, value, d[field])
+
+    :param d: DataFrame
+    :param field: Field to apply transformation to
+    :param mask: Mask to use for conditional transformation; should be true where values WILL be transformed
+    :param trans_op: Optional name of subset operation to show in summary (for convenience)
+    :param log:
+        - True/False - If boolean, then summary will be logged to stdout if True
+        - logging.Logger - Logger to use for summary
+        - None - No summary will be printed/logged
+    :param target_field: Field to which result will be attached in data frame; defaults to `field`
+    :param log_no_change: Flag to indicate whether message should be logged even if no transformation occurs; defaults
+        to False (i.e. a message will show that 0 rows have changed)
+    :return: Original data structure
+    """
+    import numpy as np
+    assert mask.dtype == np.bool
+
+    # Apply subset function and record size before and after
+    n = len(d)
+    n_chg = mask.sum()
+    target_field = target_field if target_field else field
+
+    # Return immediately if nothing further should occur (either logging or transformation)
+    if n_chg == 0 and not log_no_change:
+        return d
+
+    # Short-circuit transformation if no values would be changed
+    if n_chg > 0:
+        d[target_field] = np.where(mask, value, d[field])
+
+    if log:
+        # Create summary message
+        trans_op = trans_op if trans_op else 'Transform {}'.format(field)
+
+        msg = '{}Records changed = {} of {} (%{:.2f})'\
+            .format(
+                '[{}] '.format(trans_op),
+                n_chg, n, 100. * n_chg / n if n > 0 else 0.
             )
 
         # Print summary

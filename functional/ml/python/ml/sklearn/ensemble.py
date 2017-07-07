@@ -228,11 +228,9 @@ class EnsembleRegressor(BaseEstimator):
 
 
     """
-    def __init__(self, clfs, voting='hard', weights=None):
+    def __init__(self, clfs):
         self.clfs = clfs
         self.named_clfs = {key: value for key, value in _name_estimators(clfs)}
-        self.voting = voting
-        self.weights = weights
 
     def fit(self, X, y):
         """ Fit the clfs.
@@ -252,14 +250,6 @@ class EnsembleRegressor(BaseEstimator):
         """
         if isinstance(y, np.ndarray) and len(y.shape) > 1:
             raise NotImplementedError('Multivariate regression is not supported')
-
-        if self.voting not in ('soft', 'hard'):
-            raise ValueError("Voting must be 'soft' or 'hard'; got (voting={})".format(self.voting))
-
-        if self.weights and len(self.weights) != len(self.clfs):
-            raise ValueError('Number of classifiers and weights must be equal'
-                             '; got %d weights, %d clfs'
-                             % (len(self.weights), len(self.clfs)))
         self.clfs_ = []
         for clf in self.clfs:
             fitted_clf = clone(clf).fit(X, y)
@@ -281,7 +271,6 @@ class EnsembleRegressor(BaseEstimator):
             Predicted class labels.
         """
         return np.mean(self._predict(X), axis=1)
-
 
     def transform(self, X):
         """ Return class labels or probabilities for X for each estimator.

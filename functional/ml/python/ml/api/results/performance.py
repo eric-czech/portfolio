@@ -1,4 +1,5 @@
 
+import numpy as np
 import pandas as pd
 from ml.api.results.predictions import PREDICTION_PANEL, META_PANEL
 from ml.api.results.predictions import MODEL_PROPERTY, FOLD_PROPERTY
@@ -6,6 +7,8 @@ from ml.api.results.predictions import VALUE_PRED_PREFIX, CLASS_PRED_PREFIX, CLA
     VALUE_TRUE_PREFIX, CLASS_TRUE_PREFIX, TASK_PROPERTY
 from ml.api.results import properties
 from ml.api.constants import MODE_CLASSIFIER, MODE_REGRESSOR
+import logging
+logger = logging.getLogger(__name__)
 
 METRIC_PROPERTY = 'Metric'
 
@@ -62,6 +65,78 @@ def extract(train_res, d_pred, score_fn, by_fold=True):
     d.columns.names = [METRIC_PROPERTY, TASK_PROPERTY]
 
     return d
+
+
+def extract_lift(train_res, d_pred, task=None, class_value=1, n_group=10):
+    """
+    Extract lift\gains metrics
+
+    :param train_res: Training results
+    :param d_pred: DataFrame from `predictions.extract`
+    :param task: Name of classification task to extract metrics for (will default to first task if not specified)
+    :param class_value: Value of class for task to assume as the "positive" case; Note that if more than 2 classes
+        are present, this function will still proceed in a one vs rest comparison
+    :param n_group: Number of groups to create for lift/gain calculations
+    :return:
+    """
+
+    assert train_res.mode == MODE_CLASSIFIER, \
+        'Lift/Gain extraction only supported for {} tasks (mode given = "{}")'.format(MODE_CLASSIFIER, train_res.mode)
+    assert not pd.isnull(class_value), 'Class value cannot be null'
+
+    tasks = properties.get_prediction_tasks(train_res)
+    if len(tasks) > 1 and task is None:
+        task = tasks[0]
+        logger.warn(
+            'Multiple classification tasks are present ["{}"] and the first will be used for lift/gain extraction; '
+            'Override this behavior by setting the "task" argument -- Task selected = "{}"'\
+            .format('", "'.join(tasks), task)
+        )
+    else:
+        task = tasks[0]
+
+    # Determine predicted probability and actual label columns
+    # e.g. 'Class:Probability:Task1:1' and 'Class:Actual:Task1'
+    c_pred = '{}:{}:{}'.format(CLASS_PROB_PREFIX, task, class_value)
+    c_true = '{}:{}'.format(CLASS_TRUE_PREFIX, task)
+
+    def get_lift(g):
+        n = len(g)
+
+        # Sort predictions from highest to lowest probability
+        assert np.all(g[c_pred].between(0, 1))
+        assert np.all(g[c_pred].notnull())
+        g = g.sort_values(c_pred, ascending=False)
+
+        # Determine baseline rate of positive outcomes
+        v_rate = g[c_true].mean()
+
+        # Determine the number of records in each group
+        group_size = np.floor(n / float(n_group))
+
+        # Create list of indexes representing which group each record falls within, and cap
+        # this index at the maximum possible (this will push the remainder of the records
+        # into the last group if n not evenly divisible by group_size)
+        q = np.clip(np.floor(np.arange(n) / group_size), 0, n_group - 1).astype(np.int64) + 1
+
+        # Group by the group index and compute statistics about the true outcome
+        g = g.groupby(q)[c_true].agg(['mean', 'sum', 'count'])
+        g.columns = ['Sensitivity', 'ModelCount', 'N']
+        g.index.name = 'PredictionGroup'
+
+        # Finally, add lift/gain metrics
+        g['NCumulative'] = g['N'].cumsum()
+        g['BaselineRate'] = v_rate
+        g['BaselineCount'] = g['N'] * v_rate
+        g['LiftModel'] = g['Sensitivity'] / v_rate
+        g['LiftBaseline'] = 1.
+        g['GainModel'] = g['ModelCount'].cumsum()
+        g['GainBaseline'] = g['BaselineCount'].cumsum()
+        return g
+
+    # Group predictions by model and calculate lift/gain for each;
+    # Note that this ignores fold settings
+    return d_pred[PREDICTION_PANEL].groupby(d_pred[META_PANEL][MODEL_PROPERTY])[[c_pred, c_true]].apply(get_lift)
 
 
 def melt(d_score):
@@ -244,3 +319,127 @@ def visualize(d_score, backend='plotly', metrics=None, tasks=None, **kwargs):
         return visualize_plotly(d_score, **kwargs)
 
     return None
+
+
+def _get_single_value(g, c):
+    v = g[c].unique()
+    assert len(v) == 1, 'Field "{}" contains multiple unique values (values = {})'.format(c, v)
+    return v[0]
+
+
+def visualize_lift(d_lift, title='Lift Chart', use_counts=True, auto_plot=True):
+    """
+    Generate lift chart
+
+    :param d_lift: DataFrame from `performance.extract_lift`
+    :param title: Title for graph
+    :param use_counts: Flag indicating whether or not x axis should be display as raw counts or percentages
+    :param auto_plot: Whether or not to plot figure immediately or just return it
+    """
+    import plotly.graph_objs as go
+
+    d = d_lift.reset_index().copy()
+    d_base = d.groupby('PredictionGroup').apply(_get_single_value, c='LiftBaseline')
+    x = d.groupby('PredictionGroup').apply(_get_single_value, c='NCumulative')
+    d = d.pivot(index='PredictionGroup', columns='Model', values='LiftModel')
+
+    traces = []
+    for c in d:
+        traces.append(go.Scatter(
+            x=d.index,
+            y=d[c],
+            name=c
+        ))
+    traces.append(go.Scatter(
+        x=d_base.index,
+        y=d_base,
+        name='Baseline'
+    ))
+    if use_counts:
+        xaxis = go.XAxis(
+            ticktext=[str(v) for v in x.values],
+            tickvals=x.index.values,
+            title='Number of Predictions'
+        )
+    else:
+        xaxis = go.XAxis(
+            ticktext=['{0:.1f}%'.format(100 * v) for v in x.values / x.max()],
+            tickvals=x.index.values,
+            title='Percent Predictions'
+        )
+
+    layout = go.Layout(
+        xaxis=xaxis,
+        yaxis=go.YAxis(tickformat='%', title='Lift'),
+        title=title
+    )
+    fig = go.Figure(data=traces, layout=layout)
+    if auto_plot:
+        from py_utils import plotly_utils
+        return plotly_utils.iplot(fig)
+    else:
+        return fig
+
+
+def visualize_gain(d_lift, title='Gain Chart', use_counts=True, auto_plot=True):
+    """
+    Generate gain chart
+
+    :param d_lift: DataFrame from `performance.extract_lift`
+    :param title: Title for graph
+    :param use_counts: Flag indicating whether or not x and y axes should be display as raw counts or percentages
+    :param auto_plot: Whether or not to plot figure immediately or just return it
+    """
+    import plotly.graph_objs as go
+
+    d = d_lift.reset_index().copy()
+
+    d_ct = d.groupby('Model')['ModelCount'].sum()
+    assert d_ct.nunique() == 1
+    n_pos = 1 if use_counts else d_ct.iloc[0]
+
+    d_base = d.groupby('PredictionGroup').apply(_get_single_value, c='GainBaseline')
+    x = d.groupby('PredictionGroup').apply(_get_single_value, c='NCumulative')
+    d = d.pivot(index='PredictionGroup', columns='Model', values='GainModel')
+
+    traces = []
+    for c in d:
+        traces.append(go.Scatter(
+            x=d.index,
+            y=d[c] / n_pos,
+            name=c
+        ))
+    traces.append(go.Scatter(
+        x=d_base.index,
+        y=d_base / n_pos,
+        name='Baseline'
+    ))
+
+    if use_counts:
+        xaxis = go.XAxis(
+            ticktext=[str(v) for v in x.values],
+            tickvals=x.index.values,
+            title='Number of Predictions'
+        )
+        yaxis = go.YAxis(
+            tickformat=',',
+            title='Gain'
+        )
+    else:
+        xaxis = go.XAxis(
+            ticktext=['{0:.1f}%'.format(100 * v) for v in x.values / x.max()],
+            tickvals=x.index.values,
+            title='Percent Predictions'
+        )
+        yaxis = go.YAxis(
+            tickformat='%',
+            title='Gain'
+        )
+
+    layout = go.Layout(xaxis=xaxis, yaxis=yaxis, title=title)
+    fig = go.Figure(data=traces, layout=layout)
+    if auto_plot:
+        from py_utils import plotly_utils
+        return plotly_utils.iplot(fig)
+    else:
+        return fig

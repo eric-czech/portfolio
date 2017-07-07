@@ -4,6 +4,7 @@ import pandas as pd
 
 import numpy as np
 
+
 def to_data_frame(v, index=None, columns=None):
     """ Converts a given vector or matrix into a DataFrame
 

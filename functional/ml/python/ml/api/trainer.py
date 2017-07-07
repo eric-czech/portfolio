@@ -210,7 +210,7 @@ class Trainer(object):
             raise ValueError('Given mode "{}" is not valid.  Must be one of: {}'.format(mode, MODES))
 
     def train_classifiers(self, X, Y, clfs, cv, config=None, **kwargs):
-        return self._train(X, Y, clfs, cv, MODE_REGRESSOR, config=config, **kwargs)
+        return self._train(X, Y, clfs, cv, MODE_CLASSIFIER, config=config, **kwargs)
 
     def train_regressors(self, X, Y, clfs, cv, config=None, **kwargs):
         return self._train(X, Y, clfs, cv, MODE_REGRESSOR, config=config, **kwargs)
