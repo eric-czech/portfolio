@@ -1,5 +1,5 @@
-import multiprocessing
-multiprocessing.set_start_method('forkserver', force=True)
+# import multiprocessing
+# multiprocessing.set_start_method('forkserver', force=True)
 
 import os
 import sys

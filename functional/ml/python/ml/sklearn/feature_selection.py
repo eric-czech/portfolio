@@ -10,6 +10,98 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def get_feature_selector(X, regex, negate=False, n_feat_expected=None):
+    """
+    Returns a transformer to select features using a regular expression
+
+    :param X:
+    :param regex:
+    :param negate:
+    :param n_feat_expected:
+    :return:
+    """
+    from sklearn.preprocessing import FunctionTransformer
+    cols = X.columns.tolist()
+    feats = X.filter(regex=regex).columns.tolist()
+    if n_feat_expected is not None:
+        assert len(feats) == n_feat_expected, \
+            'Expected {} features to match regex "{}", but found {} instead'.format(n_feat_expected, regex, len(feats))
+    idx = [cols.index(c) for c in feats]
+    if negate:
+        selector = lambda X: X[:, [i for i in range(X.shape[1]) if i not in idx]]
+    else:
+        selector = lambda X: X[:, idx]
+    return FunctionTransformer(selector)
+
+
+class FeatureSelector(BaseEstimator, SelectorMixin):
+    """Select features by name or regular expression.
+
+    This feature selector works by taking either a regular expression OR list of feature indexes as well
+    as a DataFrame and determines the column indexes associated with these features
+    (available via \code{get_support}).
+
+    Parameters
+    ----------
+    features : Iterable
+        Contains full list of feature names to subset
+
+    regex : Regular Expression (optional)
+        Regular expression used to select features
+
+    items : List of feature names (optional)
+        List or tuple of feature names to be selected
+
+    * Note: Only one of regex or items must be set, an error will be thrown if both are given or neither are given
+
+    Attributes
+    ----------
+    support_matrix_ : array-like, shape=(n_features)
+        Feature support
+    """
+
+    def __init__(self, features, regex=None, items=None):
+        super(FeatureSelector, self).__init__()
+
+        # Validate filter criteria
+        if items is not None and regex is not None:
+            raise ValueError('Both `items` and `regex` cannot be set (must be one or the other)')
+        if items is None and regex is None:
+            raise ValueError('One of either `items` or `regex` must be set')
+
+        self.regex = regex
+        self.items = items
+        self.features = features
+
+    def fit(self, *args, **kwargs):
+        if len(self.features) != len(list(self.features)):
+            raise ValueError(
+                '`features` argument should be convertable to a list '
+                '(and have the same length after conversion).  List given = "{}"'
+                .format(self.features)
+            )
+
+        features = list(self.features)
+        # Apply regular expression or direct filter, depending on arguments, and create a list of "selected" features
+        if self.regex:
+            import re
+            matcher = re.compile(self.regex)
+            selected_features = [c for c in features if matcher.search(str(c)) is not None]
+        else:
+            selected_features = [c for c in features if c in self.items]
+
+        # Set selected feature index and boolean mask
+        self.selected_feature_names_ = np.array(selected_features)
+        self.selected_feature_index_ = np.array([features.index(c) for c in selected_features])
+        self.selected_feature_mask_ = np.array([c in selected_features for c in features])
+        self.features_ = features
+        return self
+
+    def _get_support_mask(self):
+        check_is_fitted(self, 'selected_feature_mask_')
+        return self.selected_feature_mask_
+
+
 class MultiOutputSelect(BaseEstimator, SelectorMixin):
     """Select features for multivariate outcomes based on a per-outcome selection strategy.
 

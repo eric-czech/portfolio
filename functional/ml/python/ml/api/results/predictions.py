@@ -21,6 +21,16 @@ VALUE_PRED_PREFIX = 'Value:Predicted'
 VALUE_TRUE_PREFIX = 'Value:Actual'
 
 
+# def get_default_proba_fn(task_name, classes):
+#     """
+#     Appropriate default probability prediction function for use in `extract` with two-class, single-task result
+#     """
+#     def proba_fn(clf_name, clf, Y_proba):
+#         assert Y_proba.shape[1] == len(classes)
+#         return pd.DataFrame(Y_proba, columns=['{}:{}'.format(task_name, c) for c in classes])
+#     return proba_fn
+
+
 def _get_probability_predictions(model_res, proba_fn, Y_proba, Y_names):
     d = {}
     if proba_fn is not None:
@@ -87,9 +97,9 @@ def extract(train_res, proba_fn=None):
                 # Add class probability predictions, which can be tricky in the case of multioutput classification
                 # models since new fields have to be added for each output and all associated classes
                 if Y_proba is not None:
-                    d_pred = _get_probability_predictions(model_res, proba_fn, Y_proba, Y_names)
-                    for c in d_pred:
-                        append(c, d_pred[c])
+                    d_pred_proba = _get_probability_predictions(model_res, proba_fn, Y_proba, Y_names)
+                    for c in d_pred_proba:
+                        append(c, d_pred_proba[c])
 
                 # Add predicted and actual class labels
                 for i, task_name in enumerate(model_res.Y_names):
