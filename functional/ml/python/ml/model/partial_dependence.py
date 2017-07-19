@@ -173,7 +173,7 @@ def plot_partial_dependence(pdp, n_cols=3, title='Partial Dependence', smooth_wi
         x = list(pdp_mean.index.values)
         y = pdp_mean.values
         if smooth_window is not None:
-            y = pd.rolling_mean(y, min_periods=1, window=smooth_window)
+            y = pd.rolling_mean(y, min_periods=1, window=smooth_window, center=True)
         y = list(y)
         line = dict(color='black')
         trace = go.Scatter(x=x, y=y, name=feature, line=line)
