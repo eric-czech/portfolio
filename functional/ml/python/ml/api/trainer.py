@@ -36,6 +36,12 @@ class TrainingModelResult(object):
         self.Y_train = Y_train
         self.Y_proba = Y_proba
 
+    def has_test_data(self):
+        return self.X_test is not None
+
+    def has_training_data(self):
+        return self.X_train is not None
+
 
 class TrainingResampleResult(object):
 
@@ -145,10 +151,10 @@ def run_fold(args):
 
         # If configured to do so, add extra data associated with the results, which are often
         # expensive in terms of storage space so these things must be explicitly enabled
-        if config.keep_training_data:
+        if config.keep_training_data_enabled(clf[CLF_NAME]):
             fold_res.X_train = X_train
             fold_res.Y_train = Y_train_df
-        if config.keep_test_data:
+        if config.keep_test_data_enabled(clf[CLF_NAME]):
             fold_res.X_test = X_test
         if mode == MODE_CLASSIFIER and config.predict_proba:
             # Compute probability predictions and put off conversion to data frame until later
@@ -167,7 +173,10 @@ class TrainerConfig(object):
             defaults to false
         :param runcv: Boolean indicating whether or not the given models should be run in cross validation or just
             trained on the training data a single time
-        :param keep_training_data: Boolean indicating whether or not training/test datasets should be preserved in results
+        :param keep_training_data: Boolean indicating whether or not test datasets should be preserved in
+            results, or a list of clf names for which this condition will be true
+        :param keep_test_data: Boolean indicating whether or not test datasets should be preserved in
+            results, or a list of clf names for which this condition will be true
         :param predict_proba: Boolean indicating whether or not class probability predictions should be made
             for classifiers; defaults to false
         :param data_prep_fn: Optional function to be passed X_train, X_test, Y_train and Y_test for each fold.  This
@@ -189,6 +198,16 @@ class TrainerConfig(object):
         self.predict_proba = predict_proba
         self.data_prep_fn = data_prep_fn
         self.model_fit_fn = model_fit_fn
+
+    def keep_training_data_enabled(self, clf):
+        if isinstance(self.keep_training_data, bool):
+            return self.keep_training_data
+        return clf in self.keep_training_data
+
+    def keep_test_data_enabled(self, clf):
+        if isinstance(self.keep_test_data, bool):
+            return self.keep_test_data
+        return clf in self.keep_test_data
 
 
 class Trainer(object):

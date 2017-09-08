@@ -74,7 +74,8 @@ def extract(train_res, proba_fn=None):
             # or an empty data frame.  Note that the original feature data and the prediction data
             # will be present in the same from but with a nested column index and two labels at
             # the top level separating them (`feat_label` and `pred_label` respectively)
-            if train_res.trainer_config.keep_test_data:
+            if model_res.has_test_data():
+                # model_res.clf_name
                 d = model_res.X_test.copy()
                 d.columns = pd.MultiIndex.from_tuples([(FEATURE_PANEL, c) for c in d])
                 d[(META_PANEL, FOLD_PROPERTY)] = model_res.fold

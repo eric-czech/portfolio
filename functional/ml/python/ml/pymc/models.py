@@ -22,14 +22,25 @@ class PYMCModel(object):
         """
         raise NotImplementedError()
 
-    def _add_step(self, args):
-        """ Add step argument for sampling
+    def process_posterior(self, estimator, posterior):
+        """ Called subsequent to fitting operation
 
-        This is likely to be overriden so it is the only sampling argument added separately like this
+        This is useful for situations like:
+        - Calculating posterior means after sampling
+        - Setting "classes_" attribute on delegating estimator (to conform to convention within scikit learn)
+
+        :param estimator: PYMCEstimator instance
         """
-        start = pm.find_MAP()
-        args['step'] = pm.NUTS(scaling=start)
-        return args
+        pass
+
+    # def _add_step(self, args):
+    #     """ Add step argument for sampling
+    #
+    #     This is likely to be overriden so it is the only sampling argument added separately like this
+    #     """
+    #     start = pm.find_MAP()
+    #     args['step'] = pm.NUTS(scaling=start)
+    #     return args
 
     def get_posterior(self, model, **kwargs):
         """
@@ -69,7 +80,6 @@ class PYMCModel(object):
                 args['random_seed'] = seeds[i]
                 args['chain'] = i
                 args['njobs'] = 1
-                args = self._add_step(args)
                 traces.append(pm.sample(**args))
             post = pm.backends.base.merge_traces(traces)
             return post
@@ -97,6 +107,7 @@ class PYMCEstimator(BaseEstimator):
         """
         self.pymc_model_ = self.model.get_model(X, y, **kwargs)
         self.posterior_ = self.model.get_posterior(self.pymc_model_, **kwargs)
+        self.model.process_posterior(self, self.posterior_)
         return self
 
     def predict_posterior(self, X, **kwargs):
@@ -106,11 +117,10 @@ class PYMCEstimator(BaseEstimator):
         return self.model.get_posterior_predictive(self.pymc_model_, self.posterior_, X, **kwargs)
 
     def predict(self, X, y_name='y', **kwargs):
-        """
-        Generates a prediction based on X, the array of covariates.
-        """
-        pp = self.predict_posterior(X, **kwargs)
-        return pp[y_name].mean(axis=0)
+        return self.predict_posterior(X, **kwargs)[y_name]
+
+    def predict_proba(self, X, y_name='y_proba', **kwargs):
+        return self.predict_posterior(X, **kwargs)[y_name]
 
     def posterior_summary(self, **kwargs):
         return pm.summary(self.posterior_, **kwargs)

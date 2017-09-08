@@ -2,12 +2,12 @@
 import pandas as pd
 
 
-def has_training_data(train_res):
-    return train_res.trainer_config.keep_training_data
-
-
-def has_test_feature_data(train_res):
-    return train_res.trainer_config.keep_test_data
+# def has_training_data(model_res):
+#     return train_res.trainer_config.keep_training_data
+#
+#
+# def has_test_feature_data(train_res):
+#     return train_res.trainer_config.keep_test_data
 
 
 def extract_resample_model_list(train_res):
