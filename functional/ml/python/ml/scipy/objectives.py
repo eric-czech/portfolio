@@ -2,6 +2,7 @@
 import numpy as np
 from py_utils.math import sigmoid
 
+
 class ScipyObjective(object):
 
     def __init__(self, evaluate_fn, jacobian_fn):
@@ -48,3 +49,20 @@ def objective_logloss_jacobian(p, X, y):
 #   from SLSQP, which generally does not like large objective function values (and using the mean instead of sum
 #   helps do that).
 OBJECTIVE_MLL = ScipyObjective(objective_logloss_evaulate, objective_logloss_jacobian)
+
+
+def objective_oml_evaluate(p_int, p_lin, X, y):
+    """
+    Mean log probability for ordinal classification task
+
+    Source: http://fa.bianp.net/blog/2013/logistic-ordinal-regression/
+
+    :param p_int: Intercept parameters [n_classes - 1]
+    :param p_lin: Linear parameters
+    :param X: Covariates [n_samples, n_features]
+    :param y: Ordinal categorical response [n_samples] of (n_classes)
+    :return:
+    """
+    pl = np.dot(X, p_lin)
+
+

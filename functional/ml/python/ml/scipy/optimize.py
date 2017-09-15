@@ -71,6 +71,12 @@ class ScipyParameters(object):
             bounds=self.bounds + other.bounds,
         )
 
+    def size(self):
+        return self.p
+
+    def get_parameter_names(self):
+        return self.names
+
     def get_parameter_index(self):
         return OrderedDict([(p, i) for i, p in enumerate(self.names)])
 
@@ -158,7 +164,61 @@ class ScipyLinearModel(ScipyModel):
         i = [pi[p] for p in self.coef_params.names]
         return self.objective.jacobian_fn(pv[i], X, y)
 
-    def evaluate_fit(self, fit):
+    def inference(self, fit):
+        params = list(fit.x)
+        res = {}
+        if not self.intercept_params.empty():
+            res['intercept'] = OrderedDict({'intercept': params.pop(0)})
+        res['linear'] = OrderedDict(zip(self.linear_params.get_parameter_names(), params[:self.linear_params.size()]))
+        if not self.fit_params.empty():
+            res['fit'] = OrderedDict(zip(self.fit_params.get_parameter_names(), params[self.linear_params.size():]))
+        return res
+
+
+class ScipyOrdinalModel(ScipyModel):
+
+    def __init__(self, builder):
+
+        if not isinstance(builder.objective, ScipyObjective):
+            raise ValueError('Objective must be of type "ScipyObjective" (type given = "{}")'
+                             .format(type(builder.objective)))
+        self.objective = builder.objective
+
+        self.linear_params = builder.linear_params
+        self.intercept_params = builder.intercept_params
+        self.fit_params = builder.fit_params
+
+        self.coef_params = self.intercept_params.merge(self.linear_params)
+        self.all_params = self.coef_params.merge(self.fit_params)
+
+    def get_parameter_index(self):
+        return self.all_params.get_parameter_index()
+
+    def get_parameter_starts(self):
+        return self.all_params.starts
+
+    def get_parameter_bounds(self):
+        return self.all_params.bounds
+
+    def prepare_training_data(self, X, _):
+        if self.intercept_params.empty():
+            return X
+        bias = np.ones((len(X), 1))
+        return np.hstack((bias, X))
+
+    def predict(self, fit, X):
+        X = self.prepare_training_data(X, None)
+        return np.dot(X, fit.x)
+
+    def evaulate_objective_fn(self, pv, pi, X, y):
+        i = [pi[p] for p in self.coef_params.names]
+        return self.objective.evaluate_fn(pv[i], X, y)
+
+    def evaulate_jacobian_fn(self, pv, pi, X, y):
+        i = [pi[p] for p in self.coef_params.names]
+        return self.objective.jacobian_fn(pv[i], X, y)
+
+    def inference(self, fit):
         raise NotImplementedError('Method not yet implemented')
 
 
@@ -178,7 +238,7 @@ class ScipyLinearModelBuilder(object):
 
     def add_intercept(self, start=None, bound=None):
         self.intercept_params = ScipyParameters(
-            names=['Intercept'],
+            names=['intercept'],
             starts=None if start is None else [start],
             bounds=None if bound is None else [bound]
         )
@@ -276,12 +336,15 @@ class ScipyRegressor(BaseEstimator):
     intercept_ : Scalar intercept if `fit_intercept=True`
 
     """
-    def __init__(self, model, constraints=None, analytical_gradients=True, raise_on_failure=True):
+    def __init__(self, model, constraints=None, analytical_gradients=True,
+                 raise_on_failure=True, seed=None, fit_kwargs=None):
         self.model = model
         self.constraints = constraints
         self.analytical_gradients = analytical_gradients
         self.raise_on_failure = raise_on_failure
         self.parameter_index = self.model.get_parameter_index()
+        self.seed = seed
+        self.fit_kwargs = fit_kwargs
 
     def _constraints(self):
         if self.constraints is None:
@@ -299,7 +362,7 @@ class ScipyRegressor(BaseEstimator):
             cons.append(con)
         return cons
 
-    def fit(self, X, y):
+    def fit(self, X, y, raise_on_failure=None, **kwargs):
         """
         Fit RLS Model.
 
@@ -316,7 +379,7 @@ class ScipyRegressor(BaseEstimator):
         -------
         self : object
         """
-        X, y = check_X_y(X, y, accept_sparse=None, y_numeric=True, multi_output=False)
+        X, y = check_X_y(X, y, accept_sparse=False, y_numeric=True, multi_output=False)
 
         if y.ndim != 1:
             raise ValueError('At the moment, only 1-d outcome values are supported '
@@ -324,6 +387,9 @@ class ScipyRegressor(BaseEstimator):
         X = self.model.prepare_training_data(X, y)
 
         # Run constrained optimization
+        np.random.seed(self.seed)
+
+        fit_kwargs = kwargs if self.fit_kwargs is None else {**self.fit_kwargs, **kwargs}
         self.fit_ = optimize.minimize(
             fun=self.model.evaulate_objective_fn,
             x0=self.model.get_parameter_starts(),
@@ -331,12 +397,16 @@ class ScipyRegressor(BaseEstimator):
             args=(self.parameter_index, X, y),
             bounds=self.model.get_parameter_bounds(),
             method='SLSQP',
-            constraints=self._constraints()
+            constraints=self._constraints(),
+            **fit_kwargs
         )
+
+        # Default raise on failure to class variable, but override with kwargs if set
+        raise_on_failure = self.raise_on_failure if raise_on_failure is None else raise_on_failure
 
         if not self.fit_.success:
             msg = get_fit_summary(self.fit_)
-            if self.raise_on_failure:
+            if raise_on_failure:
                 raise ValueError(msg)
             else:
                 warnings.warn(msg)
@@ -345,6 +415,9 @@ class ScipyRegressor(BaseEstimator):
 
     def get_fit_summary(self):
         return get_fit_summary(self.fit_)
+
+    def inference(self):
+        return self.model.inference(self.fit_)
 
     def predict(self, X):
         """
