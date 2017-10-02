@@ -1,8 +1,6 @@
 
 
 import numpy as np
-import pystan
-from theano import shared
 import pymc3 as pm
 from sklearn.base import BaseEstimator
 import logging

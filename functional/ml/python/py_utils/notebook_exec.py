@@ -30,6 +30,7 @@ def default_link_fn(path, step):
     prefix = 'Input Notebook: ' if step == 'input' else 'Output Notebook: '
     display(FileLink(str(path), result_html_prefix=prefix))
 
+
 def run_notebook(notebook_path, out_path=None,
                  nb_suffix='-out', nb_kwargs=None, clear_output=True, hide_input=True,
                  insert_pos=1, timeout=3600, execute_kwargs=None,

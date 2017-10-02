@@ -17,7 +17,6 @@ def objective_mse_evaulate(p, X, y):
 def objective_mse_jacobian(p, X, y):
     # Reference: http://theory.stanford.edu/~tim/s15/l/l15.pdf
     # See: "3.3 The Gradient of the MSE Function"
-    # return (-2 / y.shape[0]) * np.squeeze(np.dot(X.T, y - np.dot(X, p)))
     return (-2. / y.shape[0]) * np.dot(X.T, y - np.dot(X, p))
 
 
