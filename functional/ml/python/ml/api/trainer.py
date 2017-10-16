@@ -35,6 +35,22 @@ class TrainingModelResult(object):
         self.X_test = X_test
         self.Y_train = Y_train
         self.Y_proba = Y_proba
+        self.validate()
+
+    def validate(self):
+        n_test = len(self.Y_pred)
+        assert n_test == \
+            (n_test if self.Y_test is None else len(self.Y_test)) == \
+            (n_test if self.Y_proba is None else len(self.Y_proba))
+
+        if self.X_train is not None and self.Y_train is not None:
+            assert len(self.X_train) == len(self.Y_train)
+
+    def has_test_data(self):
+        return self.X_test is not None
+
+    def has_training_data(self):
+        return self.X_train is not None
 
 
 class TrainingResampleResult(object):
@@ -59,30 +75,126 @@ class TrainingResult(object):
         return io_utils.from_pickle(file_path, obj_name=obj_name)
 
 
-def _convert_to_data_frames(Y_pred, Y_test, Y_train):
+def _convert_to_data_frames(Y_pred, Y_test, Y_train, Y_names=None, Y_pred_index=None):
 
     # Extract the name(s) associated with response values
-    Y_names = Y_train.columns.tolist() if isinstance(Y_train, pd.DataFrame) else [Y_train.name]
+    if Y_names is None:
+        Y_names = Y_train.columns.tolist() if isinstance(Y_train, pd.DataFrame) else [Y_train.name]
 
     # Convert predicted values to a data frame (should be from either 1D or 2D numpy array)
-    Y_pred = to_data_frame(Y_pred, index=Y_test.index, columns=Y_names)
-    assert_true(Y_pred.columns.tolist() == Y_names,
-                lambda: 'Y_pred columns "{}" do not matched expected columns "{}"'
-                .format(Y_pred.columns.tolist(), Y_names))
+    if Y_pred is not None:
+        idx = Y_pred_index
+        if idx is None:
+            if Y_test is None:
+                raise ValueError(
+                        'Index for prediction frame (ie Y_pred) must be given '
+                        'explicitly if Y_test is not provided'
+                )
+            else:
+                idx = Y_test.index
+        Y_pred = to_data_frame(Y_pred, index=idx, columns=Y_names)
+        assert_true(Y_pred.columns.tolist() == Y_names,
+                    lambda: 'Y_pred columns "{}" do not matched expected columns "{}"'
+                    .format(Y_pred.columns.tolist(), Y_names))
 
     # Convert test response values to a data frame (should be from either a Series or DataFrame)
-    Y_test = to_data_frame(Y_test)
-    assert_true(Y_test.columns.tolist() == Y_names,
-                lambda: 'Y_test columns "{}" do not matched expected columns "{}"'
-                .format(Y_test.columns.tolist(), Y_names))
+    if Y_test is not None:
+        Y_test = to_data_frame(Y_test)
+        assert_true(Y_test.columns.tolist() == Y_names,
+                    lambda: 'Y_test columns "{}" do not matched expected columns "{}"'
+                    .format(Y_test.columns.tolist(), Y_names))
 
     # Convert training response values to a data frame (should be from either a Series or DataFrame)
-    Y_train = to_data_frame(Y_train)
-    assert_true(Y_train.columns.tolist() == Y_names,
-                lambda: 'Y_train columns "{}" do not matched expected columns "{}"'
-                .format(Y_train.columns.tolist(), Y_names))
+    if Y_train is not None:
+        Y_train = to_data_frame(Y_train)
+        assert_true(Y_train.columns.tolist() == Y_names,
+                    lambda: 'Y_train columns "{}" do not matched expected columns "{}"'
+                    .format(Y_train.columns.tolist(), Y_names))
 
     return Y_pred, Y_test, Y_train
+
+
+def _data_prep(prep_fn, X_train, X_test, Y_train, Y_test, allow_none=False):
+    X_train, X_test, Y_train, Y_test = prep_fn(X_train, X_test, Y_train, Y_test)
+    for x in [X_train, X_test]:
+        if allow_none and x is None:
+            continue
+        if not isinstance(x, pd.DataFrame):
+            raise ValueError('Data prep function must return DataFrame instances for feature data')
+    for y in [Y_train, Y_test]:
+        if allow_none and y is None:
+            continue
+        if not isinstance(y, pd.DataFrame) and not isinstance(y, pd.Series):
+            raise ValueError('Data prep function must return DataFrame or Series instances for response data')
+    return X_train, X_test, Y_train, Y_test
+
+
+def run_predict(train_res, X, Y=None):
+    from ml.api.results import properties
+
+    if train_res.refit_result is None:
+        raise ValueError('Refit models in training result cannot be missing (try retraining with config.refit=True)')
+
+    X_names = properties.extract_property_by_consensus(train_res, lambda model_result: model_result.X_names, 'X_names')
+    Y_names = properties.extract_property_by_consensus(train_res, lambda model_result: model_result.Y_names, 'Y_names')
+
+    assert_true(X_names == X.columns.tolist(),
+                lambda: 'Given feature set with columns "{}" does not match expected columns "{}"'
+                .format(X.columns.tolist(), X_names))
+
+    # Run the data preparation function if one was configured, and ensure that the results from this
+    # function are still DataFrames or Series, not numpy arrays
+    if train_res.trainer_config.data_prep_fn is not None:
+        X, _, Y, _ = _data_prep(train_res.trainer_config.data_prep_fn, X, None, Y, None, allow_none=True)
+
+    res = []
+
+    for model_res in train_res.refit_result.model_results:
+
+        log(
+            'Running predictions for model {} ==> dim(X) = {}'
+            .format(model_res.clf_name, X.shape)
+        )
+
+        # Make predictions on test data features
+        Y_pred = model_res.clf.predict(X)
+
+        # Convert predicted values to a data frame (should be from either 1D or 2D numpy array)
+        # Y_pred = to_data_frame(Y_pred, index=X.index, columns=Y_names)
+        # assert_true(Y_pred.columns.tolist() == Y_names,
+        #             lambda: 'Y_pred columns "{}" do not matched expected columns "{}"'
+        #             .format(Y_pred.columns.tolist(), Y_names))
+
+        # Convert true response values as well as predictions to data frames
+        Y_pred, Y_df, _ = _convert_to_data_frames(Y_pred, Y, None, Y_names=Y_names, Y_pred_index=X.index)
+
+        # Initialize result for model using the minimal amount of information required
+        # *Note: all X_* and Y_* values should be data frames at this point
+        fold_res = TrainingModelResult(
+            fold=0,
+            clf_name=model_res.clf_name,
+            clf=model_res.clf,
+            mode=train_res.mode,
+            Y_pred=Y_pred,
+            Y_test=Y_df,
+            X_names=X.columns.tolist(),
+            Y_names=Y_names
+        )
+
+        if train_res.trainer_config.keep_test_data_enabled(model_res.clf_name):
+            fold_res.X_test = X
+
+        if train_res.mode == MODE_CLASSIFIER and train_res.trainer_config.predict_proba:
+            # Compute probability predictions and put off conversion to data frame until later
+            # due to the complexity of this in multi-class, multi-label situations (typically
+            # all use in those cases will involve a user-specified function to interpret results
+            # from models since they vary so widely within sklearn)
+            fold_res.Y_proba = model_res.clf.predict(X)
+
+        fold_res.validate()
+
+        res.append(fold_res)
+    return TrainingResampleResult(model_results=res)
 
 
 def run_fold(args):
@@ -92,13 +204,7 @@ def run_fold(args):
     # Run the data preparation function if one was configured, and ensure that the results from this
     # function are still DataFrames or Series, not numpy arrays
     if config.data_prep_fn is not None:
-        X_train, X_test, Y_train, Y_test = config.data_prep_fn(X_train, X_test, Y_train, Y_test)
-        for x in [X_train, X_test]:
-            if not isinstance(x, pd.DataFrame):
-                raise ValueError('Data prep function must return DataFrame instances for feature data')
-        for y in [Y_train, Y_test]:
-            if not isinstance(y, pd.DataFrame) and not isinstance(y, pd.Series):
-                raise ValueError('Data prep function must return DataFrame or Series instances for response data')
+        X_train, X_test, Y_train, Y_test = _data_prep(config.data_prep_fn, X_train, X_test, Y_train, Y_test)
 
     res = []
 
@@ -145,14 +251,19 @@ def run_fold(args):
 
         # If configured to do so, add extra data associated with the results, which are often
         # expensive in terms of storage space so these things must be explicitly enabled
-        if config.keep_training_data:
+        if config.keep_training_data_enabled(clf[CLF_NAME]):
             fold_res.X_train = X_train
             fold_res.Y_train = Y_train_df
-        if config.keep_test_data:
+        if config.keep_test_data_enabled(clf[CLF_NAME]):
             fold_res.X_test = X_test
         if mode == MODE_CLASSIFIER and config.predict_proba:
             # Compute probability predictions and put off conversion to data frame until later
+            # due to the complexity of this in multi-class, multi-label situations (typically
+            # all use in those cases will involve a user-specified function to interpret results
+            # from models since they vary so widely within sklearn)
             fold_res.Y_proba = est.predict_proba(X_test)
+
+        fold_res.validate()
 
         res.append(fold_res)
     return TrainingResampleResult(model_results=res)
@@ -167,7 +278,10 @@ class TrainerConfig(object):
             defaults to false
         :param runcv: Boolean indicating whether or not the given models should be run in cross validation or just
             trained on the training data a single time
-        :param keep_training_data: Boolean indicating whether or not training/test datasets should be preserved in results
+        :param keep_training_data: Boolean indicating whether or not test datasets should be preserved in
+            results, or a list of clf names for which this condition will be true
+        :param keep_test_data: Boolean indicating whether or not test datasets should be preserved in
+            results, or a list of clf names for which this condition will be true
         :param predict_proba: Boolean indicating whether or not class probability predictions should be made
             for classifiers; defaults to false
         :param data_prep_fn: Optional function to be passed X_train, X_test, Y_train and Y_test for each fold.  This
@@ -189,6 +303,16 @@ class TrainerConfig(object):
         self.predict_proba = predict_proba
         self.data_prep_fn = data_prep_fn
         self.model_fit_fn = model_fit_fn
+
+    def keep_training_data_enabled(self, clf):
+        if isinstance(self.keep_training_data, bool):
+            return self.keep_training_data
+        return clf in self.keep_training_data
+
+    def keep_test_data_enabled(self, clf):
+        if isinstance(self.keep_test_data, bool):
+            return self.keep_test_data
+        return clf in self.keep_test_data
 
 
 class Trainer(object):
@@ -272,9 +396,20 @@ class Trainer(object):
             print('Beginning model refitting')
             refit_res = run_fold(args)
             log('Model refitting complete ({} model(s) run)'.format(len(clfs)))
+
+        print('Training complete')
         log_hr()
 
         return TrainingResult(
             resample_results=cv_res, refit_result=refit_res,
             trainer_config=config, mode=mode
         )
+
+    def predict(self, train_res, X, Y=None):
+        pred_res = run_predict(train_res, X, Y=Y)
+        return TrainingResult(
+            resample_results=[pred_res], refit_result=None,
+            trainer_config=train_res.trainer_config, mode=train_res.mode
+        )
+
+

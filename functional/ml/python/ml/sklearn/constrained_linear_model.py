@@ -270,3 +270,6 @@ class RLSRegressor(BaseEstimator):
         X = check_array(X)
         X = self._prep(X)
         return np.dot(X, self.optimize_result_.x)
+
+
+

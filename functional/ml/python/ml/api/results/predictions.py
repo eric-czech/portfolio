@@ -74,14 +74,19 @@ def extract(train_res, proba_fn=None):
             # or an empty data frame.  Note that the original feature data and the prediction data
             # will be present in the same from but with a nested column index and two labels at
             # the top level separating them (`feat_label` and `pred_label` respectively)
-            if train_res.trainer_config.keep_test_data:
+            if model_res.has_test_data():
+                # model_res.clf_name
                 d = model_res.X_test.copy()
                 d.columns = pd.MultiIndex.from_tuples([(FEATURE_PANEL, c) for c in d])
                 d[(META_PANEL, FOLD_PROPERTY)] = model_res.fold
             else:
+                # d = pd.DataFrame(
+                #     {(META_PANEL, FOLD_PROPERTY): np.repeat(model_res.fold, len(model_res.Y_test))},
+                #     index=model_res.Y_test.index
+                # )
                 d = pd.DataFrame(
-                    {(META_PANEL, FOLD_PROPERTY): np.repeat(model_res.fold, len(model_res.Y_test))},
-                    index=model_res.Y_test.index
+                    {(META_PANEL, FOLD_PROPERTY): np.repeat(model_res.fold, len(model_res.Y_pred))},
+                    index=model_res.Y_pred.index
                 )
 
             # Add predictions and actuals to resulting frame within the `pred_label` panel
@@ -104,13 +109,15 @@ def extract(train_res, proba_fn=None):
                 # Add predicted and actual class labels
                 for i, task_name in enumerate(model_res.Y_names):
                     append('{}:{}'.format(CLASS_PRED_PREFIX, task_name), Y_pred.iloc[:, i])
-                    append('{}:{}'.format(CLASS_TRUE_PREFIX, task_name), Y_true.iloc[:, i])
+                    if Y_true is not None:
+                        append('{}:{}'.format(CLASS_TRUE_PREFIX, task_name), Y_true.iloc[:, i])
 
             elif train_res.mode == MODE_REGRESSOR:
                 # Add predicted and actual values
                 for i, task_name in enumerate(model_res.Y_names):
                     append('{}:{}'.format(VALUE_PRED_PREFIX, task_name), Y_pred.iloc[:, i])
-                    append('{}:{}'.format(VALUE_TRUE_PREFIX, task_name), Y_true.iloc[:, i])
+                    if Y_true is not None:
+                        append('{}:{}'.format(VALUE_TRUE_PREFIX, task_name), Y_true.iloc[:, i])
             else:
                 raise NotImplementedError(
                     'Prediction extraction for training mode "{}" not yet implemented'

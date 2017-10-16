@@ -20,7 +20,7 @@ def _repeat_mean(X, r):
 
 def get_univariate_dependence_1d(clf, X, features, pred_fun, feature_grids=None,
                               print_progress=True, grid_window=[0, 1], grid_size=50,
-                             discrete_thresh_ct=10, fill_mode='mean'):
+                             discrete_thresh_ct=10, fill_df='mean'):
     """
     Get univariate effect across training data
 
@@ -35,11 +35,13 @@ def get_univariate_dependence_1d(clf, X, features, pred_fun, feature_grids=None,
     :param grid_size: Number of grid points to calculate dependence for
     :param discrete_thresh_ct: Number of distinct values present below which to consider a variable discrete rather
         than continuous
-    :param fill_mode: Either 'mean' or 'zeros' indicating how non-target features should be set
+    :param fill_df: Either 'mean', 'zeros', or callable indicating how non-target features should be set; if
+        callable, function should take single argument `num_rows` and return a data frame with the same
+        column names as X and as many rows as `num_rows` (with good default values for each non-target feature)
     :return:
     """
 
-    assert fill_mode in ['zeros', 'mean'], '"fill_mode" must be either "zeros" or "mean"'
+    assert fill_df in ['zeros', 'mean'] or callable(fill_df), '"fill_df" must be either "zeros", "mean", or callable'
 
     res = OrderedDict()
     for i, feature in enumerate(features):
@@ -62,10 +64,12 @@ def get_univariate_dependence_1d(clf, X, features, pred_fun, feature_grids=None,
                 xmax = np.percentile(x, gw[1] * 100)
                 grid = np.linspace(xmin, xmax, grid_size)
 
-        if fill_mode == 'mean':
+        if fill_df == 'mean':
             Xz = _repeat_mean(X, len(grid))
-        elif fill_mode == 'zeros':
+        elif fill_df == 'zeros':
             Xz = pd.DataFrame(np.zeros((len(grid), len(X.columns))), columns=X.columns)
+        else:
+            Xz = fill_df(len(grid))
         Xz[feature] = grid
         res[feature] = pd.Series(pred_fun(clf, Xz), index=grid)
     return res
