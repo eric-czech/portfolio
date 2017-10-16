@@ -79,3 +79,12 @@ class ScipyConstraints(object):
     def get_constraints(self):
         # Return copied constraint definitions
         return [dict(c) for c in self.constraints]
+
+    def merge(self, constraints):
+        """ Merge constraint set with another
+        :param constraints: Other constraint set to add to this one
+        :return: New constraint set object
+        """
+        res = ScipyConstraints()
+        res.constraints = self.get_constraints() + constraints.get_constraints()
+        return res
