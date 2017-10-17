@@ -194,7 +194,7 @@ class ScipyLinearRegressionModel(ScipyLinearModel):
 
     def predict(self, fit, X):
         X = self.prepare_training_data(X, None)
-        return {'values': np.dot(X, fit.x)}
+        return {PRED_VALUES: np.dot(X, fit.x)}
 
 
 class ScipyLogisticRegressionModel(ScipyLinearModel):
@@ -205,13 +205,23 @@ class ScipyLogisticRegressionModel(ScipyLinearModel):
     def predict(self, fit, X):
         from py_utils import math
         X = self.prepare_training_data(X, None)
-        y_proba = math.sigmoid(np.dot(X, fit.x), clip=True)
+        y_proba = math.sigmoid(np.dot(X, fit.x), clip=True)[:, np.newaxis]
         y_proba = np.hstack((1. - y_proba, y_proba))
         y_pred = np.argmax(y_proba, axis=1)
         return {
             PRED_VALUES: y_pred,
             PRED_PROBAS: y_proba
         }
+
+
+class ScipyPoissonRegressionModel(ScipyLinearModel):
+
+    def __init__(self, builder):
+        super(ScipyPoissonRegressionModel, self).__init__(builder)
+
+    def predict(self, fit, X):
+        X = self.prepare_training_data(X, None)
+        return {PRED_VALUES: np.exp(np.dot(X, fit.x))}
 
 
 class ScipyLinearModelBuilder(object):
@@ -221,7 +231,7 @@ class ScipyLinearModelBuilder(object):
         self.linear_params = None
         self.intercept_params = EMPTY_PARAMS
         self.fit_params = EMPTY_PARAMS
-        self.constraints = None
+        self.constraints = ScipyConstraints()
 
     # Not necessary until something other than MSE is needed for scalar, continuous outcome regression
     # def set_objective(self, objective):
@@ -255,9 +265,7 @@ class ScipyLinearModelBuilder(object):
         return self
 
     def add_constraints(self, constraints):
-        if self.constraints is None:
-            self.constraints = []
-        self.constraints.extend(constraints)
+        self.constraints = self.constraints.merge(constraints)
         return self
 
     def _validate(self):
@@ -304,6 +312,18 @@ class ScipyLogisticRegressionModelBuilder(ScipyLinearModelBuilder):
 
     def _build(self):
         return ScipyLogisticRegressionModel(self)
+
+
+class ScipyPoissonRegressionModelBuilder(ScipyLinearModelBuilder):
+
+    def __init__(self):
+        super(ScipyPoissonRegressionModelBuilder, self).__init__()
+
+    def _objective(self):
+        return OBJECTIVE_PML
+
+    def _build(self):
+        return ScipyPoissonRegressionModel(self)
 
 
 class ScipyOrdinalRegressionModel(ScipyModel):

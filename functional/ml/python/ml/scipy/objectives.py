@@ -50,104 +50,140 @@ def objective_logloss_jacobian(p, X, y):
 OBJECTIVE_MLL = ScipyObjective(objective_logloss_evaulate, objective_logloss_jacobian)
 
 
-def objective_oml_evaluate_old(n_classes, p_out, p_lin, X, y, epsilon=1e-128):
-    """
-    Mean log probability for ordinal classification task
+######################
+# Poisson Objectives #
+######################
 
-    References:
-        - http://fa.bianp.net/blog/2013/logistic-ordinal-regression/
-        - https://github.com/fabianp/minirank/blob/master/minirank/logistic.py
+def objective_poisson_evaulate(p, X, y, max_link=512):
+    """ Mean log probability for poisson outcome """
+    from scipy.stats import poisson
+    yp = np.exp(np.clip(np.dot(X, p), -max_link, max_link))
+    return -np.mean(poisson.logpmf(y, yp))
 
-    :param n_classes: Number of outcome classes
-    :param p_out: Outcome intercept parameters [n_classes - 1]
-    :param p_lin: Linear parameters
-    :param X: Covariates [n_samples, n_features]
-    :param y: Ordinal categorical response ([n_samples] of n_classes unique values)
-    :param epsilon: Small value below which differences of predicted probabilities are considered to be 0
-    :return:
-    """
-    from py_utils import math
-    assert np.all(np.in1d(y, np.arange(1, n_classes + 1)))
-
-    n = len(y)
-
-    if np.any(np.diff(p_out) < 0):
-        return np.inf
-
-    lp = 0
-    for i in range(n):
-        k = y[i]
-        Xi = X[i]
-
-        s0 = 1 if k == n_classes else math.sigmoid(np.dot(Xi, p_lin) + p_out[k-1], clip=True)
-        s1 = 0 if k == 1 else math.sigmoid(np.dot(Xi, p_lin) + p_out[k-2], clip=True)
-        assert 0 <= s0 <= 1
-        assert 0 <= s1 <= 1
-        p = s0 - s1
-        assert p >= 0
-        if p < epsilon:
-            return np.inf
-        else:
-            lp += np.log(p)
-
-    # print('params: ', pv)
-    # print('logprob: ', -lp)
-    return -lp / n
+    # from scipy.special import gammaln
+    # yp = np.clip(np.dot(X, p), -np.inf, max_link)
+    # return -np.mean(-np.exp(yp) + y * yp - gammaln(y + 1))
 
 
-def objective_oml_jacobian_old(n_classes, p_out, p_lin, X, y, epsilon=1e-128):
-    """
-    Mean log probability gradient for ordinal classification task
+def objective_poisson_jacobian(p, X, y, max_link=512):
+    """ Mean log probability gradient for poisson outcome """
+    # yp = np.exp(np.clip(np.dot(X, p), -max_link, max_link))
+    # yd = (y - yp)[:, np.newaxis]
+    # return (-1. / y.shape[0]) * np.sum(X * yd, axis=0)
 
-    References:
-        - http://fa.bianp.net/blog/2013/logistic-ordinal-regression/
-        - https://github.com/fabianp/minirank/blob/master/minirank/logistic.py
-
-    :param n_classes: Number of outcome classes
-    :param p_out: Outcome intercept parameters [n_classes - 1]
-    :param p_lin: Linear parameters
-    :param X: Covariates [n_samples, n_features]
-    :param y: Ordinal categorical response ([n_samples] of n_classes unique values)
-    :param epsilon: Small value below which differences of predicted probabilities are considered to be 0
-    :return:
-    """
-    from py_utils import math
-    assert np.all(np.in1d(y, np.arange(1, n_classes + 1)))
-
-    n = len(y)
-
-    # Initialize gradient vectors to accmulate in loop
-    gb = np.zeros(X.shape[1])
-    ga = np.zeros(n_classes - 1)
-
-    gnan = np.repeat(np.nan, len(gb) + len(ga))
-
-    for i in range(n):
-        k = y[i]
-        Xi = X[i]
-
-        # Helper values for gradient calculation
-        s0 = 1 if k == n_classes else math.sigmoid(np.dot(Xi, p_lin) + p_out[k-1], clip=True)
-        s1 = 0 if k == 1 else math.sigmoid(np.dot(Xi, p_lin) + p_out[k-2], clip=True)
-        spq0 = s0 * (1 - s0)
-        spq1 = s1 * (1 - s1)
-
-        if (s0 - s1) < epsilon:
-            return gnan
-
-        # Accumulate gradient components
-        if k < n_classes:
-            ga[k-1] += spq0 / (s0 - s1)
-        if k > 1:
-            ga[k-2] -= spq1 / (s0 - s1)
-        gb += (Xi * (spq0 - spq1)) / (s0 - s1)
-
-    j = np.concatenate((gb, ga)) / n
-    # print('jac', j)
-    return -j
+    yp = np.exp(np.clip(np.dot(X, p), -max_link, max_link))
+    return -(1./y.shape[0]) * np.dot(y - yp, X)
 
 
-OBJECTIVE_OML_OLD = ScipyObjective(objective_oml_evaluate_old, objective_oml_jacobian_old)
+# Mean poisson log probability objective
+# Notes:
+# - See https://www.cs.princeton.edu/~bee/courses/lec/lec_jan29.pdf
+# - https://github.com/statsmodels/statsmodels/blob/master/statsmodels/discrete/discrete_model.py
+OBJECTIVE_PML = ScipyObjective(objective_poisson_evaulate, objective_poisson_jacobian)
+
+
+######################
+# Ordinal Objectives #
+######################
+
+# def objective_oml_evaluate_old(n_classes, p_out, p_lin, X, y, epsilon=1e-128):
+#     """
+#     Mean log probability for ordinal classification task
+#
+#     References:
+#         - http://fa.bianp.net/blog/2013/logistic-ordinal-regression/
+#         - https://github.com/fabianp/minirank/blob/master/minirank/logistic.py
+#
+#     :param n_classes: Number of outcome classes
+#     :param p_out: Outcome intercept parameters [n_classes - 1]
+#     :param p_lin: Linear parameters
+#     :param X: Covariates [n_samples, n_features]
+#     :param y: Ordinal categorical response ([n_samples] of n_classes unique values)
+#     :param epsilon: Small value below which differences of predicted probabilities are considered to be 0
+#     :return:
+#     """
+#     from py_utils import math
+#     assert np.all(np.in1d(y, np.arange(1, n_classes + 1)))
+#
+#     n = len(y)
+#
+#     if np.any(np.diff(p_out) < 0):
+#         return np.inf
+#
+#     lp = 0
+#     for i in range(n):
+#         k = y[i]
+#         Xi = X[i]
+#
+#         s0 = 1 if k == n_classes else math.sigmoid(np.dot(Xi, p_lin) + p_out[k-1], clip=True)
+#         s1 = 0 if k == 1 else math.sigmoid(np.dot(Xi, p_lin) + p_out[k-2], clip=True)
+#         assert 0 <= s0 <= 1
+#         assert 0 <= s1 <= 1
+#         p = s0 - s1
+#         assert p >= 0
+#         if p < epsilon:
+#             return np.inf
+#         else:
+#             lp += np.log(p)
+#
+#     # print('params: ', pv)
+#     # print('logprob: ', -lp)
+#     return -lp / n
+#
+#
+# def objective_oml_jacobian_old(n_classes, p_out, p_lin, X, y, epsilon=1e-128):
+#     """
+#     Mean log probability gradient for ordinal classification task
+#
+#     References:
+#         - http://fa.bianp.net/blog/2013/logistic-ordinal-regression/
+#         - https://github.com/fabianp/minirank/blob/master/minirank/logistic.py
+#
+#     :param n_classes: Number of outcome classes
+#     :param p_out: Outcome intercept parameters [n_classes - 1]
+#     :param p_lin: Linear parameters
+#     :param X: Covariates [n_samples, n_features]
+#     :param y: Ordinal categorical response ([n_samples] of n_classes unique values)
+#     :param epsilon: Small value below which differences of predicted probabilities are considered to be 0
+#     :return:
+#     """
+#     from py_utils import math
+#     assert np.all(np.in1d(y, np.arange(1, n_classes + 1)))
+#
+#     n = len(y)
+#
+#     # Initialize gradient vectors to accmulate in loop
+#     gb = np.zeros(X.shape[1])
+#     ga = np.zeros(n_classes - 1)
+#
+#     gnan = np.repeat(np.nan, len(gb) + len(ga))
+#
+#     for i in range(n):
+#         k = y[i]
+#         Xi = X[i]
+#
+#         # Helper values for gradient calculation
+#         s0 = 1 if k == n_classes else math.sigmoid(np.dot(Xi, p_lin) + p_out[k-1], clip=True)
+#         s1 = 0 if k == 1 else math.sigmoid(np.dot(Xi, p_lin) + p_out[k-2], clip=True)
+#         spq0 = s0 * (1 - s0)
+#         spq1 = s1 * (1 - s1)
+#
+#         if (s0 - s1) < epsilon:
+#             return gnan
+#
+#         # Accumulate gradient components
+#         if k < n_classes:
+#             ga[k-1] += spq0 / (s0 - s1)
+#         if k > 1:
+#             ga[k-2] -= spq1 / (s0 - s1)
+#         gb += (Xi * (spq0 - spq1)) / (s0 - s1)
+#
+#     j = np.concatenate((gb, ga)) / n
+#     # print('jac', j)
+#     return -j
+#
+#
+# OBJECTIVE_OML_OLD = ScipyObjective(objective_oml_evaluate_old, objective_oml_jacobian_old)
 
 
 def objective_oml_evaluate(n_classes, p_out, p_lin, X, y, epsilon=1e-128):
@@ -217,36 +253,42 @@ def objective_oml_jacobian(n_classes, p_out, p_lin, X, y, epsilon=1e-128):
     assert np.all(np.in1d(y, np.arange(1, n_classes + 1)))
 
     n = len(y)
+    idx = np.arange(n)
 
-    # Initialize gradient vectors to accmulate in loop
-    gb = np.zeros(X.shape[1])
-    ga = np.zeros(n_classes - 1)
+    # Compute cumulative probability of each outcome by repeating outcome intercepts and adding them
+    # to the linear predictor (dot product of ind. vars and linear parameters)
+    v_out = np.tile(p_out, (n, 1))
+    v_lin = np.dot(X, p_lin)[:, np.newaxis]
+    y_proba = math.sigmoid(v_out + v_lin, clip=True)
 
-    gnan = np.repeat(np.nan, len(gb) + len(ga))
+    # Add 0 and 1 vectors to cumulative probabilities
+    y_proba = np.hstack((np.zeros((n, 1)), y_proba, np.ones((n, 1))))
 
-    for i in range(n):
-        k = y[i]
-        Xi = X[i]
+    # Select left and right cumulative probabilities active for each observation (based on actual outcome)
+    ypr = y_proba[idx, y]
+    ypl = y_proba[idx, y-1]
+    ypd = ypr - ypl
+    assert ypr.ndim == ypl.ndim == 1
 
-        # Helper values for gradient calculation
-        s0 = 1 if k == n_classes else math.sigmoid(np.dot(Xi, p_lin) + p_out[k-1], clip=True)
-        s1 = 0 if k == 1 else math.sigmoid(np.dot(Xi, p_lin) + p_out[k-2], clip=True)
-        spq0 = s0 * (1 - s0)
-        spq1 = s1 * (1 - s1)
+    # If any differences between cumulative probabilities are sufficiently close to 0, return
+    # a nan gradient instead of hitting division by zero errors/overflow below
+    if np.any(ypd < epsilon):
+        return np.repeat(np.nan, len(p_lin) + len(p_out))
 
-        if (s0 - s1) < epsilon:
-            return gnan
+    # Calculate gradient for linear parameters
+    g_lin = np.sum(X * (1 - ypr - ypl)[:, np.newaxis], axis=0)
 
-        # Accumulate gradient components
-        if k < n_classes:
-            ga[k-1] += spq0 / (s0 - s1)
-        if k > 1:
-            ga[k-2] -= spq1 / (s0 - s1)
-        gb += (Xi * (spq0 - spq1)) / (s0 - s1)
+    # Compute gradient components for ordinal outcome intercepts noting that if there c classes
+    # then there are c - 1 parameters being optimized but c + 1 cumulative probabilities computed (probabilities
+    # for parameters surrounded by 0 and 1) -- this means that y, which contains integers in [1, c] are ok
+    # to use directly as an indexer, as is y - 1 (but the gradient components for the 0 and 1 columns should be
+    # dropped in the result)
+    g_out = np.zeros_like(y_proba)
+    g_out[idx, y] = (ypr * (1 - ypr)) / ypd
+    g_out[idx, y - 1] = -(ypl * (1 - ypl)) / ypd
+    g_out = np.sum(g_out, axis=0)[1:-1]  # Ignore first and last gradient components
 
-    j = np.concatenate((gb, ga)) / n
-    # print('jac', j)
-    return -j
+    return -np.concatenate((g_lin, g_out)) / n
 
 
 OBJECTIVE_OML = ScipyObjective(objective_oml_evaluate, objective_oml_jacobian)
