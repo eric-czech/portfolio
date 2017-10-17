@@ -122,7 +122,7 @@ class ScipyRegressor(BaseEstimator):
             cons.append(con)
         return cons
 
-    def fit(self, X, y, raise_on_failure=None, **kwargs):
+    def fit(self, X, y, sample_weight=None, raise_on_failure=None, **kwargs):
         """
         Fit RLS Model.
 
@@ -159,7 +159,7 @@ class ScipyRegressor(BaseEstimator):
             err = optimize.check_grad(
                 self.model.evaluate_objective_fn,
                 self.model.evaluate_jacobian_fn,
-                pv, X, y
+                pv, X, y, sample_weight
             )
             self.gradient_err_.append(err)
 
@@ -168,7 +168,7 @@ class ScipyRegressor(BaseEstimator):
             fun=self.model.evaluate_objective_fn,
             x0=self.model.get_parameter_starts(),
             jac=self.model.evaluate_jacobian_fn if self.analytical_gradients else None,
-            args=(X, y),
+            args=(X, y, sample_weight),
             bounds=self.model.get_parameter_bounds(),
             method='SLSQP',
             constraints=self._constraints(),

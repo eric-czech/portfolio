@@ -106,10 +106,10 @@ class ScipyModel(object):
     def get_parameter_constraints(self):
         raise NotImplementedError('Method not yet implemented')
 
-    def evaluate_objective_fn(self, pv, X, y):
+    def evaluate_objective_fn(self, pv, X, y, w):
         raise NotImplementedError('Method not yet implemented')
 
-    def evaluate_jacobian_fn(self, pv, X, y):
+    def evaluate_jacobian_fn(self, pv, X, y, w):
         raise NotImplementedError('Method not yet implemented')
 
     def validate(self, X, y):
@@ -171,11 +171,11 @@ class ScipyLinearModel(ScipyModel):
         bias = np.ones((len(X), 1))
         return np.hstack((bias, X))
 
-    def evaluate_objective_fn(self, pv, X, y):
+    def evaluate_objective_fn(self, pv, X, y, w):
         i = [self.parameter_index[p] for p in self.coef_params.names]
         return self.objective.evaluate_fn(pv[i], X, y)
 
-    def evaluate_jacobian_fn(self, pv, X, y):
+    def evaluate_jacobian_fn(self, pv, X, y, w):
         i = [self.parameter_index[p] for p in self.coef_params.names]
         return self.objective.jacobian_fn(pv[i], X, y)
 
@@ -398,11 +398,11 @@ class ScipyOrdinalRegressionModel(ScipyModel):
             PRED_PROBAS: y_proba
         }
 
-    def evaluate_objective_fn(self, pv, X, y):
+    def evaluate_objective_fn(self, pv, X, y, w):
         p_out, p_lin = self._split_params(pv)
         return self.objective.evaluate_fn(self.n_classes, p_out, p_lin, X, y)
 
-    def evaluate_jacobian_fn(self, pv, X, y):
+    def evaluate_jacobian_fn(self, pv, X, y, w):
         p_out, p_lin = self._split_params(pv)
         return self.objective.jacobian_fn(self.n_classes, p_out, p_lin, X, y)
 
