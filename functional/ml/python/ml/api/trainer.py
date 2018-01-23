@@ -189,7 +189,7 @@ def run_predict(train_res, X, Y=None):
             # due to the complexity of this in multi-class, multi-label situations (typically
             # all use in those cases will involve a user-specified function to interpret results
             # from models since they vary so widely within sklearn)
-            fold_res.Y_proba = model_res.clf.predict(X)
+            fold_res.Y_proba = model_res.clf.predict_proba(X)
 
         fold_res.validate()
 
@@ -198,13 +198,24 @@ def run_predict(train_res, X, Y=None):
 
 
 def run_fold(args):
-    i, train, test, clfs, mode, X, Y, config = args
+    i, train, test, clfs, mode, X, Y, W, config = args
     X_train, X_test, Y_train, Y_test = X.iloc[train], X.iloc[test], Y.iloc[train], Y.iloc[test]
+
+    # Initialize sample weighting
+    if W is None:
+        W_train, W_test = None, None
+    else:
+        W_train, W_test = W.iloc[train], W.iloc[test]
 
     # Run the data preparation function if one was configured, and ensure that the results from this
     # function are still DataFrames or Series, not numpy arrays
     if config.data_prep_fn is not None:
-        X_train, X_test, Y_train, Y_test = _data_prep(config.data_prep_fn, X_train, X_test, Y_train, Y_test)
+        X_train, X_test, Y_train, Y_test = _data_prep(
+            config.data_prep_fn,
+            X_train, X_test,
+            Y_train, Y_test,
+            W_train=W_train, W_test=W_test
+        )
 
     res = []
 
@@ -219,16 +230,27 @@ def run_fold(args):
 
         log(
             'Running model {} ({}) on fold {} ==> dim(X_train) = {}, dim(X_test) = {}, '
-            'dim(Y_train) = {}, dim(Y_test) = {}'
-            .format(clf[CLF_NAME], _get_clf_name(est), i+1, X_train.shape, X_test.shape, Y_train.shape, Y_test.shape)
+            'dim(Y_train) = {}, dim(Y_test) = {} [dim(W_train) = {}, dim(W_test) = {}'
+            .format(
+                clf[CLF_NAME], _get_clf_name(est), i+1, X_train.shape, X_test.shape,
+                Y_train.shape, Y_test.shape,
+                (None if W_train is None else W_train.shape),
+                (None if W_test is None else W_test.shape)
+            )
         )
 
         # If explicitly provided, use a custom model fitting function
         if config.model_fit_fn is not None:
-            config.model_fit_fn(clf[CLF_NAME], est, X_train, Y_train, X_test, Y_test, i == -1)
+            config.model_fit_fn(
+                clf[CLF_NAME], est, X_train, Y_train, X_test, Y_test, i == -1,
+                W_train=W_train, W_test=W_test
+            )
         # Otherwise, run base estimator fit
         else:
-            est.fit(X_train, Y_train)
+            if W_train is None:
+                est.fit(X_train, Y_train)
+            else:
+                est.fit(X_train, Y_train, sample_weight=W_train)
 
         # Make predictions on test data features
         Y_pred = est.predict(X_test)
@@ -333,13 +355,13 @@ class Trainer(object):
         if mode not in MODES:
             raise ValueError('Given mode "{}" is not valid.  Must be one of: {}'.format(mode, MODES))
 
-    def train_classifiers(self, X, Y, clfs, cv, config=None, **kwargs):
-        return self._train(X, Y, clfs, cv, MODE_CLASSIFIER, config=config, **kwargs)
+    def train_classifiers(self, X, Y, clfs, cv, config=None, W=None, **kwargs):
+        return self._train(X, Y, clfs, cv, MODE_CLASSIFIER, config=config, W=W, **kwargs)
 
-    def train_regressors(self, X, Y, clfs, cv, config=None, **kwargs):
-        return self._train(X, Y, clfs, cv, MODE_REGRESSOR, config=config, **kwargs)
+    def train_regressors(self, X, Y, clfs, cv, config=None, W=None, **kwargs):
+        return self._train(X, Y, clfs, cv, MODE_REGRESSOR, config=config, W=W, **kwargs)
 
-    def _train(self, X, Y, clfs, cv, mode, config=None, **kwargs):
+    def _train(self, X, Y, clfs, cv, mode, config=None, W=None, **kwargs):
         """ Fit multiple classification or regression model concurrently
 
         :param X: Feature data set (must be a pandas DataFrame)
@@ -353,6 +375,7 @@ class Trainer(object):
         :param mode: Either 'classifier' (#MODE_CLASSIFIER) or 'regressor' (#MODE_REGRESSOR)
         :param config: Trainer configuration; controls options like retention of training data, whether or not to
             refit a model to the entire training set, custom functions for model fitting, etc. See \code{TrainerConfig}
+        :param W: Optional sample weight (must be pandas Series)
         :param kwargs:
             Logging kwargs:
                 log_*: log_file and log_format can be passed to determine logging output location and style
@@ -365,6 +388,8 @@ class Trainer(object):
             raise ValueError('Feature data (X) must be a DataFrame')
         if not isinstance(Y, pd.DataFrame) and not isinstance(Y, pd.Series):
             raise ValueError('Response data (Y) must be a DataFrame or Series')
+        if W is not None and not isinstance(W, pd.Series):
+            raise ValueError('Sample weight (W) must be a Series')
 
         if config is None:
             config = self.default_config
@@ -377,7 +402,7 @@ class Trainer(object):
         if len(kwargs) > 0:
             raise ValueError('The following keyword arguments are not valid: {}'.format(kwargs.keys()))
 
-        args_list = [(i, train, test, clfs, mode, X, Y, config) for i, (train, test) in enumerate(cv)]
+        args_list = [(i, train, test, clfs, mode, X, Y, W, config) for i, (train, test) in enumerate(cv)]
 
         log_file = log_kwargs.get('file', DEFAULT_LOG_FILE)
         set_logger(log_file, log_kwargs.get('format', DEFAULT_LOG_FORMAT))
@@ -391,7 +416,7 @@ class Trainer(object):
         refit_res = None
         if config.refit:
             idx = np.arange(0, len(Y))
-            args = (-1, idx, idx, clfs, mode, X, Y, config)
+            args = (-1, idx, idx, clfs, mode, X, Y, W, config)
 
             print('Beginning model refitting')
             refit_res = run_fold(args)

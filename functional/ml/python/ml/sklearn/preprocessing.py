@@ -30,6 +30,8 @@ class MeanScaler(BaseEstimator, TransformerMixin):
         self.mean_ = None
 
     def fit(self, v):
+        if np.any(v < 0):
+            raise ValueError('Mean scaling not meant for use with negative values')
         self.mean_ = np.mean(v, axis=0)
         return self
 

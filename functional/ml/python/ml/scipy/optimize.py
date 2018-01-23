@@ -15,6 +15,7 @@ from sklearn.utils.validation import check_is_fitted, check_array
 from sklearn.base import BaseEstimator
 from scipy import optimize
 from ml.scipy.constraints import *
+from ml.scipy.common import *
 import warnings
 
 
@@ -41,6 +42,15 @@ def get_fit_summary(fit):
     Objective Function Value: {}
     """.format(fit.success, fit.status, fit.message, fit.nit, fit.nfev, fit.fun)
     return preamble + '\n' + summary
+
+
+def _check_w(w):
+    if w is None:
+        return
+    w = np.array(w)
+    if w.ndim > 1:
+        raise ValueError('Sample weight must be one-dimensional')
+    return w
 
 
 class ScipyRegressor(BaseEstimator):
@@ -140,12 +150,18 @@ class ScipyRegressor(BaseEstimator):
         self : object
         """
         X, y = check_X_y(X, y, accept_sparse=False, y_numeric=True, multi_output=False)
+        sample_weight = _check_w(sample_weight)
 
         if y.ndim != 1:
             raise ValueError('At the moment, only 1-d outcome values are supported '
                              '(this assumption is built into objective function definitions)')
         self.model.validate(X, y)
-        X = self.model.prepare_training_data(X, y)
+        X, y = self.model.prepare_training_data(X, y)
+
+        # Set classes attribute (if underlying model is a classifier) for compatibility w/ sklearn classifiers
+        classes = self.model.get_classes(y)
+        if classes is not None:
+            self.classes_ = classes
 
         # Run constrained optimization
         np.random.seed(self.seed)
@@ -241,10 +257,20 @@ class ScipyRegressor(BaseEstimator):
     def get_fit_summary(self):
         return get_fit_summary(self.fit_)
 
-    def inference(self):
-        return self.model.inference(self.fit_)
+    def inference(self, **kwargs):
+        return self.model.inference(self.fit_, **kwargs)
 
-    def predict(self, X, key='values'):
+    def influence(self, inference, observation, **kwargs):
+        """
+        Return model factor/feature influence for a single observation
+
+        :param inference: Resulting model inference (see #inference)
+        :param observation: Series containing observation data to evaluate (should have same length as X.shape[1])
+        :return: Series containing influencing factors for a prediction on this observation
+        """
+        return self.model.influence(inference, observation, **kwargs)
+
+    def predict(self, X, key=PRED_VALUES):
         """
 
         :param X: {array-like, sparse matrix}, shape = [n_samples, n_features]
@@ -253,8 +279,8 @@ class ScipyRegressor(BaseEstimator):
         :param key: string or None
             Name/type of prediction to return result for; common choices are:
                 - None - Returns all available prediction results as a dictionary
-                - values - Typically these are scalar values equal to numeric outcome or categorical class
-                - probabilities - Typically a 2-D n_samples x n_classes probability matrix
+                - 'values' - Typically these are scalar values equal to numeric outcome or categorical class
+                - 'probabilities' - Typically a 2-D n_samples x n_classes probability matrix
             Other values are possible but depend on the underlying implementation
         :return: Predicted result (structure varies)
         """
@@ -265,6 +291,10 @@ class ScipyRegressor(BaseEstimator):
             return pred
         else:
             return pred[key]
+
+    def predict_proba(self, X, key=PRED_PROBAS):
+        return self.predict(X, key=key)
+
 
 
 

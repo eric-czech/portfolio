@@ -112,22 +112,31 @@ class ScipyModel(object):
     def evaluate_jacobian_fn(self, pv, X, y, w):
         raise NotImplementedError('Method not yet implemented')
 
+    def get_classes(self, y):
+        """ Get all possible class values for classification objectives """
+        return None
+
     def validate(self, X, y):
         pass
 
     def predict(self, fit, X):
         raise NotImplementedError('Method not yet implemented')
 
-    def inference(self, fit):
+    def inference(self, fit, **kwargs):
         raise NotImplementedError('Method not yet implemented')
 
-    def _extract_params(self, parameter_values, parameter_set):
+    def influence(self, inference, observation, **kwargs):
+        raise NotImplementedError('Method not yet implemented')
+
+    def _extract_params(self, parameter_values, parameter_set, transform=None):
         """
         Extract ordered dict of parameter values keyed by name
 
         :param parameter_values: ndarray containing all parameter values
             (usually much larger than size of parameter set)
         :param parameter_set: Subset of parameters to extract
+        :param transform: Function used to transform parameter values;
+            signature: fn(parameter_array) -> parameter_array
         :return: Dictionary containing parameter values
         """
         if parameter_set.empty():
@@ -135,7 +144,10 @@ class ScipyModel(object):
         params = parameter_set.get_parameter_names()
         parameter_index = self.get_parameter_index()
         idx = [parameter_index[p] for p in params]
-        return OrderedDict(zip(params, parameter_values[idx]))
+        vals = parameter_values[idx]
+        if transform is not None:
+            vals = transform(vals)
+        return OrderedDict(zip(params, vals))
 
 
 class ScipyLinearModel(ScipyModel):
@@ -165,53 +177,122 @@ class ScipyLinearModel(ScipyModel):
     def get_parameter_constraints(self):
         return self.constraints
 
-    def prepare_training_data(self, X, _):
+    def prepare_training_data(self, X, y):
         if self.intercept_params.empty():
-            return X
+            return X, y
         bias = np.ones((len(X), 1))
-        return np.hstack((bias, X))
+        return np.hstack((bias, X)), y
 
     def evaluate_objective_fn(self, pv, X, y, w):
         i = [self.parameter_index[p] for p in self.coef_params.names]
-        return self.objective.evaluate_fn(pv[i], X, y)
+        return self.objective.evaluate_fn(pv[i], X, y, w)
 
     def evaluate_jacobian_fn(self, pv, X, y, w):
         i = [self.parameter_index[p] for p in self.coef_params.names]
-        return self.objective.jacobian_fn(pv[i], X, y)
+        return self.objective.jacobian_fn(pv[i], X, y, w)
 
-    def inference(self, fit):
+    def inference(self, fit, **kwargs):
         return ScipyModelInference({
             'intercept': self._extract_params(fit.x, self.intercept_params),
             'linear': self._extract_params(fit.x, self.linear_params),
             'fit': self._extract_params(fit.x, self.fit_params)
         })
 
+    def influence(self, inference, observation, **kwargs):
+        import pandas as pd
+        if not isinstance(observation, pd.Series):
+            raise ValueError(
+                'Observation must be a Series to obtain influence (type given = {})'
+                .format(type(observation))
+            )
+        d_inf = inference['linear']
+        if d_inf.isnull().any():
+            raise ValueError('Linear inference contains null values')
+        if observation.isnull().any():
+            raise ValueError('Observation contains null values')
+        if len(d_inf) != len(observation):
+            raise ValueError(
+                'Linear inference shape ({}) does not match observation shape ({})'
+                .format(d_inf.shape, observation.shape)
+            )
+        if not d_inf.index.sort_values().equals(observation.index.sort_values()):
+            raise ValueError(
+                'Linear inference index does not equal observation index\n'
+                'Observation Index = {}\nInference Index = {}'
+                .format(observation.index.sort_values(), d_inf.index.sort_values())
+            )
+        # Return element-wise product of inference (ie parameters) and observation
+        return d_inf * observation
+
 
 class ScipyLinearRegressionModel(ScipyLinearModel):
 
     def __init__(self, builder):
         super(ScipyLinearRegressionModel, self).__init__(builder)
+        self.y_scaler = builder.y_scaler
+
+    def prepare_training_data(self, X, y):
+        if not self.intercept_params.empty():
+            bias = np.ones((len(X), 1))
+            X = np.hstack((bias, X))
+        if y is not None and self.y_scaler is not None:
+            self.y_scaler = self.y_scaler.fit(y)
+            y = self.y_scaler.transform(y)
+        return X, y
+
+    def _invert(self, v):
+        if self.y_scaler is None:
+            return v
+        return self.y_scaler.inverse_transform(v)
+
+    def inference(self, fit, invert=True, **kwargs):
+        transform = self._invert if invert else None
+        return ScipyModelInference({
+            'intercept': self._extract_params(fit.x, self.intercept_params, transform=transform),
+            'linear': self._extract_params(fit.x, self.linear_params, transform=transform),
+            'fit': self._extract_params(fit.x, self.fit_params)
+        })
 
     def predict(self, fit, X):
-        X = self.prepare_training_data(X, None)
-        return {PRED_VALUES: np.dot(X, fit.x)}
+        X, _ = self.prepare_training_data(X, None)
+        y = np.dot(X, fit.x)
+        return {PRED_VALUES: self._invert(y)}
 
 
 class ScipyLogisticRegressionModel(ScipyLinearModel):
 
     def __init__(self, builder):
         super(ScipyLogisticRegressionModel, self).__init__(builder)
+        self.is_binomial = builder.is_binomial
 
     def predict(self, fit, X):
         from py_utils import math
-        X = self.prepare_training_data(X, None)
+        X, _ = self.prepare_training_data(X, None)
         y_proba = math.sigmoid(np.dot(X, fit.x), clip=True)[:, np.newaxis]
         y_proba = np.hstack((1. - y_proba, y_proba))
-        y_pred = np.argmax(y_proba, axis=1)
+
+        # In "binomial" mode rather than "bernoulli", predicted values should
+        # be fractions rather than classes
+        y_pred = y_proba[:, 1] if self.is_binomial else np.argmax(y_proba, axis=1)
+
         return {
             PRED_VALUES: y_pred,
             PRED_PROBAS: y_proba
         }
+
+    def validate(self, X, y):
+        # Verify that all outcomes in [0, 1] (including fractions)
+        mask = (y >= 0) & (y <= 1)
+        if not np.all(mask):
+            raise ValueError(
+                'All outcome (i.e. y) values must be in [0, 1]; Invalid values found = {}'
+                .format(np.unique(y[~mask]))
+            )
+
+    def get_classes(self, y):
+        if self.is_binomial:
+            return None
+        return [0, 1]
 
 
 class ScipyPoissonRegressionModel(ScipyLinearModel):
@@ -220,7 +301,7 @@ class ScipyPoissonRegressionModel(ScipyLinearModel):
         super(ScipyPoissonRegressionModel, self).__init__(builder)
 
     def predict(self, fit, X):
-        X = self.prepare_training_data(X, None)
+        X, _ = self.prepare_training_data(X, None)
         return {PRED_VALUES: np.exp(np.dot(X, fit.x))}
 
 
@@ -294,6 +375,11 @@ class ScipyLinearRegressionModelBuilder(ScipyLinearModelBuilder):
 
     def __init__(self):
         super(ScipyLinearRegressionModelBuilder, self).__init__()
+        self.y_scaler = None
+
+    def set_y_scaler(self, scaler):
+        self.y_scaler = scaler
+        return self
 
     def _objective(self):
         return OBJECTIVE_MSE
@@ -306,6 +392,15 @@ class ScipyLogisticRegressionModelBuilder(ScipyLinearModelBuilder):
 
     def __init__(self):
         super(ScipyLogisticRegressionModelBuilder, self).__init__()
+        self.is_binomial = False
+
+    def enable_binomial_outcome(self):
+        self.is_binomial = True
+        return self
+
+    def enable_bernoulli_outcome(self):
+        self.is_binomial = False
+        return self
 
     def _objective(self):
         return OBJECTIVE_MLL
@@ -364,10 +459,13 @@ class ScipyOrdinalRegressionModel(ScipyModel):
     def validate(self, X, y):
         y_range = np.arange(1, self.n_classes + 1)
         if not np.all(np.in1d(y, y_range)):
-            raise ValueError('Outcome values must be one of {}'.format(y_range))
+            raise ValueError('Outcome (i.e. y) values must be one of {}'.format(y_range))
 
-    def prepare_training_data(self, X, _):
-        return X
+    def get_classes(self, y):
+        return np.arange(1, self.n_classes + 1)
+
+    def prepare_training_data(self, X, y):
+        return X, y
 
     def _split_params(self, pv):
         """ Split parameters into linear and outcome intercepts
@@ -380,7 +478,7 @@ class ScipyOrdinalRegressionModel(ScipyModel):
 
     def _predict_proba(self, fit, X):
         from py_utils import math
-        X = self.prepare_training_data(X, None)
+        X, _ = self.prepare_training_data(X, None)
         n = len(X)
         p_out, p_lin = self._split_params(fit.x)
         yb = np.dot(X, p_lin)[:, np.newaxis]
@@ -399,14 +497,18 @@ class ScipyOrdinalRegressionModel(ScipyModel):
         }
 
     def evaluate_objective_fn(self, pv, X, y, w):
+        if w is not None:
+            raise ValueError('Sample weights not supported for this model')
         p_out, p_lin = self._split_params(pv)
         return self.objective.evaluate_fn(self.n_classes, p_out, p_lin, X, y)
 
     def evaluate_jacobian_fn(self, pv, X, y, w):
+        if w is not None:
+            raise ValueError('Sample weights not supported for this model')
         p_out, p_lin = self._split_params(pv)
         return self.objective.jacobian_fn(self.n_classes, p_out, p_lin, X, y)
 
-    def inference(self, fit):
+    def inference(self, fit, **kwargs):
         return ScipyModelInference({
             'intercepts': self._extract_params(fit.x, self.outcome_params),
             'linear': self._extract_params(fit.x, self.linear_params),

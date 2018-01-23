@@ -10,34 +10,53 @@ class ScipyObjective(object):
         self.jacobian_fn = jacobian_fn
 
 
-def objective_mse_evaulate(p, X, y):
-    return np.mean(np.square(y - np.dot(X, p)))
+def objective_mse_evaulate(p, X, y, w):
+    if w is None:
+        return np.mean(np.square(y - np.dot(X, p)))
+    else:
+        return np.mean(w * np.square(y - np.dot(X, p)))
 
 
-def objective_mse_jacobian(p, X, y):
-    # Reference: http://theory.stanford.edu/~tim/s15/l/l15.pdf
-    # See: "3.3 The Gradient of the MSE Function"
-    return (-2. / y.shape[0]) * np.dot(X.T, y - np.dot(X, p))
+def objective_mse_jacobian(p, X, y, w):
+    if w is None:
+        return (-2. / y.shape[0]) * np.dot(X.T, y - np.dot(X, p))
+    else:
+        return (-2. / y.shape[0]) * np.dot(X.T * w, y - np.dot(X, p))
 
 
 # Mean squared error objective
 # Notes:
 # - See [1] for derivation of gradient ("3.3 The Gradient of the MSE Function")
+# - See [2] and [3] and [4] for least squares objective function with weights (especially 4)
+# - See [5] for jacobian of weighted least squares problem
 #     [1] - http://theory.stanford.edu/~tim/s15/l/l15.pdf
+#     [2] - http://www.itl.nist.gov/div898/handbook/pmd/section4/pmd432.htm
+#     [3] - https://arxiv.org/pdf/1310.5715.pdf
+#     [4] - https://www.mathworks.com/help/curvefit/least-squares-fitting.html#bq_5kr9-3
+#     [5] - https://stats.stackexchange.com/questions/237235/how-do-you-derive-the-gradient-for-weighted-least-squares
 OBJECTIVE_MSE = ScipyObjective(objective_mse_evaulate, objective_mse_jacobian)
 
 
-def objective_logloss_evaulate(p, X, y):
+def objective_logloss_evaulate(p, X, y, w):
     """ Mean log probability for logistic outcome """
     pl = np.dot(X, p)
+    ov = y * pl - np.log(1 + np.exp(pl))
+
     # Negative for minimization
-    return -1. * np.mean(y * pl - np.log(1 + np.exp(pl)))
+    if w is None:
+        return -1. * np.mean(ov)
+    else:
+        return -1. * np.mean(w * ov)
 
 
-def objective_logloss_jacobian(p, X, y):
+def objective_logloss_jacobian(p, X, y, w):
     """ Mean log probability gradient for logistic outcome """
     yp = sigmoid(np.dot(X, p))
-    return (-1. / y.shape[0]) * np.dot(X.T, y - yp)
+
+    if w is None:
+        return (-1. / y.shape[0]) * np.dot(X.T, y - yp)
+    else:
+        return (-1. / y.shape[0]) * np.dot(X.T * w, y - yp)
 
 # Mean log-loss objective
 # Notes:
@@ -47,6 +66,10 @@ def objective_logloss_jacobian(p, X, y):
 # - The mean log probability is used insted of the sum to avoid issues with "directional line search" errors
 #   from SLSQP, which generally does not like large objective function values (and using the mean instead of sum
 #   helps do that).
+#
+# Notes on how to do this with weights:
+# - http://article.sciencepublishinggroup.com/html/10.11648.j.sjams.20150306.13.html#paper-content-1-2
+
 OBJECTIVE_MLL = ScipyObjective(objective_logloss_evaulate, objective_logloss_jacobian)
 
 
@@ -54,8 +77,10 @@ OBJECTIVE_MLL = ScipyObjective(objective_logloss_evaulate, objective_logloss_jac
 # Poisson Objectives #
 ######################
 
-def objective_poisson_evaulate(p, X, y, max_link=512):
+def objective_poisson_evaulate(p, X, y, w, max_link=512):
     """ Mean log probability for poisson outcome """
+    if w is not None:
+        raise ValueError('Sample weights not supported for this model')
     from scipy.stats import poisson
     yp = np.exp(np.clip(np.dot(X, p), -max_link, max_link))
     return -np.mean(poisson.logpmf(y, yp))
@@ -65,12 +90,10 @@ def objective_poisson_evaulate(p, X, y, max_link=512):
     # return -np.mean(-np.exp(yp) + y * yp - gammaln(y + 1))
 
 
-def objective_poisson_jacobian(p, X, y, max_link=512):
+def objective_poisson_jacobian(p, X, y, w, max_link=512):
     """ Mean log probability gradient for poisson outcome """
-    # yp = np.exp(np.clip(np.dot(X, p), -max_link, max_link))
-    # yd = (y - yp)[:, np.newaxis]
-    # return (-1. / y.shape[0]) * np.sum(X * yd, axis=0)
-
+    if w is not None:
+        raise ValueError('Sample weights not supported for this model')
     yp = np.exp(np.clip(np.dot(X, p), -max_link, max_link))
     return -(1./y.shape[0]) * np.dot(y - yp, X)
 
