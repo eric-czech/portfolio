@@ -14,8 +14,6 @@ from sklearn.utils import check_X_y
 from sklearn.utils.validation import check_is_fitted, check_array
 from sklearn.base import BaseEstimator
 from scipy import optimize
-from collections import OrderedDict
-from ml.scipy.objectives import *
 from ml.scipy.constraints import *
 import warnings
 
@@ -27,249 +25,6 @@ import warnings
 #
 #     def get_jacobian(self, param_value_map, param_index_map):
 #         raise NotImplementedError('Constraint jacobian not implemented')
-
-
-class ScipyParameters(object):
-
-    def __init__(self, names, starts=None, bounds=None):
-
-        if not isinstance(names, list):
-            raise ValueError('Parameter names must be given as a list (given type = "{}")'.format(type(names)))
-        param_val, param_cts = np.unique(names, return_counts=True)
-        if len(param_cts) > 0 and param_cts.max() > 1:
-            dupe_params = param_val[param_cts > 1]
-            raise ValueError('Parameter name list contains duplicates (duplicate values = "{}")'.format(dupe_params))
-        self.names = names
-        self.p = len(names)
-
-        if starts is not None and not isinstance(starts, list):
-            raise ValueError('Parameter starts must be given as a list (given type = "{}")'.format(type(starts)))
-        self.starts = [0. for _ in range(self.p)] if starts is None else starts
-        if self.starts is not None:
-            if len(self.starts) != self.p:
-                raise ValueError(
-                    'Starting values for parameters must have same length as parameter '
-                    'names (n params = {}, n starting positions given = {})'
-                    .format(self.p, len(self.starts))
-                )
-
-        if bounds is not None and not isinstance(bounds, list):
-            raise ValueError('Parameter bounds must be given as a list (given type = "{}")'.format(type(bounds)))
-        self.bounds = [(None, None) for _ in range(self.p)] if bounds is None else bounds
-        if self.bounds is not None:
-            if len(self.bounds) != self.p:
-                raise ValueError(
-                    'Bounds for parameters must have same length as parameter '
-                    'names (n params = {}, n bounds given = {})'
-                    .format(self.p, len(self.bounds))
-                )
-
-    def merge(self, other):
-        return ScipyParameters(
-            self.names + other.names,
-            starts=self.starts + other.starts,
-            bounds=self.bounds + other.bounds,
-        )
-
-    def size(self):
-        return self.p
-
-    def get_parameter_names(self):
-        return self.names
-
-    def get_parameter_index(self):
-        return OrderedDict([(p, i) for i, p in enumerate(self.names)])
-
-    def get_initial_values(self):
-        return np.array(self.starts)
-
-    def empty(self):
-        return self.p == 0
-
-    def index_of(self, parameter):
-        if parameter not in self.names:
-            raise ValueError('Parameter "{}" not found in parameter name list'.format(parameter))
-        return self.names.index(parameter)
-
-EMPTY_PARAMS = ScipyParameters([], starts=[], bounds=[])
-
-
-class ScipyModel(object):
-
-    def get_parameter_index(self):
-        raise NotImplementedError('Method not yet implemented')
-
-    def prepare_training_data(self, X, y):
-        raise NotImplementedError('Method not yet implemented')
-
-    def get_parameter_starts(self):
-        raise NotImplementedError('Method not yet implemented')
-
-    def get_parameter_bounds(self):
-        raise NotImplementedError('Method not yet implemented')
-
-    def evaulate_objective_fn(self, pv, pi, X, y):
-        raise NotImplementedError('Method not yet implemented')
-
-    def evaulate_jacobian_fn(self, pv, pi, X, y):
-        raise NotImplementedError('Method not yet implemented')
-
-    def evaluate_fit(self, fit):
-        raise NotImplementedError('Method not yet implemented')
-
-    def predict(self, fit, X):
-        raise NotImplementedError('Method not yet implemented')
-
-
-class ScipyLinearModel(ScipyModel):
-
-    def __init__(self, builder):
-
-        if not isinstance(builder.objective, ScipyObjective):
-            raise ValueError('Objective must be of type "ScipyObjective" (type given = "{}")'
-                             .format(type(builder.objective)))
-        self.objective = builder.objective
-
-        self.linear_params = builder.linear_params
-        self.intercept_params = builder.intercept_params
-        self.fit_params = builder.fit_params
-
-        self.coef_params = self.intercept_params.merge(self.linear_params)
-        self.all_params = self.coef_params.merge(self.fit_params)
-
-    def get_parameter_index(self):
-        return self.all_params.get_parameter_index()
-
-    def get_parameter_starts(self):
-        return self.all_params.starts
-
-    def get_parameter_bounds(self):
-        return self.all_params.bounds
-
-    def prepare_training_data(self, X, _):
-        if self.intercept_params.empty():
-            return X
-        bias = np.ones((len(X), 1))
-        return np.hstack((bias, X))
-
-    def predict(self, fit, X):
-        X = self.prepare_training_data(X, None)
-        return np.dot(X, fit.x)
-
-    def evaulate_objective_fn(self, pv, pi, X, y):
-        i = [pi[p] for p in self.coef_params.names]
-        return self.objective.evaluate_fn(pv[i], X, y)
-
-    def evaulate_jacobian_fn(self, pv, pi, X, y):
-        i = [pi[p] for p in self.coef_params.names]
-        return self.objective.jacobian_fn(pv[i], X, y)
-
-    def inference(self, fit):
-        params = list(fit.x)
-        res = {}
-        if not self.intercept_params.empty():
-            res['intercept'] = OrderedDict({'intercept': params.pop(0)})
-        res['linear'] = OrderedDict(zip(self.linear_params.get_parameter_names(), params[:self.linear_params.size()]))
-        if not self.fit_params.empty():
-            res['fit'] = OrderedDict(zip(self.fit_params.get_parameter_names(), params[self.linear_params.size():]))
-        return res
-
-
-class ScipyOrdinalModel(ScipyModel):
-
-    def __init__(self, builder):
-
-        if not isinstance(builder.objective, ScipyObjective):
-            raise ValueError('Objective must be of type "ScipyObjective" (type given = "{}")'
-                             .format(type(builder.objective)))
-        self.objective = builder.objective
-
-        self.linear_params = builder.linear_params
-        self.intercept_params = builder.intercept_params
-        self.fit_params = builder.fit_params
-
-        self.coef_params = self.intercept_params.merge(self.linear_params)
-        self.all_params = self.coef_params.merge(self.fit_params)
-
-    def get_parameter_index(self):
-        return self.all_params.get_parameter_index()
-
-    def get_parameter_starts(self):
-        return self.all_params.starts
-
-    def get_parameter_bounds(self):
-        return self.all_params.bounds
-
-    def prepare_training_data(self, X, _):
-        if self.intercept_params.empty():
-            return X
-        bias = np.ones((len(X), 1))
-        return np.hstack((bias, X))
-
-    def predict(self, fit, X):
-        X = self.prepare_training_data(X, None)
-        return np.dot(X, fit.x)
-
-    def evaulate_objective_fn(self, pv, pi, X, y):
-        i = [pi[p] for p in self.coef_params.names]
-        return self.objective.evaluate_fn(pv[i], X, y)
-
-    def evaulate_jacobian_fn(self, pv, pi, X, y):
-        i = [pi[p] for p in self.coef_params.names]
-        return self.objective.jacobian_fn(pv[i], X, y)
-
-    def inference(self, fit):
-        raise NotImplementedError('Method not yet implemented')
-
-
-class ScipyLinearModelBuilder(object):
-
-    def __init__(self):
-        self.objective = None
-        self.linear_params = None
-        self.intercept_params = EMPTY_PARAMS
-        self.fit_params = EMPTY_PARAMS
-
-    def set_objective(self, objective):
-        if not isinstance(objective, ScipyObjective):
-            raise ValueError('Objective must be of type "ScipyObjective" (type given = "{}")'.format(type(objective)))
-        self.objective = objective
-        return self
-
-    def add_intercept(self, start=None, bound=None):
-        self.intercept_params = ScipyParameters(
-            names=['intercept'],
-            starts=None if start is None else [start],
-            bounds=None if bound is None else [bound]
-        )
-        return self
-
-    def add_linear_params(self, names, starts=None, bounds=None):
-        self.linear_params = ScipyParameters(
-            names=names,
-            starts=starts,
-            bounds=bounds
-        )
-        return self
-
-    def add_fit_params(self, names, starts=None, bounds=None):
-        self.fit_params = ScipyParameters(
-            names=names,
-            starts=starts,
-            bounds=bounds
-        )
-        return self
-
-    def build(self):
-        if self.objective is None:
-            raise ValueError('Objective for linear model must be set')
-        if self.linear_params is None:
-            raise ValueError('Linear parameters must be specified before building full parameter set')
-        if self.intercept_params is None:
-            raise ValueError('Intercept params must be set (to EMPTY_PARAMS if not desired)')
-        if self.fit_params is None:
-            raise ValueError('Fit params must be set (to EMPTY_PARAMS if not desired)')
-        return ScipyLinearModel(self)
 
 
 def get_fit_summary(fit):
@@ -336,33 +91,38 @@ class ScipyRegressor(BaseEstimator):
     intercept_ : Scalar intercept if `fit_intercept=True`
 
     """
-    def __init__(self, model, constraints=None, analytical_gradients=True,
-                 raise_on_failure=True, seed=None, fit_kwargs=None):
+    def __init__(self, model, analytical_gradients=True, monitor_gradient=False,
+                 raise_on_failure=True, seed=None, fit_kwargs=None,
+                 gradient_diff_thresh=3):
         self.model = model
-        self.constraints = constraints
         self.analytical_gradients = analytical_gradients
         self.raise_on_failure = raise_on_failure
-        self.parameter_index = self.model.get_parameter_index()
+        self.monitor_gradient = monitor_gradient
+        self.gradient_diff_thresh = gradient_diff_thresh
+        self.constraints = self.model.get_parameter_constraints()
         self.seed = seed
         self.fit_kwargs = fit_kwargs
 
     def _constraints(self):
         if self.constraints is None:
-            return None
+            return []
 
         cons = []
-        for con in self.constraints.get_constraints():
+        parameter_index = self.model.get_parameter_index()
+        for constraint in self.constraints.get_constraints():
+            # Copy to avoid side effects on mutation
+            con = dict(constraint)
             if 'args' in con:
                 raise ValueError('Constraint cannot include "args" key')
             if self.analytical_gradients and 'jac' not in con:
                 raise ValueError('Jacobian for constraints must be supplied when using `analytical_gradients=True`')
             if not self.analytical_gradients and 'jac' in con:
                 del con['jac']
-            con['args'] = (self.parameter_index,)
+            con['args'] = (parameter_index,)
             cons.append(con)
         return cons
 
-    def fit(self, X, y, raise_on_failure=None, **kwargs):
+    def fit(self, X, y, sample_weight=None, raise_on_failure=None, **kwargs):
         """
         Fit RLS Model.
 
@@ -384,26 +144,42 @@ class ScipyRegressor(BaseEstimator):
         if y.ndim != 1:
             raise ValueError('At the moment, only 1-d outcome values are supported '
                              '(this assumption is built into objective function definitions)')
+        self.model.validate(X, y)
         X = self.model.prepare_training_data(X, y)
 
         # Run constrained optimization
         np.random.seed(self.seed)
 
+        self.gradient_err_ = []
+
+        # Initialize function for checking analytical gradients vs approximate gradients
+        def callback(pv):
+            if not self.monitor_gradient:
+                return
+            err = optimize.check_grad(
+                self.model.evaluate_objective_fn,
+                self.model.evaluate_jacobian_fn,
+                pv, X, y, sample_weight
+            )
+            self.gradient_err_.append(err)
+
         fit_kwargs = kwargs if self.fit_kwargs is None else {**self.fit_kwargs, **kwargs}
         self.fit_ = optimize.minimize(
-            fun=self.model.evaulate_objective_fn,
+            fun=self.model.evaluate_objective_fn,
             x0=self.model.get_parameter_starts(),
-            jac=self.model.evaulate_jacobian_fn if self.analytical_gradients else None,
-            args=(self.parameter_index, X, y),
+            jac=self.model.evaluate_jacobian_fn if self.analytical_gradients else None,
+            args=(X, y, sample_weight),
             bounds=self.model.get_parameter_bounds(),
             method='SLSQP',
             constraints=self._constraints(),
+            callback=callback,
             **fit_kwargs
         )
 
         # Default raise on failure to class variable, but override with kwargs if set
         raise_on_failure = self.raise_on_failure if raise_on_failure is None else raise_on_failure
 
+        # Trigger appropriate action on lack of convergence (or other optimization error)
         if not self.fit_.success:
             msg = get_fit_summary(self.fit_)
             if raise_on_failure:
@@ -411,7 +187,56 @@ class ScipyRegressor(BaseEstimator):
             else:
                 warnings.warn(msg)
 
+        # Trigger appropriate action on gradient calculation discrepancy, if necessary
+        if self._gradient_error():
+            msg = self._gradient_error_message()
+            if raise_on_failure:
+                raise ValueError(msg)
+            else:
+                warnings.warn(msg)
+
         return self
+
+    def _gradient_error(self):
+        """
+        Determine whether or not analytical gradient calculations contain errors
+
+        This is only available when analytical_gradients=True and monitor_gradient=True (gradient monitoring is
+        very expensive computationally).
+        :return: Flag indicating whether or not there was a big enough discrepancy between gradient calculation methods
+        """
+        if not self.monitor_gradient or not self.analytical_gradients:
+            return False
+        err = np.array(self.gradient_err_)
+
+        # Assume a gradient calculation error occurred if gradients were all nan/inf or if more than the
+        # threshold number of iterations had an MSE greater than 1
+        if np.all(~np.isfinite(err)) or np.sum(err[np.isfinite(err)] > 1.) > self.gradient_diff_thresh:
+            return True
+        return False
+
+    def _gradient_error_message(self):
+        """
+        Generate informative message with context around gradient monitoring failures
+        """
+        err = np.array(self.gradient_err_)
+        err_n = None if not np.any(np.isfinite(err)) else np.sum(err[np.isfinite(err)] > 1)
+        err_max = None if not np.any(np.isfinite(err)) else err[np.isfinite(err)].max()
+        return 'Gradient monitoring operation determined that more than {} iteration(s) had an analytical gradient ' \
+               'that differed significantly in MSE (> 1) between gradient components ' \
+               'found via finite differencing (or that all differences were non-finite/nan).  Gradient MSE history ' \
+               'across all iterations:\n{}\nMax MSE = {}\nN over 1 = {}' \
+            .format(self.gradient_diff_thresh, err, err_max, err_n)
+
+    def get_gradient_error_history(self):
+        """
+        Fetch history of MSE discrepancies between analytical gradients and those approximated via finite differences
+
+        This is only available after fitting and when both analytical_gradients=True and monitor_gradient=True
+        :return: Array of MSE between gradients for each iteration
+        """
+        check_is_fitted(self, 'fit_')
+        return np.array(self.gradient_err_)
 
     def get_fit_summary(self):
         return get_fit_summary(self.fit_)
@@ -419,24 +244,28 @@ class ScipyRegressor(BaseEstimator):
     def inference(self):
         return self.model.inference(self.fit_)
 
-    def predict(self, X):
+    def predict(self, X, key='values'):
         """
-        Predict new values
 
-        Parameters
-        ----------
-        X : {array-like, sparse matrix}, shape = [n_samples, n_features]
+        :param X: {array-like, sparse matrix}, shape = [n_samples, n_features]
             Training vectors, where n_samples is the number of samples and
             n_features is the number of features.
-
-        Returns
-        ----------
-        y : array-like, shape = [n_samples]
-            Predicted values
+        :param key: string or None
+            Name/type of prediction to return result for; common choices are:
+                - None - Returns all available prediction results as a dictionary
+                - values - Typically these are scalar values equal to numeric outcome or categorical class
+                - probabilities - Typically a 2-D n_samples x n_classes probability matrix
+            Other values are possible but depend on the underlying implementation
+        :return: Predicted result (structure varies)
         """
         check_is_fitted(self, 'fit_')
         X = check_array(X)
-        return self.model.predict(self.fit_, X)
+        pred = self.model.predict(self.fit_, X)
+        if key is None:
+            return pred
+        else:
+            return pred[key]
+
 
 
 

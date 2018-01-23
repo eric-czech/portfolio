@@ -7,6 +7,25 @@ class ScipyConstraints(object):
     def __init__(self):
         self.constraints = []
 
+    def add_l2_regularization(self, params, lam):
+
+        def lagrangian(pv, pi):
+            pb = np.array([pv[pi[p]] for p in params])
+            return lam - .5 * np.dot(pb, pb)
+
+        def jacobian(pv, pi):
+            j = np.zeros(len(pi))
+            idx = np.array([pi[p] for p in params])
+            j[idx] = -pv[idx]
+            return j
+
+        self.constraints.append({
+            'type': 'ineq',
+            'fun': lagrangian,
+            'jac': jacobian
+        })
+        return self
+
     def add_gte(self, larger_param, smaller_param):
 
         def lagrangian(pv, pi):
@@ -79,3 +98,12 @@ class ScipyConstraints(object):
     def get_constraints(self):
         # Return copied constraint definitions
         return [dict(c) for c in self.constraints]
+
+    def merge(self, constraints):
+        """ Merge constraint set with another
+        :param constraints: Other constraint set to add to this one
+        :return: New constraint set object
+        """
+        res = ScipyConstraints()
+        res.constraints = self.get_constraints() + constraints.get_constraints()
+        return res
