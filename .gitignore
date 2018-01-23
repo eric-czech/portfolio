@@ -2,8 +2,11 @@
 *.rdx
 *.rdb
 *.RData
+*.DS_Store
 *.ipynb_checkpoints
 *.idea
 *.rda
+*.recommenders
+*.metadata
 .Rproj.user
 .Rhistory
