@@ -6,5 +6,7 @@
 *.ipynb_checkpoints
 *.idea
 *.rda
+*.recommenders
+*.metadata
 .Rproj.user
 .Rhistory
